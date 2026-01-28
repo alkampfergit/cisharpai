@@ -32,7 +32,7 @@ public sealed class OpenAiChatCompletionIntegrationTests
         var client = provider.GetRequiredService<IChatCompletionClient>();
 
         var request = new ChatCompletionRequest(
-            Messages: [new LlmMessage(LlmRole.User, "Reply with exactly: hello")],
+            Messages: [new LlmMessage(LlmRole.User, "Reply with exactly: hello followed by an haiku on something")],
             Model: "gpt-4.1-nano",
             Temperature: 0,
             MaxTokens: 20);
