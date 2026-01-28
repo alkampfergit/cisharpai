@@ -1,7 +1,9 @@
-namespace cisharpai.test;
+namespace cisharpai.integration.test;
 
 public static class DotEnv
 {
+    public const string OpenAiTestApiKey = "OPENAI_TEST_API_KEY";
+
     public static void Load()
     {
         var directory = new DirectoryInfo(Directory.GetCurrentDirectory());

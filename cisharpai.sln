@@ -15,6 +15,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "cisharpai.Anthropic", "src\
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "cisharpai.AzureOpenAi", "src\cisharpai.AzureOpenAi\cisharpai.AzureOpenAi.csproj", "{1936E29C-D837-4D1F-B971-EF01227B9DCC}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "cisharpai.integration.test", "src\cisharpai.integration.test\cisharpai.integration.test.csproj", "{B0B4D16C-7FD8-47A4-9FF0-D3A61EFA38E5}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -85,6 +87,18 @@ Global
 		{1936E29C-D837-4D1F-B971-EF01227B9DCC}.Release|x64.Build.0 = Release|Any CPU
 		{1936E29C-D837-4D1F-B971-EF01227B9DCC}.Release|x86.ActiveCfg = Release|Any CPU
 		{1936E29C-D837-4D1F-B971-EF01227B9DCC}.Release|x86.Build.0 = Release|Any CPU
+		{B0B4D16C-7FD8-47A4-9FF0-D3A61EFA38E5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B0B4D16C-7FD8-47A4-9FF0-D3A61EFA38E5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B0B4D16C-7FD8-47A4-9FF0-D3A61EFA38E5}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{B0B4D16C-7FD8-47A4-9FF0-D3A61EFA38E5}.Debug|x64.Build.0 = Debug|Any CPU
+		{B0B4D16C-7FD8-47A4-9FF0-D3A61EFA38E5}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{B0B4D16C-7FD8-47A4-9FF0-D3A61EFA38E5}.Debug|x86.Build.0 = Debug|Any CPU
+		{B0B4D16C-7FD8-47A4-9FF0-D3A61EFA38E5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B0B4D16C-7FD8-47A4-9FF0-D3A61EFA38E5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B0B4D16C-7FD8-47A4-9FF0-D3A61EFA38E5}.Release|x64.ActiveCfg = Release|Any CPU
+		{B0B4D16C-7FD8-47A4-9FF0-D3A61EFA38E5}.Release|x64.Build.0 = Release|Any CPU
+		{B0B4D16C-7FD8-47A4-9FF0-D3A61EFA38E5}.Release|x86.ActiveCfg = Release|Any CPU
+		{B0B4D16C-7FD8-47A4-9FF0-D3A61EFA38E5}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -95,5 +109,6 @@ Global
 		{35D3D956-FB23-4096-B265-CB9D7B7EC674} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{AD7444E7-3462-4E61-A09A-6BB97F44355E} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{1936E29C-D837-4D1F-B971-EF01227B9DCC} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{B0B4D16C-7FD8-47A4-9FF0-D3A61EFA38E5} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal
