@@ -25,6 +25,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Cisharpai\Cisharpai.csproj" />
     <ProjectReference Include="..\Cisharpai.OpenAi\Cisharpai.OpenAi.csproj" />
+    <ProjectReference Include="..\Cisharpai.Anthropic\Cisharpai.Anthropic.csproj" />
   </ItemGroup>
 
 </Project>

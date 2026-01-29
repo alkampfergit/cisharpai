@@ -3,6 +3,7 @@ namespace Cisharpai.Integration.Tests;
 public static class DotEnv
 {
     public const string OpenAiTestApiKey = "OPENAI_TEST_API_KEY";
+    public const string AnthropicTestApiKey = "ANTHROPIC_TEST_API_KEY";
 
     public static void Load()
     {

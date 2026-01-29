@@ -28,3 +28,5 @@ Each supported provider has its own project providing concrete implementations o
 ### Testing
 *   **`src/Cisharpai.Tests/`**: Unit tests.
 *   **`src/Cisharpai.Integration.Tests/`**: Integration tests verifying connection to real APIs.
+    *   `OpenAi/OpenAiChatCompletionIntegrationTests.cs`: Tests OpenAI models (gpt-4.1-nano, gpt-5-nano).
+    *   `Anthropic/AnthropicChatCompletionIntegrationTests.cs`: Tests Anthropic models (claude-opus-4-5, claude-sonnet-4-5, claude-haiku-4-5).
