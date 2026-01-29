@@ -11,8 +11,6 @@ public sealed class OpenAiResponsesApiRequest
     [JsonPropertyName("max_output_tokens")]
     public int? MaxOutputTokens { get; set; }
 
-    public double? Temperature { get; set; }
-
     public OpenAiReasoningOption? Reasoning { get; set; }
 
     public OpenAiTextOption? Text { get; set; }

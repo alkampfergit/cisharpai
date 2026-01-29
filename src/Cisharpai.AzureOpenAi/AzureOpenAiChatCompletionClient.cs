@@ -20,31 +20,52 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient
         ChatCompletionRequest request,
         CancellationToken cancellationToken = default)
     {
-        var providerRequest = new AzureOpenAiChatRequest
+        try
         {
-            Temperature = request.Temperature,
-            MaxTokens = request.MaxTokens,
-            Messages = request.Messages
-                .Select(m => new AzureOpenAiChatMessage
-                {
-                    Role = MapRole(m.Role),
-                    Content = m.Content
-                })
-                .ToList()
-        };
+            var providerRequest = new AzureOpenAiChatRequest
+            {
+                Temperature = request.Temperature,
+                MaxTokens = request.MaxTokens,
+                Messages = request.Messages
+                    .Select(m => new AzureOpenAiChatMessage
+                    {
+                        Role = MapRole(m.Role),
+                        Content = m.Content
+                    })
+                    .ToList()
+            };
 
-        var uri = $"openai/deployments/{_options.DeploymentName}/chat/completions?api-version={_options.ApiVersion}";
+            var uri = $"openai/deployments/{_options.DeploymentName}/chat/completions?api-version={_options.ApiVersion}";
 
-        var raw = await _client.PostAsync<AzureOpenAiChatRequest, AzureOpenAiChatResponse>(
-            uri,
-            providerRequest,
-            cancellationToken);
+            string? rawJson = null;
+            AzureOpenAiChatResponse raw;
 
-        return new ChatCompletionResponse(
-            Content: raw.Choices.FirstOrDefault()?.Message.Content ?? string.Empty,
-            Model: raw.Model,
-            PromptTokens: raw.Usage.PromptTokens,
-            CompletionTokens: raw.Usage.CompletionTokens);
+            if (request.IncludeRawResponse)
+            {
+                (raw, rawJson) = await _client.PostWithRawAsync<AzureOpenAiChatRequest, AzureOpenAiChatResponse>(
+                    uri, providerRequest, cancellationToken);
+            }
+            else
+            {
+                raw = await _client.PostAsync<AzureOpenAiChatRequest, AzureOpenAiChatResponse>(
+                    uri, providerRequest, cancellationToken);
+            }
+
+            return new ChatCompletionResponse(
+                Content: raw.Choices.FirstOrDefault()?.Message.Content ?? string.Empty,
+                Model: raw.Model,
+                PromptTokens: raw.Usage.PromptTokens,
+                CompletionTokens: raw.Usage.CompletionTokens,
+                RawResponseJson: rawJson);
+        }
+        catch (LlmHttpRequestException ex)
+        {
+            return ChatCompletionResponse.Error(ex.Message, ex.ResponseBody);
+        }
+        catch (Exception ex)
+        {
+            return ChatCompletionResponse.Error(ex.Message);
+        }
     }
 
     private static string MapRole(LlmRole role) => role switch

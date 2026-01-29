@@ -1,0 +1,75 @@
+using System.Net;
+using Cisharpai.Models;
+using Cisharpai.AzureOpenAi;
+
+namespace Cisharpai.Tests.AzureOpenAi;
+
+public sealed class AzureOpenAiChatCompletionClientTests
+{
+    [Test]
+    public async Task GetChatCompletionAsync_MapsResponseToSharedModel()
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(AzureResponseJson, System.Text.Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://myresource.openai.azure.com/") };
+        var options = new AzureOpenAiClientOptions { DeploymentName = "gpt-4", ApiVersion = "2024-02-01" };
+        var client = new AzureOpenAiChatCompletionClient(httpClient, options);
+
+        var response = await client.GetChatCompletionAsync(new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "Hello")],
+            Model: "gpt-4"));
+
+        Assert.That(response.Content, Is.EqualTo("Hello there!"));
+        Assert.That(response.Model, Is.EqualTo("gpt-4"));
+        Assert.That(response.PromptTokens, Is.EqualTo(10));
+        Assert.That(response.CompletionTokens, Is.EqualTo(20));
+        Assert.That(response.IsSuccess, Is.True);
+        Assert.That(response.ErrorMessage, Is.Null);
+    }
+
+    [Test]
+    public async Task GetChatCompletionAsync_HttpError_ReturnsErrorResponse()
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError)
+            {
+                Content = new StringContent("""{"error":{"message":"Internal error"}}""",
+                    System.Text.Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://myresource.openai.azure.com/") };
+        var options = new AzureOpenAiClientOptions { DeploymentName = "gpt-4", ApiVersion = "2024-02-01" };
+        var client = new AzureOpenAiChatCompletionClient(httpClient, options);
+
+        var response = await client.GetChatCompletionAsync(new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "Hello")],
+            Model: "gpt-4"));
+
+        Assert.That(response.IsSuccess, Is.False);
+        Assert.That(response.ErrorMessage, Does.Contain("500"));
+        Assert.That(response.Content, Is.EqualTo(string.Empty));
+        Assert.That(response.Model, Is.EqualTo(string.Empty));
+    }
+
+    private const string AzureResponseJson = """
+        {
+            "model": "gpt-4",
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": "Hello there!"
+                    }
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 10,
+                "completion_tokens": 20
+            }
+        }
+        """;
+}

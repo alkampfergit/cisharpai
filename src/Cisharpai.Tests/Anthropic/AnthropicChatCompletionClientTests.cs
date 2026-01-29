@@ -63,6 +63,71 @@ public sealed class AnthropicChatCompletionClientTests
         Assert.That(response.Model, Is.EqualTo("claude-sonnet-4-20250514"));
         Assert.That(response.PromptTokens, Is.EqualTo(15));
         Assert.That(response.CompletionTokens, Is.EqualTo(25));
+        Assert.That(response.IsSuccess, Is.True);
+        Assert.That(response.ErrorMessage, Is.Null);
+    }
+
+    [Test]
+    public async Task GetChatCompletionAsync_IncludeRawResponse_ReturnsRawJson()
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(AnthropicResponseJson, System.Text.Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
+        var client = new AnthropicChatCompletionClient(httpClient);
+
+        var response = await client.GetChatCompletionAsync(new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "Hello")],
+            Model: "claude-sonnet-4-20250514",
+            IncludeRawResponse: true));
+
+        Assert.That(response.RawResponseJson, Is.Not.Null);
+        Assert.That(response.RawResponseJson, Does.Contain("claude-sonnet-4-20250514"));
+    }
+
+    [Test]
+    public async Task GetChatCompletionAsync_WithoutIncludeRawResponse_RawJsonIsNull()
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(AnthropicResponseJson, System.Text.Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
+        var client = new AnthropicChatCompletionClient(httpClient);
+
+        var response = await client.GetChatCompletionAsync(new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "Hello")],
+            Model: "claude-sonnet-4-20250514"));
+
+        Assert.That(response.RawResponseJson, Is.Null);
+    }
+
+    [Test]
+    public async Task GetChatCompletionAsync_HttpError_ReturnsErrorResponse()
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError)
+            {
+                Content = new StringContent("""{"error":{"message":"Internal error"}}""",
+                    System.Text.Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
+        var client = new AnthropicChatCompletionClient(httpClient);
+
+        var response = await client.GetChatCompletionAsync(new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "Hello")],
+            Model: "claude-sonnet-4-20250514"));
+
+        Assert.That(response.IsSuccess, Is.False);
+        Assert.That(response.ErrorMessage, Does.Contain("500"));
+        Assert.That(response.Content, Is.EqualTo(string.Empty));
+        Assert.That(response.Model, Is.EqualTo(string.Empty));
     }
 
     private const string AnthropicResponseJson = """

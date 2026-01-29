@@ -1,3 +1,4 @@
+using Cisharpai;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Cisharpai.Anthropic;
@@ -20,7 +21,7 @@ public static class AnthropicServiceCollectionExtensions
             })
             .AddHttpMessageHandler<AnthropicAuthenticationHandler>();
 
-        builder.AddStandardResilienceHandler();
+        builder.AddCisharpaiResilienceHandler();
 
         services.AddSingleton<IChatCompletionClient>(sp =>
             sp.GetRequiredService<AnthropicChatCompletionClient>());

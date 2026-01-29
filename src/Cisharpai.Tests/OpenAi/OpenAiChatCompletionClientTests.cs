@@ -65,6 +65,8 @@ public sealed class OpenAiChatCompletionClientTests
         Assert.That(response.Model, Is.EqualTo("gpt-4-0613"));
         Assert.That(response.PromptTokens, Is.EqualTo(10));
         Assert.That(response.CompletionTokens, Is.EqualTo(20));
+        Assert.That(response.IsSuccess, Is.True);
+        Assert.That(response.ErrorMessage, Is.Null);
     }
 
     [Test]
@@ -308,6 +310,157 @@ public sealed class OpenAiChatCompletionClientTests
         Assert.That(response.CompletionTokens, Is.EqualTo(20));
     }
 
+    [Test]
+    public async Task GetChatCompletionAsync_IncludeRawResponse_ReturnsRawJson()
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(OpenAiResponseJson, System.Text.Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.openai.com/v1/") };
+        var client = new OpenAiChatCompletionClient(httpClient, new OpenAiClientOptions());
+
+        var response = await client.GetChatCompletionAsync(new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "Hi")],
+            Model: "gpt-4",
+            IncludeRawResponse: true));
+
+        Assert.That(response.RawResponseJson, Is.Not.Null);
+        Assert.That(response.RawResponseJson, Does.Contain("gpt-4-0613"));
+    }
+
+    [Test]
+    public async Task GetChatCompletionAsync_WithoutIncludeRawResponse_RawJsonIsNull()
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(OpenAiResponseJson, System.Text.Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.openai.com/v1/") };
+        var client = new OpenAiChatCompletionClient(httpClient, new OpenAiClientOptions());
+
+        var response = await client.GetChatCompletionAsync(new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "Hi")],
+            Model: "gpt-4"));
+
+        Assert.That(response.RawResponseJson, Is.Null);
+    }
+
+    [Test]
+    public async Task GetChatCompletionAsync_Gpt5Model_IncludeRawResponse_ReturnsRawJson()
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(ResponsesApiResponseJson, System.Text.Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.openai.com/v1/") };
+        var client = new OpenAiChatCompletionClient(httpClient, new OpenAiClientOptions());
+
+        var response = await client.GetChatCompletionAsync(new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "Hi")],
+            Model: "gpt-5",
+            IncludeRawResponse: true));
+
+        Assert.That(response.RawResponseJson, Is.Not.Null);
+        Assert.That(response.RawResponseJson, Does.Contain("resp_abc123"));
+        Assert.That(response.RawResponseJson, Does.Contain("output_text"));
+    }
+
+    [Test]
+    public async Task GetChatCompletionAsync_Gpt5Model_CompletedResponse_HasCompletedStatus()
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(ResponsesApiResponseJson, System.Text.Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.openai.com/v1/") };
+        var client = new OpenAiChatCompletionClient(httpClient, new OpenAiClientOptions());
+
+        var response = await client.GetChatCompletionAsync(new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "Hi")],
+            Model: "gpt-5"));
+
+        Assert.That(response.Status, Is.EqualTo("completed"));
+        Assert.That(response.IncompleteReason, Is.Null);
+        Assert.That(response.IsSuccess, Is.True);
+        Assert.That(response.ErrorMessage, Is.Null);
+    }
+
+    [Test]
+    public async Task GetChatCompletionAsync_Gpt5Model_IncompleteResponse_HasIncompleteStatusAndReason()
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(IncompleteResponsesApiResponseJson, System.Text.Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.openai.com/v1/") };
+        var client = new OpenAiChatCompletionClient(httpClient, new OpenAiClientOptions());
+
+        var response = await client.GetChatCompletionAsync(new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "Hi")],
+            Model: "gpt-5"));
+
+        Assert.That(response.Status, Is.EqualTo("incomplete"));
+        Assert.That(response.IncompleteReason, Is.EqualTo("max_output_tokens"));
+        Assert.That(response.Content, Is.EqualTo(string.Empty));
+        Assert.That(response.PromptTokens, Is.EqualTo(18));
+        Assert.That(response.CompletionTokens, Is.EqualTo(0));
+        Assert.That(response.IsSuccess, Is.False);
+        Assert.That(response.ErrorMessage, Is.EqualTo("max_output_tokens"));
+    }
+
+    [Test]
+    public async Task GetChatCompletionAsync_Gpt5Model_IncompleteResponse_IncludeRawResponse_ReturnsRawJson()
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(IncompleteResponsesApiResponseJson, System.Text.Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.openai.com/v1/") };
+        var client = new OpenAiChatCompletionClient(httpClient, new OpenAiClientOptions());
+
+        var response = await client.GetChatCompletionAsync(new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "Hi")],
+            Model: "gpt-5",
+            IncludeRawResponse: true));
+
+        Assert.That(response.RawResponseJson, Is.Not.Null);
+        Assert.That(response.RawResponseJson, Does.Contain("max_output_tokens"));
+        Assert.That(response.Status, Is.EqualTo("incomplete"));
+    }
+
+    [Test]
+    public async Task GetChatCompletionAsync_LegacyModel_StatusIsNull()
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(OpenAiResponseJson, System.Text.Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.openai.com/v1/") };
+        var client = new OpenAiChatCompletionClient(httpClient, new OpenAiClientOptions());
+
+        var response = await client.GetChatCompletionAsync(new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "Hi")],
+            Model: "gpt-4"));
+
+        Assert.That(response.Status, Is.Null);
+        Assert.That(response.IncompleteReason, Is.Null);
+    }
+
     private const string OpenAiResponseJson = """
         {
             "model": "gpt-4-0613",
@@ -330,6 +483,7 @@ public sealed class OpenAiChatCompletionClientTests
         {
             "id": "resp_abc123",
             "model": "gpt-5-20250801",
+            "status": "completed",
             "output": [
                 {
                     "type": "message",
@@ -345,6 +499,117 @@ public sealed class OpenAiChatCompletionClientTests
             "usage": {
                 "input_tokens": 10,
                 "output_tokens": 20
+            }
+        }
+        """;
+
+    [Test]
+    public async Task GetChatCompletionAsync_HttpError_ReturnsErrorResponse()
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError)
+            {
+                Content = new StringContent("""{"error":{"message":"Server error"}}""",
+                    System.Text.Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.openai.com/v1/") };
+        var client = new OpenAiChatCompletionClient(httpClient, new OpenAiClientOptions());
+
+        var response = await client.GetChatCompletionAsync(new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "Hi")],
+            Model: "gpt-4"));
+
+        Assert.That(response.IsSuccess, Is.False);
+        Assert.That(response.ErrorMessage, Does.Contain("500"));
+        Assert.That(response.Content, Is.EqualTo(string.Empty));
+        Assert.That(response.Model, Is.EqualTo(string.Empty));
+    }
+
+    [Test]
+    public async Task GetChatCompletionAsync_HttpError_IncludesResponseBodyInRawJson()
+    {
+        const string errorBody = """{"error":{"message":"Unauthorized"}}""";
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.Unauthorized)
+            {
+                Content = new StringContent(errorBody, System.Text.Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.openai.com/v1/") };
+        var client = new OpenAiChatCompletionClient(httpClient, new OpenAiClientOptions());
+
+        var response = await client.GetChatCompletionAsync(new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "Hi")],
+            Model: "gpt-4"));
+
+        Assert.That(response.IsSuccess, Is.False);
+        Assert.That(response.RawResponseJson, Is.EqualTo(errorBody));
+    }
+
+    [Test]
+    public async Task GetChatCompletionAsync_Gpt5Model_FailedStatus_ReturnsErrorResponse()
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(FailedResponsesApiResponseJson, System.Text.Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.openai.com/v1/") };
+        var client = new OpenAiChatCompletionClient(httpClient, new OpenAiClientOptions());
+
+        var response = await client.GetChatCompletionAsync(new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "Hi")],
+            Model: "gpt-5"));
+
+        Assert.That(response.IsSuccess, Is.False);
+        Assert.That(response.Status, Is.EqualTo("failed"));
+        Assert.That(response.ErrorMessage, Is.EqualTo("Response status: failed"));
+    }
+
+    private const string FailedResponsesApiResponseJson = """
+        {
+            "id": "resp_failed_001",
+            "object": "response",
+            "created_at": 1769687600,
+            "status": "failed",
+            "model": "gpt-5-20250801",
+            "output": [],
+            "usage": {
+                "input_tokens": 10,
+                "output_tokens": 0
+            }
+        }
+        """;
+
+    private const string IncompleteResponsesApiResponseJson = """
+        {
+            "id": "resp_016da2d93d1a29cf00697b4a2ffcf48197b3bd133bf3f4b0fd",
+            "object": "response",
+            "created_at": 1769687600,
+            "status": "incomplete",
+            "incomplete_details": {
+                "reason": "max_output_tokens"
+            },
+            "model": "gpt-5-nano-2025-08-07",
+            "output": [
+                {
+                    "id": "rs_016da2d93d1a29cf00697b4a3068a08197a1f8b5f1da3e94d7",
+                    "type": "reasoning",
+                    "summary": []
+                }
+            ],
+            "usage": {
+                "input_tokens": 18,
+                "input_tokens_details": {
+                    "cached_tokens": 0
+                },
+                "output_tokens": 0,
+                "output_tokens_details": {
+                    "reasoning_tokens": 0
+                },
+                "total_tokens": 18
             }
         }
         """;

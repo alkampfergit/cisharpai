@@ -1,4 +1,5 @@
 using Azure.Core;
+using Cisharpai;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Cisharpai.AzureOpenAi;
@@ -26,7 +27,7 @@ public static class AzureOpenAiServiceCollectionExtensions
             })
             .AddHttpMessageHandler<AzureOpenAiAuthenticationHandler>();
 
-        builder.AddStandardResilienceHandler();
+        builder.AddCisharpaiResilienceHandler();
 
         services.AddSingleton<IChatCompletionClient>(sp =>
             sp.GetRequiredService<AzureOpenAiChatCompletionClient>());

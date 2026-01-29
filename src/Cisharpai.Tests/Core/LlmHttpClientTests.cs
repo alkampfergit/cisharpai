@@ -177,6 +177,42 @@ public sealed class LlmHttpClientTests
             await client.PostAsync<object, TestResponse>("api/test", new { }));
     }
 
+    [Test]
+    public async Task PostWithRawAsync_ReturnsDeserializedResultAndRawJson()
+    {
+        const string json = "{\"name\":\"result\",\"count\":5}";
+        var handler = new MockHttpMessageHandler((_, _) =>
+        {
+            var response = new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json")
+            };
+            return Task.FromResult(response);
+        });
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://test.com") };
+        var client = new LlmHttpClient(httpClient);
+
+        var (result, rawJson) = await client.PostWithRawAsync<object, TestResponse>("api/test", new { });
+
+        Assert.That(result.Name, Is.EqualTo("result"));
+        Assert.That(result.Count, Is.EqualTo(5));
+        Assert.That(rawJson, Is.EqualTo(json));
+    }
+
+    [Test]
+    public void PostWithRawAsync_ThrowsLlmHttpRequestExceptionOnNonSuccessStatusCode()
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError)));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://test.com") };
+        var client = new LlmHttpClient(httpClient);
+
+        Assert.ThrowsAsync<LlmHttpRequestException>(async () =>
+            await client.PostWithRawAsync<object, JsonElement>("api/test", new { }));
+    }
+
     private sealed class TestResponse
     {
         public string Name { get; set; } = string.Empty;

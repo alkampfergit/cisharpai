@@ -5,6 +5,9 @@ namespace Cisharpai.OpenAi;
 
 public sealed class OpenAiChatCompletionClient : IChatCompletionClient
 {
+    private const string ChatCompletionsEndpoint = "chat/completions";
+    private const string ResponsesEndpoint = "responses";
+
     private readonly LlmHttpClient _client;
     private readonly OpenAiClientOptions _options;
 
@@ -18,14 +21,25 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient
         ChatCompletionRequest request,
         CancellationToken cancellationToken = default)
     {
-        var modelType = DetectModelType(request.Model);
-
-        return modelType switch
+        try
         {
-            OpenAiModelType.Gpt5 => await SendResponsesApiAsync(request, cancellationToken),
-            OpenAiModelType.Reasoning => await SendReasoningChatAsync(request, cancellationToken),
-            _ => await SendLegacyChatAsync(request, cancellationToken)
-        };
+            var modelType = DetectModelType(request.Model);
+
+            return modelType switch
+            {
+                OpenAiModelType.Gpt5 => await SendResponsesApiAsync(request, cancellationToken),
+                OpenAiModelType.Reasoning => await SendReasoningChatAsync(request, cancellationToken),
+                _ => await SendLegacyChatAsync(request, cancellationToken)
+            };
+        }
+        catch (LlmHttpRequestException ex)
+        {
+            return ChatCompletionResponse.Error(ex.Message, ex.ResponseBody);
+        }
+        catch (Exception ex)
+        {
+            return ChatCompletionResponse.Error(ex.Message);
+        }
     }
 
     private async Task<ChatCompletionResponse> SendLegacyChatAsync(
@@ -40,10 +54,16 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient
             Messages = MapMessages(request.Messages)
         };
 
-        var raw = await _client.PostAsync<OpenAiChatRequest, OpenAiChatResponse>(
-            "chat/completions", providerRequest, cancellationToken);
+        if (request.IncludeRawResponse)
+        {
+            var (raw, rawJson) = await _client.PostWithRawAsync<OpenAiChatRequest, OpenAiChatResponse>(
+                ChatCompletionsEndpoint, providerRequest, cancellationToken);
+            return MapChatResponse(raw, rawJson);
+        }
 
-        return MapChatResponse(raw);
+        return MapChatResponse(
+            await _client.PostAsync<OpenAiChatRequest, OpenAiChatResponse>(
+                ChatCompletionsEndpoint, providerRequest, cancellationToken));
     }
 
     private async Task<ChatCompletionResponse> SendReasoningChatAsync(
@@ -57,10 +77,16 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient
             Messages = MapMessages(request.Messages)
         };
 
-        var raw = await _client.PostAsync<OpenAiReasoningRequest, OpenAiChatResponse>(
-            "chat/completions", providerRequest, cancellationToken);
+        if (request.IncludeRawResponse)
+        {
+            var (raw, rawJson) = await _client.PostWithRawAsync<OpenAiReasoningRequest, OpenAiChatResponse>(
+                ChatCompletionsEndpoint, providerRequest, cancellationToken);
+            return MapChatResponse(raw, rawJson);
+        }
 
-        return MapChatResponse(raw);
+        return MapChatResponse(
+            await _client.PostAsync<OpenAiReasoningRequest, OpenAiChatResponse>(
+                ChatCompletionsEndpoint, providerRequest, cancellationToken));
     }
 
     private async Task<ChatCompletionResponse> SendResponsesApiAsync(
@@ -80,8 +106,19 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient
                 : null
         };
 
-        var raw = await _client.PostAsync<OpenAiResponsesApiRequest, OpenAiResponsesApiResponse>(
-            "responses", providerRequest, cancellationToken);
+        string? rawJson = null;
+        OpenAiResponsesApiResponse raw;
+
+        if (request.IncludeRawResponse)
+        {
+            (raw, rawJson) = await _client.PostWithRawAsync<OpenAiResponsesApiRequest, OpenAiResponsesApiResponse>(
+                ResponsesEndpoint, providerRequest, cancellationToken);
+        }
+        else
+        {
+            raw = await _client.PostAsync<OpenAiResponsesApiRequest, OpenAiResponsesApiResponse>(
+                ResponsesEndpoint, providerRequest, cancellationToken);
+        }
 
         var content = raw.Output
             .Where(o => o.Type == "message")
@@ -90,20 +127,31 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient
             .Select(c => c.Text)
             .FirstOrDefault() ?? string.Empty;
 
+        var isError = raw.Status is "incomplete" or "failed";
+        var errorMessage = isError
+            ? (raw.IncompleteDetails?.Reason ?? $"Response status: {raw.Status}")
+            : null;
+
         return new ChatCompletionResponse(
             Content: content,
             Model: raw.Model,
             PromptTokens: raw.Usage.InputTokens,
-            CompletionTokens: raw.Usage.OutputTokens);
+            CompletionTokens: raw.Usage.OutputTokens,
+            RawResponseJson: rawJson,
+            Status: raw.Status,
+            IncompleteReason: raw.IncompleteDetails?.Reason,
+            IsSuccess: !isError,
+            ErrorMessage: errorMessage);
     }
 
-    private static ChatCompletionResponse MapChatResponse(OpenAiChatResponse raw)
+    private static ChatCompletionResponse MapChatResponse(OpenAiChatResponse raw, string? rawJson = null)
     {
         return new ChatCompletionResponse(
             Content: raw.Choices.FirstOrDefault()?.Message.Content ?? string.Empty,
             Model: raw.Model,
             PromptTokens: raw.Usage.PromptTokens,
-            CompletionTokens: raw.Usage.CompletionTokens);
+            CompletionTokens: raw.Usage.CompletionTokens,
+            RawResponseJson: rawJson);
     }
 
     private static List<OpenAiChatMessage> MapMessages(IReadOnlyList<LlmMessage> messages)
