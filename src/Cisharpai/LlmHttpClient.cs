@@ -36,7 +36,22 @@ public sealed class LlmHttpClient
 
         using var response = await _httpClient.SendAsync(request, cancellationToken)
             .ConfigureAwait(false);
-        response.EnsureSuccessStatusCode();
+
+        if (!response.IsSuccessStatusCode)
+        {
+            string? responseBody = null;
+            try
+            {
+                responseBody = await response.Content.ReadAsStringAsync(cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            catch
+            {
+                // If we can't read the body, we still want to throw with whatever we have.
+            }
+
+            throw new LlmHttpRequestException(response.StatusCode, responseBody);
+        }
 
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken)
             .ConfigureAwait(false);

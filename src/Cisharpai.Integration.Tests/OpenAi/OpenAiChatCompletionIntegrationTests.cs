@@ -13,8 +13,9 @@ public sealed class OpenAiChatCompletionIntegrationTests
         DotEnv.Load();
     }
 
-    [Test]
-    public async Task GetChatCompletionAsync_ReturnsValidResponse()
+    [TestCase("gpt-4.1-nano")]
+    [TestCase("gpt-5-nano")]
+    public async Task GetChatCompletionAsync_ReturnsValidResponse(string model)
     {
         var apiKey = Environment.GetEnvironmentVariable(DotEnv.OpenAiTestApiKey);
         Assert.That(apiKey, Is.Not.Null.And.Not.Empty,
@@ -33,7 +34,7 @@ public sealed class OpenAiChatCompletionIntegrationTests
 
         var request = new ChatCompletionRequest(
             Messages: [new LlmMessage(LlmRole.User, "Reply with exactly: hello followed by an haiku on something")],
-            Model: "gpt-4.1-nano",
+            Model: model,
             Temperature: 0,
             MaxTokens: 20);
 

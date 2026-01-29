@@ -7,4 +7,8 @@ public sealed class OpenAiClientOptions
     public string ApiKey { get; set; } = string.Empty;
 
     public string? Organization { get; set; }
+
+    public string? ReasoningEffort { get; set; }
+
+    public string? TextVerbosity { get; set; }
 }

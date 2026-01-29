@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet test:*)",
+      "Bash(findstr:*)",
+      "Bash(Select-String -Pattern \"Passed|Failed|Total\")"
+    ]
+  }
+}
