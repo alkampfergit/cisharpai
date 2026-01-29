@@ -19,13 +19,11 @@ public static class AzureOpenAiServiceCollectionExtensions
         if (credential is not null)
             services.AddSingleton(credential);
 
-        services.AddTransient<AzureOpenAiAuthenticationHandler>();
-
         var builder = services.AddHttpClient<AzureOpenAiChatCompletionClient>(client =>
             {
                 client.BaseAddress = new Uri(options.Endpoint);
             })
-            .AddHttpMessageHandler<AzureOpenAiAuthenticationHandler>();
+            .AddHttpMessageHandler(() => new AzureOpenAiAuthenticationHandler(options, credential));
 
         builder.AddCisharpaiResilienceHandler();
 

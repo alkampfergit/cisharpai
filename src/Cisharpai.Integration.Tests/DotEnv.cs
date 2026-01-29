@@ -4,6 +4,9 @@ public static class DotEnv
 {
     public const string OpenAiTestApiKey = "OPENAI_TEST_API_KEY";
     public const string AnthropicTestApiKey = "ANTHROPIC_TEST_API_KEY";
+    public const string AzureOpenAiTestEndpoint = "AZURE_OPENAI_TEST_ENDPOINT";
+    public const string AzureOpenAiTestApiKey = "AZURE_OPENAI_TEST_API_KEY";
+    public const string AzureOpenAiTestDeployments = "AZURE_OPENAI_TEST_DEPLOYMENTS";
 
     public static void Load()
     {

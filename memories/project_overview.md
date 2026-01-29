@@ -20,8 +20,8 @@ Each supported provider has its own project providing concrete implementations o
 
 *   **`src/Cisharpai.OpenAi/`**: Connector for standard OpenAI API. Supports legacy Chat Completions API (GPT-4, etc.), reasoning models (o1/o3/o4), and the Responses API (GPT-5) with status/incomplete handling.
     *   `OpenAiChatCompletionClient.cs`: Implements `IChatCompletionClient`. Routes to the correct endpoint/format based on model detection.
-*   **`src/Cisharpai.AzureOpenAi/`**: Connector for Azure OpenAI Service.
-    *   `AzureOpenAiChatCompletionClient.cs`: Implements `IChatCompletionClient` with Azure-specific auth/routing.
+*   **`src/Cisharpai.AzureOpenAi/`**: Connector for Azure OpenAI Service. Supports both legacy models and reasoning/GPT-5 models (uses `max_completion_tokens` instead of `max_tokens`). Supports API key and Azure AD (TokenCredential) authentication.
+    *   `AzureOpenAiChatCompletionClient.cs`: Implements `IChatCompletionClient` with Azure-specific auth/routing. Detects reasoning models (o1/o3/o4/gpt-5) and uses appropriate request format.
 *   **`src/Cisharpai.Anthropic/`**: Connector for Anthropic (Claude) API.
     *   `AnthropicChatCompletionClient.cs`: Implements `IChatCompletionClient`.
 
@@ -30,3 +30,4 @@ Each supported provider has its own project providing concrete implementations o
 *   **`src/Cisharpai.Integration.Tests/`**: Integration tests verifying connection to real APIs.
     *   `OpenAi/OpenAiChatCompletionIntegrationTests.cs`: Tests OpenAI models (gpt-4.1-nano, gpt-5-nano).
     *   `Anthropic/AnthropicChatCompletionIntegrationTests.cs`: Tests Anthropic models (claude-opus-4-5, claude-sonnet-4-5, claude-haiku-4-5).
+    *   `AzureOpenAi/AzureOpenAiChatCompletionIntegrationTests.cs`: Tests Azure OpenAI deployments (from `AZURE_OPENAI_TEST_DEPLOYMENTS` env var, comma-separated).

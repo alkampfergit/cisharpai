@@ -22,18 +22,28 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient
     {
         try
         {
-            var providerRequest = new AzureOpenAiChatRequest
-            {
-                Temperature = request.Temperature,
-                MaxTokens = request.MaxTokens,
-                Messages = request.Messages
-                    .Select(m => new AzureOpenAiChatMessage
-                    {
-                        Role = MapRole(m.Role),
-                        Content = m.Content
-                    })
-                    .ToList()
-            };
+            var messages = request.Messages
+                .Select(m => new AzureOpenAiChatMessage
+                {
+                    Role = MapRole(m.Role),
+                    Content = m.Content
+                })
+                .ToList();
+
+            var isReasoning = IsReasoningModel(request.Model);
+
+            object providerRequest = isReasoning
+                ? new AzureOpenAiReasoningChatRequest
+                {
+                    Messages = messages,
+                    MaxCompletionTokens = request.MaxTokens
+                }
+                : new AzureOpenAiChatRequest
+                {
+                    Temperature = request.Temperature,
+                    MaxTokens = request.MaxTokens,
+                    Messages = messages
+                };
 
             var uri = $"openai/deployments/{_options.DeploymentName}/chat/completions?api-version={_options.ApiVersion}";
 
@@ -42,12 +52,12 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient
 
             if (request.IncludeRawResponse)
             {
-                (raw, rawJson) = await _client.PostWithRawAsync<AzureOpenAiChatRequest, AzureOpenAiChatResponse>(
+                (raw, rawJson) = await _client.PostWithRawAsync<object, AzureOpenAiChatResponse>(
                     uri, providerRequest, cancellationToken);
             }
             else
             {
-                raw = await _client.PostAsync<AzureOpenAiChatRequest, AzureOpenAiChatResponse>(
+                raw = await _client.PostAsync<object, AzureOpenAiChatResponse>(
                     uri, providerRequest, cancellationToken);
             }
 
@@ -75,4 +85,10 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient
         LlmRole.Assistant => "assistant",
         _ => throw new ArgumentOutOfRangeException(nameof(role), role, null)
     };
+
+    private static bool IsReasoningModel(string model) =>
+        model.StartsWith("o1", StringComparison.OrdinalIgnoreCase) ||
+        model.StartsWith("o3", StringComparison.OrdinalIgnoreCase) ||
+        model.StartsWith("o4", StringComparison.OrdinalIgnoreCase) ||
+        model.StartsWith("gpt-5", StringComparison.OrdinalIgnoreCase);
 }

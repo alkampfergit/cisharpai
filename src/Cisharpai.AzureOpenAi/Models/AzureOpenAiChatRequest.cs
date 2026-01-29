@@ -18,3 +18,11 @@ public sealed class AzureOpenAiChatRequest
     [JsonPropertyName("max_tokens")]
     public int? MaxTokens { get; set; }
 }
+
+public sealed class AzureOpenAiReasoningChatRequest
+{
+    public List<AzureOpenAiChatMessage> Messages { get; set; } = [];
+
+    [JsonPropertyName("max_completion_tokens")]
+    public int? MaxCompletionTokens { get; set; }
+}

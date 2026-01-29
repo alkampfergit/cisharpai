@@ -18,6 +18,11 @@ public static class HttpClientBuilderExtensions
                 UseJitter = true
             };
 
+            resilienceOptions.AttemptTimeout = new HttpTimeoutStrategyOptions
+            {
+                Timeout = TimeSpan.FromSeconds(60)
+            };
+
             resilienceOptions.TotalRequestTimeout = new HttpTimeoutStrategyOptions
             {
                 Timeout = TimeSpan.FromSeconds(90)
@@ -25,7 +30,7 @@ public static class HttpClientBuilderExtensions
 
             resilienceOptions.CircuitBreaker = new HttpCircuitBreakerStrategyOptions
             {
-                SamplingDuration = TimeSpan.FromSeconds(30),
+                SamplingDuration = TimeSpan.FromSeconds(120),
                 FailureRatio = 0.2,
                 MinimumThroughput = 10,
                 BreakDuration = TimeSpan.FromSeconds(15)
