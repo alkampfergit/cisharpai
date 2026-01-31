@@ -4,7 +4,20 @@
       "Bash(dotnet test:*)",
       "Bash(findstr:*)",
       "Bash(Select-String -Pattern \"Passed|Failed|Total\")",
-      "Bash(dotnet build:*)"
+      "Bash(dotnet build:*)",
+      "Bash(bd list:*)",
+      "Bash(bd stats:*)",
+      "Bash(bd create:*)",
+      "Bash(bd dep add:*)",
+      "Bash(bd epic add-child:*)",
+      "Bash(bd update:*)",
+      "Bash(bd ready:*)",
+      "Bash(bd blocked:*)",
+      "Bash(bd sync:*)",
+      "Bash(bd show:*)",
+      "Bash(xargs -I {} sh -c 'echo \"\"=== {} ===\"\" && cat \"\"{}\"\"')",
+      "Bash(bd close:*)",
+      "Bash(git add:*)"
     ]
   }
 }

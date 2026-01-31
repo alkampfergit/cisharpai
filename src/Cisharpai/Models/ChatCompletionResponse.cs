@@ -6,6 +6,7 @@ public sealed record ChatCompletionResponse(
     int PromptTokens,
     int CompletionTokens,
     string? RawResponseJson = null,
+    string? RawRequestJson = null,
     string? Status = null,
     string? IncompleteReason = null,
     bool IsSuccess = true,

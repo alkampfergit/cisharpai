@@ -47,18 +47,19 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient
 
             var uri = $"openai/deployments/{_options.DeploymentName}/chat/completions?api-version={_options.ApiVersion}";
 
-            string? rawJson = null;
+            string? rawResponseJson = null;
+            string? rawRequestJson = null;
             AzureOpenAiChatResponse raw;
 
             if (request.IncludeRawResponse)
             {
-                (raw, rawJson) = await _client.PostWithRawAsync<object, AzureOpenAiChatResponse>(
-                    uri, providerRequest, cancellationToken);
+                (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<object, AzureOpenAiChatResponse>(
+                    uri, providerRequest, cancellationToken, request.ExtraParameters);
             }
             else
             {
                 raw = await _client.PostAsync<object, AzureOpenAiChatResponse>(
-                    uri, providerRequest, cancellationToken);
+                    uri, providerRequest, cancellationToken, request.ExtraParameters);
             }
 
             return new ChatCompletionResponse(
@@ -66,7 +67,8 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient
                 Model: raw.Model,
                 PromptTokens: raw.Usage.PromptTokens,
                 CompletionTokens: raw.Usage.CompletionTokens,
-                RawResponseJson: rawJson);
+                RawResponseJson: rawResponseJson,
+                RawRequestJson: rawRequestJson);
         }
         catch (LlmHttpRequestException ex)
         {

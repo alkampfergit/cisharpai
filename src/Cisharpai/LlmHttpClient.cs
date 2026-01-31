@@ -24,14 +24,14 @@ public sealed class LlmHttpClient
     public async Task<TResponse> PostAsync<TRequest, TResponse>(
         string uri,
         TRequest payload,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        JsonElement? extraParameters = null)
     {
+        var json = SerializeAndMerge(payload, extraParameters);
+
         using var request = new HttpRequestMessage(HttpMethod.Post, uri)
         {
-            Content = new StringContent(
-                JsonSerializer.Serialize(payload, _serializerOptions),
-                Encoding.UTF8,
-                "application/json")
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
         };
 
         using var response = await _httpClient.SendAsync(request, cancellationToken)
@@ -65,17 +65,17 @@ public sealed class LlmHttpClient
         return result;
     }
 
-    public async Task<(TResponse Result, string RawJson)> PostWithRawAsync<TRequest, TResponse>(
+    public async Task<(TResponse Result, string RawResponseJson, string RawRequestJson)> PostWithRawAsync<TRequest, TResponse>(
         string uri,
         TRequest payload,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        JsonElement? extraParameters = null)
     {
+        var requestJson = SerializeAndMerge(payload, extraParameters);
+
         using var request = new HttpRequestMessage(HttpMethod.Post, uri)
         {
-            Content = new StringContent(
-                JsonSerializer.Serialize(payload, _serializerOptions),
-                Encoding.UTF8,
-                "application/json")
+            Content = new StringContent(requestJson, Encoding.UTF8, "application/json")
         };
 
         using var response = await _httpClient.SendAsync(request, cancellationToken)
@@ -97,14 +97,26 @@ public sealed class LlmHttpClient
             throw new LlmHttpRequestException(response.StatusCode, responseBody);
         }
 
-        var rawJson = await response.Content.ReadAsStringAsync(cancellationToken)
+        var rawResponseJson = await response.Content.ReadAsStringAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        var result = JsonSerializer.Deserialize<TResponse>(rawJson, _serializerOptions);
+        var result = JsonSerializer.Deserialize<TResponse>(rawResponseJson, _serializerOptions);
 
         if (result is null)
             throw new InvalidOperationException("Response body was empty or invalid.");
 
-        return (result, rawJson);
+        return (result, rawResponseJson, requestJson);
+    }
+
+    private string SerializeAndMerge<TRequest>(TRequest payload, JsonElement? extraParameters)
+    {
+        var json = JsonSerializer.Serialize(payload, _serializerOptions);
+
+        if (extraParameters.HasValue && extraParameters.Value.ValueKind == JsonValueKind.Object)
+        {
+            json = JsonDeepMerge.Merge(json, extraParameters.Value);
+        }
+
+        return json;
     }
 }

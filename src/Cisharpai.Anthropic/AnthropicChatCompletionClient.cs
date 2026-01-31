@@ -37,18 +37,19 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient
                     .ToList()
             };
 
-            string? rawJson = null;
+            string? rawResponseJson = null;
+            string? rawRequestJson = null;
             AnthropicChatResponse raw;
 
             if (request.IncludeRawResponse)
             {
-                (raw, rawJson) = await _client.PostWithRawAsync<AnthropicChatRequest, AnthropicChatResponse>(
-                    "messages", providerRequest, cancellationToken);
+                (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<AnthropicChatRequest, AnthropicChatResponse>(
+                    "messages", providerRequest, cancellationToken, request.ExtraParameters);
             }
             else
             {
                 raw = await _client.PostAsync<AnthropicChatRequest, AnthropicChatResponse>(
-                    "messages", providerRequest, cancellationToken);
+                    "messages", providerRequest, cancellationToken, request.ExtraParameters);
             }
 
             var content = string.Join("", raw.Content
@@ -60,7 +61,8 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient
                 Model: raw.Model,
                 PromptTokens: raw.Usage.InputTokens,
                 CompletionTokens: raw.Usage.OutputTokens,
-                RawResponseJson: rawJson);
+                RawResponseJson: rawResponseJson,
+                RawRequestJson: rawRequestJson);
         }
         catch (LlmHttpRequestException ex)
         {

@@ -28,4 +28,6 @@ Project structure can be find here: [project_overview.md](../memories/project_ov
 
 @../memories/project_overview.md
 
-#
+## Beade integration
+
+If the prompt is related to beads tool you can find the documentation here: [beads-guide.md](../memories/beads-guide.md)

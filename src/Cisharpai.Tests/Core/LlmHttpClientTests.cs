@@ -193,11 +193,12 @@ public sealed class LlmHttpClientTests
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://test.com") };
         var client = new LlmHttpClient(httpClient);
 
-        var (result, rawJson) = await client.PostWithRawAsync<object, TestResponse>("api/test", new { });
+        var (result, rawResponseJson, rawRequestJson) = await client.PostWithRawAsync<object, TestResponse>("api/test", new { });
 
         Assert.That(result.Name, Is.EqualTo("result"));
         Assert.That(result.Count, Is.EqualTo(5));
-        Assert.That(rawJson, Is.EqualTo(json));
+        Assert.That(rawResponseJson, Is.EqualTo(json));
+        Assert.That(rawRequestJson, Is.Not.Null);
     }
 
     [Test]

@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace Cisharpai.Models;
 
 public sealed record ChatCompletionRequest(
@@ -5,4 +7,5 @@ public sealed record ChatCompletionRequest(
     string Model,
     double? Temperature = null,
     int? MaxTokens = null,
-    bool IncludeRawResponse = false);
+    bool IncludeRawResponse = false,
+    JsonElement? ExtraParameters = null);
