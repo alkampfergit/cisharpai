@@ -24,18 +24,15 @@ jobs:
         with:
           versionSpec: '6.x'
 
-      - name: Debug GitVersion
-        run: |
-          echo "=== Git branch info ==="
-          git branch -a
-          echo "=== Running GitVersion directly ==="
-          dotnet-gitversion /output json /config GitVersion.yml 2>&1 || true
-
       - name: Determine version
         id: gitversion
-        uses: gittools/actions/gitversion/execute@v3.2.1
-        with:
-          useConfigFile: true
+        run: |
+          OUTPUT=$(dotnet-gitversion /output json /config GitVersion.yml)
+          echo "$OUTPUT"
+          echo "semVer=$(echo "$OUTPUT" | jq -r '.SemVer')" >> $GITHUB_OUTPUT
+          echo "assemblySemVer=$(echo "$OUTPUT" | jq -r '.AssemblySemVer')" >> $GITHUB_OUTPUT
+          echo "assemblySemFileVer=$(echo "$OUTPUT" | jq -r '.AssemblySemFileVer')" >> $GITHUB_OUTPUT
+          echo "informationalVersion=$(echo "$OUTPUT" | jq -r '.InformationalVersion')" >> $GITHUB_OUTPUT
 
       - name: Setup .NET 8
         uses: actions/setup-dotnet@v4
