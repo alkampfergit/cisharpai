@@ -17,7 +17,15 @@
       "Bash(bd show:*)",
       "Bash(xargs -I {} sh -c 'echo \"\"=== {} ===\"\" && cat \"\"{}\"\"')",
       "Bash(bd close:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(ls:*)",
+      "Bash(dotnet sln:*)",
+      "Bash(dotnet add:*)",
+      "Bash(dotnet restore:*)",
+      "Bash(git -C /Users/gianmariaricci/develop/github/cisharpai status)",
+      "Bash(git -C /Users/gianmariaricci/develop/github/cisharpai diff --stat)",
+      "Bash(git -C /Users/gianmariaricci/develop/github/cisharpai log --oneline -5)",
+      "Bash(git -C /Users/gianmariaricci/develop/github/cisharpai add .beads/)"
     ]
   }
 }
