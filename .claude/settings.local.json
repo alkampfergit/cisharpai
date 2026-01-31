@@ -25,7 +25,15 @@
       "Bash(git -C /Users/gianmariaricci/develop/github/cisharpai status)",
       "Bash(git -C /Users/gianmariaricci/develop/github/cisharpai diff --stat)",
       "Bash(git -C /Users/gianmariaricci/develop/github/cisharpai log --oneline -5)",
-      "Bash(git -C /Users/gianmariaricci/develop/github/cisharpai add .beads/)"
+      "Bash(git -C /Users/gianmariaricci/develop/github/cisharpai add .beads/)",
+      "Bash(dotnet:*)",
+      "Bash(git commit --no-gpg-sign -m \"$\\(cat <<''EOF''\nAdd GitHub Actions CI/CD pipeline for NuGet publishing\n\n- Directory.Build.props with packing metadata and Source Link\n- GitVersion.yml for semantic versioning \\(ContinuousDelivery\\)\n- pipeline.yml: build, test \\(unit + integration\\), pack, publish\n- IsPackable=false for Console and Test projects\n- Publish job runs only on v* tags with --skip-duplicate\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push:*)",
+      "Bash(gh pr create --base develop --head feature/embeddings --title \"Add embedding support and CI/CD pipeline\" --body \"$\\(cat <<''EOF''\n## Summary\n- Add embedding support for OpenAI and Cohere providers\n- Add GitHub Actions CI/CD pipeline for NuGet publishing\n- Configure Directory.Build.props, GitVersion, Source Link\n\n## Test plan\n- [ ] CI pipeline builds successfully\n- [ ] Unit tests pass on both net8.0 and net10.0\n- [ ] Integration tests run with secrets\n- [ ] NuGet packages are packed correctly\nEOF\n\\)\")",
+      "Bash(gh run list:*)",
+      "Bash(gh run watch:*)",
+      "Bash(gh run view:*)",
+      "WebFetch(domain:gitversion.net)"
     ]
   }
 }
