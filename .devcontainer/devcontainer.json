@@ -1,0 +1,37 @@
+{
+  "name": "AI Document Manager (.NET 10 + SQL Server 2025)",
+  "image": "mcr.microsoft.com/devcontainers/dotnet:10.0",
+  "features": {
+    "ghcr.io/devcontainers/features/dotnet:2": {},
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts"
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {
+      "version": "latest"
+    }
+  },
+  "workspaceFolder": "/workspace",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-dotnettools.csdevkit",
+        "ms-dotnettools.csharp",
+        "github.copilot",
+        "anthropic.claude-code"
+      ],
+      "settings": {
+        "dotnet.defaultSolution": "Cisharpai.sln",
+        "terminal.integrated.defaultProfile.linux": "zsh",
+        "terminal.integrated.profiles.linux": {
+          "zsh": {
+            "path": "/usr/bin/zsh"
+          }
+        }
+      }
+    }
+  },
+  "containerEnv": {
+  },
+  "postCreateCommand": "bash .devcontainer/postcreate.sh",
+  "remoteUser": "vscode"
+}

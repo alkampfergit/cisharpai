@@ -1,0 +1,27 @@
+workflow: GitFlow/v1
+
+branches:
+  main:
+    regex: ^master$|^main$
+    increment: Patch
+  develop:
+    regex: ^dev(elop)?(ment)?$
+    mode: ContinuousDelivery
+    label: alpha
+    increment: Minor
+  feature:
+    regex: ^features?[/-]
+    mode: ContinuousDelivery
+    label: alpha
+    increment: Inherit
+  release:
+    regex: ^releases?[/-]
+    label: beta
+    increment: None
+  hotfix:
+    regex: ^hotfix(es)?[/-]
+    label: beta
+    increment: Patch
+
+ignore:
+  sha: []
