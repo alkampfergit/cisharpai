@@ -12,7 +12,6 @@
       "version": "latest"
     }
   },
-  "workspaceFolder": "/workspace",
   "customizations": {
     "vscode": {
       "extensions": [
