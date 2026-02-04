@@ -18,6 +18,7 @@
         "ms-dotnettools.csdevkit",
         "ms-dotnettools.csharp",
         "github.copilot",
+        "planet57.vscode-beads",
         "anthropic.claude-code"
       ],
       "settings": {
