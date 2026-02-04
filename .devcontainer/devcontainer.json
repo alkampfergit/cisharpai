@@ -1,6 +1,6 @@
 {
   "name": "AI Document Manager (.NET 10 + SQL Server 2025)",
-  "image": "mcr.microsoft.com/devcontainers/dotnet:10",
+  "image": "mcr.microsoft.com/devcontainers/dotnet:10.0",
   "features": {
     "ghcr.io/devcontainers/features/dotnet:2": {},
     "ghcr.io/devcontainers/features/node:1": {
