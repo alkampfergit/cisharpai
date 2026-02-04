@@ -15,8 +15,6 @@ public static class DotEnv
     public const string AzureOpenAiApiKey = "AZURE_OPENAI_API_KEY";
     public const string AzureOpenAiApiVersion = "AZURE_OPENAI_API_VERSION";
 
-    public const string CohereApiKey = "COHERE_API_KEY";
-
     public static void Load()
     {
         var directory = new DirectoryInfo(Directory.GetCurrentDirectory());

@@ -56,25 +56,6 @@ Optional settings for GPT-5 Responses API can be configured on `OpenAiClientOpti
 - `ReasoningEffort`
 - `TextVerbosity`
 
-## Embeddings
-
-OpenAI also supports text embeddings via a separate client registration:
-
-```csharp
-services.AddOpenAiEmbeddingClient(options =>
-{
-    options.ApiKey = "YOUR_API_KEY";
-});
-
-var client = provider.GetRequiredService<IEmbeddingClient>();
-var response = await client.GetEmbeddingsAsync(new EmbeddingRequest(
-    Input: ["Hello world"],
-    Model: "text-embedding-3-small",
-    Dimensions: 256));
-```
-
-See [Embeddings](embeddings.md) for full documentation.
-
 ## Troubleshooting
 
 - If you need the raw JSON, set `IncludeRawResponse: true` and read `RawResponseJson` on the response.

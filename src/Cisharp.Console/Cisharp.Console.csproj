@@ -5,7 +5,6 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <IsPackable>false</IsPackable>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,7 +16,6 @@
     <ProjectReference Include="..\Cisharpai.OpenAi\Cisharpai.OpenAi.csproj" />
     <ProjectReference Include="..\Cisharpai.Anthropic\Cisharpai.Anthropic.csproj" />
     <ProjectReference Include="..\Cisharpai.AzureOpenAi\Cisharpai.AzureOpenAi.csproj" />
-    <ProjectReference Include="..\Cisharpai.Cohere\Cisharpai.Cohere.csproj" />
   </ItemGroup>
 
 </Project>
