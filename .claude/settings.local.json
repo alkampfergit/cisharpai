@@ -17,7 +17,9 @@
       "Bash(bd show:*)",
       "Bash(xargs -I {} sh -c 'echo \"\"=== {} ===\"\" && cat \"\"{}\"\"')",
       "Bash(bd close:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(dotnet sln:*)",
+      "Bash(dotnet add:*)"
     ]
   }
 }
