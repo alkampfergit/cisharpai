@@ -12,6 +12,7 @@ permissions:
   id-token: write
   contents: read
   attestations: write
+  checks: write
 
 jobs:
   build:
@@ -68,6 +69,16 @@ jobs:
           mkdir -p flattened-trx
           find artifacts/TestResults -name "*.trx" -type f -exec cp {} flattened-trx/ \;
           echo "Found $(find flattened-trx -name '*.trx' | wc -l) TRX files"
+
+      - name: Publish test report
+        if: always()
+        uses: dorny/test-reporter@b082adf0eced0765477756c2a610396589b8c637
+        with:
+          name: Test Run Summary
+          path: 'flattened-trx/*.trx'
+          reporter: dotnet-trx
+          use-actions-summary: 'true'
+          fail-on-error: 'false'
 
       - name: Upload test results
         if: always()
