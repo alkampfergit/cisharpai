@@ -55,6 +55,46 @@ Start here:
 
 - OpenAI console scenario: [src/Cisharp.Console/Scenarios/OpenAiChatScenario.cs](src/Cisharp.Console/Scenarios/OpenAiChatScenario.cs)
 
+## Building Locally
+
+The project includes a PowerShell build script that handles versioning, building, testing, and NuGet packaging.
+
+### Prerequisites
+
+- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) and [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
+- [PowerShell 7+](https://github.com/PowerShell/PowerShell) (`pwsh`)
+
+### Running the build
+
+```bash
+pwsh scripts/build.ps1
+```
+
+This will:
+1. Restore dotnet tools (including [GitVersion](https://gitversion.net/))
+2. Calculate the version using GitVersion (ContinuousDeployment mode)
+3. Restore NuGet packages
+4. Build the solution in Release configuration
+5. Run unit tests on both net8.0 and net10.0
+6. Pack NuGet packages into `artifacts/NuGet/`
+
+### Build options
+
+```bash
+# Skip tests
+pwsh scripts/build.ps1 -skiptest
+
+# Build and publish to nuget.org
+pwsh scripts/build.ps1 -nugetApiKey "YOUR_KEY" -nugetPublish $true
+```
+
+### Build artifacts
+
+| Output | Location |
+|--------|----------|
+| NuGet packages (`.nupkg` + `.snupkg`) | `artifacts/NuGet/` |
+| Test results (`.trx`) | `artifacts/TestResults/` |
+
 ## Running Integration Tests
 
 Integration tests require environment variables to be set. Create a `.env` file in the repository root or set them in your environment.

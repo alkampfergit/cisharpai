@@ -1,4 +1,4 @@
-workflow: GitFlow/v1
+mode: ContinuousDeployment
 
 branches:
   main:
@@ -6,12 +6,10 @@ branches:
     increment: Patch
   develop:
     regex: ^dev(elop)?(ment)?$
-    mode: ContinuousDelivery
     label: alpha
     increment: Minor
   feature:
     regex: ^features?[/-]
-    mode: ContinuousDelivery
     label: alpha
     increment: Inherit
   release:

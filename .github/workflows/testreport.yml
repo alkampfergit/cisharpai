@@ -1,0 +1,57 @@
+name: 'Test Report'
+
+on:
+  workflow_run:
+    workflows: ['Cisharpai CI']
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Workflow run ID to fetch test results from'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+  checks: write
+
+concurrency:
+  group: test-report-${{ github.event.workflow_run.id || github.run_id }}
+  cancel-in-progress: true
+
+jobs:
+  report:
+    if: >
+      (github.event_name == 'workflow_dispatch') ||
+      (github.event.workflow_run.conclusion == 'success') ||
+      (github.event.workflow_run.conclusion == 'failure')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Log triggering workflow
+        run: |
+          echo "Triggered by workflow run:"
+          echo "  Run ID: ${{ github.event.workflow_run.id || inputs.run_id }}"
+          echo "  Event:  ${{ github.event_name }}"
+
+      - name: Download test results from triggering run
+        uses: actions/download-artifact@v4
+        with:
+          name: TestResults
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id || inputs.run_id }}
+
+      - name: Publish test report
+        uses: dorny/test-reporter@b082adf0eced0765477756c2a610396589b8c637
+        with:
+          name: Test Run Summary
+          path: '*.trx'
+          reporter: dotnet-trx
+          use-actions-summary: 'true'
