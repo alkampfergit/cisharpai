@@ -1,26 +1,15 @@
-namespace Cisharp.Console.Configuration;
+namespace Cisharpai.Tests.Common;
 
-public static class DotEnv
+/// <summary>
+/// Utility class to load environment variables from a .env file.
+/// Searches for .env in the current directory and parent directories.
+/// </summary>
+public static class DotEnvLoader
 {
-    public const string OpenAiApiKey = "OPENAI_API_KEY";
-    public const string OpenAiOrganization = "OPENAI_ORG";
-    public const string OpenAiBaseUrl = "OPENAI_BASE_URL";
-
-    public const string AnthropicApiKey = "ANTHROPIC_API_KEY";
-    public const string AnthropicBaseUrl = "ANTHROPIC_BASE_URL";
-    public const string AnthropicApiVersion = "ANTHROPIC_API_VERSION";
-
-    public const string AzureOpenAiEndpoint = "AZURE_OPENAI_ENDPOINT";
-    public const string AzureOpenAiDeployment = "AZURE_OPENAI_DEPLOYMENT";
-    public const string AzureOpenAiApiKey = "AZURE_OPENAI_API_KEY";
-    public const string AzureOpenAiApiVersion = "AZURE_OPENAI_API_VERSION";
-
-    public const string CohereApiKey = "COHERE_API_KEY";
-
-    public const string AzureInferenceEndpoint = "AZURE_INFERENCE_ENDPOINT";
-    public const string AzureInferenceApiKey = "AZURE_INFERENCE_API_KEY";
-    public const string AzureInferenceModel = "AZURE_INFERENCE_MODEL";
-
+    /// <summary>
+    /// Loads environment variables from a .env file found in the current
+    /// directory or any parent directory.
+    /// </summary>
     public static void Load()
     {
         var directory = new DirectoryInfo(Directory.GetCurrentDirectory());
@@ -28,6 +17,7 @@ public static class DotEnv
         while (directory is not null)
         {
             var filePath = Path.Combine(directory.FullName, ".env");
+
             if (File.Exists(filePath))
             {
                 LoadFile(filePath);
@@ -38,7 +28,11 @@ public static class DotEnv
         }
     }
 
-    private static void LoadFile(string path)
+    /// <summary>
+    /// Loads environment variables from the specified .env file path.
+    /// </summary>
+    /// <param name="path">Path to the .env file.</param>
+    public static void LoadFile(string path)
     {
         foreach (var line in File.ReadAllLines(path))
         {
@@ -53,6 +47,7 @@ public static class DotEnv
             var key = trimmed[..separatorIndex].Trim();
             var value = trimmed[(separatorIndex + 1)..].Trim();
 
+            // Strip surrounding quotes
             if (value.Length >= 2 &&
                 ((value.StartsWith('"') && value.EndsWith('"')) ||
                  (value.StartsWith('\'') && value.EndsWith('\''))))

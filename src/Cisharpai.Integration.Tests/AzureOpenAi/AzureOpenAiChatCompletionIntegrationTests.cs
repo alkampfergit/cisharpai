@@ -1,5 +1,6 @@
 using Cisharpai.Models;
-using Cisharpai.AzureOpenAi;
+using Cisharpai.Azure;
+using Cisharpai.Azure.AzureOpenAi;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Cisharpai.Integration.Tests.AzureOpenAi;
@@ -17,7 +18,11 @@ public sealed class AzureOpenAiChatCompletionIntegrationTests
         DotEnv.Load();
         var raw = Environment.GetEnvironmentVariable(DotEnv.AzureOpenAiTestDeployments);
         if (string.IsNullOrWhiteSpace(raw))
+        {
+            // Return a placeholder so the test runs and fails with a clear message
+            yield return "__MISSING_DEPLOYMENTS__";
             yield break;
+        }
 
         foreach (var deployment in raw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             yield return deployment;
@@ -26,6 +31,9 @@ public sealed class AzureOpenAiChatCompletionIntegrationTests
     [TestCaseSource(nameof(Deployments))]
     public async Task GetChatCompletionAsync_ReturnsValidResponse(string deployment)
     {
+        Assert.That(deployment, Is.Not.EqualTo("__MISSING_DEPLOYMENTS__"),
+            $"Environment variable {DotEnv.AzureOpenAiTestDeployments} must be set.");
+
         var endpoint = Environment.GetEnvironmentVariable(DotEnv.AzureOpenAiTestEndpoint);
         var apiKey = Environment.GetEnvironmentVariable(DotEnv.AzureOpenAiTestApiKey);
 
@@ -68,6 +76,9 @@ public sealed class AzureOpenAiChatCompletionIntegrationTests
     [TestCaseSource(nameof(Deployments))]
     public async Task GetChatCompletionAsync_VeryLowMaxTokens_ReturnsTruncatedResponse(string deployment)
     {
+        Assert.That(deployment, Is.Not.EqualTo("__MISSING_DEPLOYMENTS__"),
+            $"Environment variable {DotEnv.AzureOpenAiTestDeployments} must be set.");
+
         var endpoint = Environment.GetEnvironmentVariable(DotEnv.AzureOpenAiTestEndpoint);
         var apiKey = Environment.GetEnvironmentVariable(DotEnv.AzureOpenAiTestApiKey);
 

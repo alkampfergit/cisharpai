@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net10.0</TargetFrameworks>
+    <TargetFramework>net10.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
@@ -9,13 +9,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="coverlet.collector" Version="6.0.4" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="9.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.0" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.0" />
-    <PackageReference Include="NUnit" Version="4.3.2" />
-    <PackageReference Include="NUnit.Analyzers" Version="4.7.0" />
-    <PackageReference Include="NUnit3TestAdapter" Version="5.0.0" />
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Logging" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NUnit" />
+    <PackageReference Include="NUnit.Analyzers" />
+    <PackageReference Include="NUnit3TestAdapter" />
   </ItemGroup>
 
   <ItemGroup>
@@ -26,8 +26,9 @@
     <ProjectReference Include="..\Cisharpai\Cisharpai.csproj" />
     <ProjectReference Include="..\Cisharpai.OpenAi\Cisharpai.OpenAi.csproj" />
     <ProjectReference Include="..\Cisharpai.Anthropic\Cisharpai.Anthropic.csproj" />
-    <ProjectReference Include="..\Cisharpai.AzureOpenAi\Cisharpai.AzureOpenAi.csproj" />
+    <ProjectReference Include="..\Cisharpai.Azure\Cisharpai.Azure.csproj" />
     <ProjectReference Include="..\Cisharpai.Cohere\Cisharpai.Cohere.csproj" />
+    <ProjectReference Include="..\Cisharpai.Tests.Common\Cisharpai.Tests.Common.csproj" />
   </ItemGroup>
 
 </Project>

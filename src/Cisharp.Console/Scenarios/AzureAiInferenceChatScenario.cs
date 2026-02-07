@@ -1,35 +1,32 @@
 using Cisharp.Console.Configuration;
 using Cisharpai;
 using Cisharpai.Azure;
-using Cisharpai.Azure.AzureOpenAi;
+using Cisharpai.Azure.AzureAiInference;
 using Cisharpai.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Spectre.Console;
 
 namespace Cisharp.Console.Scenarios;
 
-public sealed class AzureOpenAiChatScenario : IScenario
+public sealed class AzureAiInferenceChatScenario : IScenario
 {
-    public string Name => "Azure OpenAI chat";
-    public string Description => "Runs a chat completion using Azure OpenAI.";
+    public string Name => "Azure AI Inference chat";
+    public string Description => "Runs a chat completion using Azure AI Inference (Phi-3, Llama-3, Mistral, etc.).";
 
     public async Task RunAsync(CancellationToken cancellationToken = default)
     {
-        var endpoint = ScenarioHelpers.RequireEnv(DotEnv.AzureOpenAiEndpoint);
-        var deployment = ScenarioHelpers.RequireEnv(DotEnv.AzureOpenAiDeployment);
-        var apiKey = ScenarioHelpers.RequireEnv(DotEnv.AzureOpenAiApiKey);
-        var apiVersion = ScenarioHelpers.GetEnv(DotEnv.AzureOpenAiApiVersion);
+        var endpoint = ScenarioHelpers.RequireEnv(DotEnv.AzureInferenceEndpoint);
+        var apiKey = ScenarioHelpers.RequireEnv(DotEnv.AzureInferenceApiKey);
+        var modelId = ScenarioHelpers.RequireEnv(DotEnv.AzureInferenceModel);
 
-        var prompt = AnsiConsole.Ask("User prompt?", "Summarize the benefits of dependency injection.");
+        var prompt = AnsiConsole.Ask("User prompt?", "Explain the benefits of dependency injection in 3 sentences.");
 
         var services = ScenarioHelpers.CreateServiceCollection();
-        services.AddAzureOpenAiClient(options =>
+        services.AddAzureAiInferenceChatCompletion(options =>
         {
             options.Endpoint = endpoint;
-            options.DeploymentName = deployment;
             options.ApiKey = apiKey;
-            if (!string.IsNullOrWhiteSpace(apiVersion))
-                options.ApiVersion = apiVersion;
+            options.ModelId = modelId;
         });
 
         await using var provider = services.BuildServiceProvider();
@@ -37,11 +34,18 @@ public sealed class AzureOpenAiChatScenario : IScenario
 
         var request = new ChatCompletionRequest(
             Messages: [new LlmMessage(LlmRole.User, prompt)],
-            Model: deployment,
+            Model: modelId,
             Temperature: 0.2,
             MaxTokens: 200);
 
+        AnsiConsole.MarkupLine("[grey]Sending request...[/]");
         var response = await client.GetChatCompletionAsync(request, cancellationToken);
+
+        if (!response.IsSuccess)
+        {
+            AnsiConsole.MarkupLine($"[red]Error:[/] {Markup.Escape(response.ErrorMessage ?? "Unknown error")}");
+            return;
+        }
 
         AnsiConsole.MarkupLine($"[green]Model:[/] {Markup.Escape(response.Model)}");
         AnsiConsole.MarkupLine($"[yellow]Tokens:[/] prompt {response.PromptTokens}, completion {response.CompletionTokens}");
