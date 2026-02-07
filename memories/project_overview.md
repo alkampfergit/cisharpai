@@ -58,6 +58,13 @@ Each supported provider has its own project providing concrete implementations o
 *   **`src/Cisharpai.Cohere/`**: Connector for Cohere API.
     *   `CohereEmbeddingClient.cs`: Implements `IEmbeddingClient`. Supports input types (search_query, search_document, classification, clustering).
 
+### Build & Versioning
+*   **`GitVersion.yml`**: Configures GitVersion in `ContinuousDeployment` mode. Branch labels: `alpha` for develop/feature, `beta` for release/hotfix, none for main.
+*   **`.config/dotnet-tools.json`**: Local dotnet tool manifest. Includes `gitversion.tool` v6.4.0.
+*   **`scripts/build.ps1`**: PowerShell build script (modeled after NStore). Parameters: `$nugetApiKey`, `$nugetPublish`, `-skiptest`. Steps: tool restore, GitVersion, restore, build (Release), test (unit tests on net8.0+net10.0), pack (5 library projects), optional publish to nuget.org. Outputs to `artifacts/NuGet/` (packages) and `artifacts/TestResults/` (trx files).
+*   **`Directory.Build.props`**: Global MSBuild properties for packaging (authors, license, SourceLink, symbols).
+*   **`Directory.Packages.props`**: Central package version management.
+
 ### Testing
 *   **`src/Cisharpai.Tests.Common/`**: Shared test utilities referenced by all test projects.
     *   `DotEnvLoader.cs`: Static utility class to load environment variables from a `.env` file. Searches current and parent directories.
