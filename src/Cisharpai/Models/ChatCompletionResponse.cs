@@ -10,7 +10,12 @@ public sealed record ChatCompletionResponse(
     string? Status = null,
     string? IncompleteReason = null,
     bool IsSuccess = true,
-    string? ErrorMessage = null)
+    string? ErrorMessage = null,
+    /// <summary>
+    /// When using Structured Outputs, the model may refuse to generate output for safety reasons.
+    /// When non-null, Content may be empty and the caller should check this field.
+    /// </summary>
+    string? Refusal = null)
 {
     public static ChatCompletionResponse Error(string errorMessage, string? rawResponseJson = null) =>
         new(

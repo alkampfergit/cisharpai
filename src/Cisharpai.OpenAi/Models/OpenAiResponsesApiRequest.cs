@@ -23,5 +23,9 @@ public sealed class OpenAiReasoningOption
 
 public sealed class OpenAiTextOption
 {
-    public string Verbosity { get; set; } = string.Empty;
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Verbosity { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public OpenAiTextFormat? Format { get; set; }
 }

@@ -10,4 +10,8 @@ public sealed class OpenAiReasoningRequest
 
     [JsonPropertyName("max_completion_tokens")]
     public int? MaxCompletionTokens { get; set; }
+
+    [JsonPropertyName("response_format")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public OpenAiResponseFormat? ResponseFormat { get; set; }
 }

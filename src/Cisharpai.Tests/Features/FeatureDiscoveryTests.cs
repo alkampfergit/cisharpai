@@ -1,4 +1,5 @@
 using Cisharpai.Features;
+using Cisharpai.Features.Chat;
 using Cisharpai.Features.Embeddings;
 using Cisharpai.OpenAi;
 using Cisharpai.Anthropic;
@@ -223,5 +224,74 @@ public sealed class FeatureDiscoveryTests
         var multimodalFeature = client.Features.Get<IMultimodalEmbeddingFeature>();
 
         Assert.That(multimodalFeature, Is.Not.Null);
+    }
+
+    // --- JSON Output Feature discovery ---
+
+    [Test]
+    public void OpenAiChatCompletionClient_ExposesJsonOutputFeature()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.openai.com/v1/") };
+        var client = new OpenAiChatCompletionClient(httpClient, new OpenAiClientOptions());
+
+        var feature = client.Features.Get<IJsonOutputFeature>();
+
+        Assert.That(feature, Is.Not.Null);
+        Assert.That(feature, Is.SameAs(client));
+    }
+
+    [Test]
+    public void AzureOpenAiChatCompletionClient_ExposesJsonOutputFeature()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://test.openai.azure.com/") };
+        var options = new AzureOpenAiClientOptions { DeploymentName = "test", ApiKey = "key" };
+        var client = new AzureOpenAiChatCompletionClient(httpClient, options);
+
+        var feature = client.Features.Get<IJsonOutputFeature>();
+
+        Assert.That(feature, Is.Not.Null);
+        Assert.That(feature, Is.SameAs(client));
+    }
+
+    [Test]
+    public void AzureAiInferenceChatCompletionClient_ExposesJsonOutputFeature()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://test.inference.azure.com/") };
+        var options = new AzureAiInferenceClientOptions { ModelId = "test-model", ApiKey = "key" };
+        var client = new AzureAiInferenceChatCompletionClient(httpClient, options);
+
+        var feature = client.Features.Get<IJsonOutputFeature>();
+
+        Assert.That(feature, Is.Not.Null);
+        Assert.That(feature, Is.SameAs(client));
+    }
+
+    [Test]
+    public void AnthropicChatCompletionClient_DoesNotExposeJsonOutputFeature()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
+        var client = new AnthropicChatCompletionClient(httpClient);
+
+        Assert.That(client.Features.Get<IJsonOutputFeature>(), Is.Null);
+    }
+
+    [Test]
+    public void CohereEmbeddingClient_DoesNotExposeJsonOutputFeature()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.cohere.com/v2/") };
+        var client = new CohereEmbeddingClient(httpClient);
+
+        Assert.That(client.Features.Get<IJsonOutputFeature>(), Is.Null);
+    }
+
+    [Test]
+    public void FeatureDiscovery_ViaInterface_WorksForOpenAiJsonOutput()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.openai.com/v1/") };
+        IChatCompletionClient client = new OpenAiChatCompletionClient(httpClient, new OpenAiClientOptions());
+
+        var jsonFeature = client.Features.Get<IJsonOutputFeature>();
+
+        Assert.That(jsonFeature, Is.Not.Null);
     }
 }

@@ -12,4 +12,8 @@ public sealed class OpenAiChatRequest
 
     [JsonPropertyName("max_tokens")]
     public int? MaxTokens { get; set; }
+
+    [JsonPropertyName("response_format")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public OpenAiResponseFormat? ResponseFormat { get; set; }
 }
