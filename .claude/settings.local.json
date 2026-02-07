@@ -19,7 +19,19 @@
       "Bash(bd close:*)",
       "Bash(git add:*)",
       "Bash(dotnet sln:*)",
-      "Bash(dotnet add:*)"
+      "Bash(dotnet add:*)",
+      "Bash(bd --help:*)",
+      "Bash(sqlite3:*)",
+      "Bash(pip show:*)",
+      "Bash(bd migrate:*)",
+      "Bash(pip install:*)",
+      "Bash(pip3 install:*)",
+      "Bash(npm install:*)",
+      "Bash(npx beads:*)",
+      "Bash(/home/vscode/.local/bin/bd migrate:*)",
+      "Bash(/home/vscode/.local/bin/bd list:*)",
+      "Bash(/home/vscode/.local/bin/bd:*)",
+      "Bash(dotnet restore:*)"
     ]
   }
 }

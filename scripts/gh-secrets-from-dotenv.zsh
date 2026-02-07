@@ -7,6 +7,10 @@ allowlist=(
   AZURE_OPENAI_TEST_ENDPOINT
   AZURE_OPENAI_TEST_API_KEY
   AZURE_OPENAI_TEST_DEPLOYMENTS
+  AZURE_OPENAI_TEST_EMBEDDING_DEPLOYMENT
+  AZURE_INFERENCE_TEST_ENDPOINT
+  AZURE_INFERENCE_TEST_API_KEY
+  AZURE_INFERENCE_TEST_MODELS
   COHERE_TEST_API_KEY
 )
 
@@ -58,7 +62,11 @@ if [[ -z "$env_file" ]]; then
   exit 1
 fi
 
+echo "Reading secrets from: $env_file"
+
 set_count=0
+set_keys=()
+debug=${DEBUG:-0}
 
 while IFS= read -r line || [[ -n "$line" ]]; do
   line="$(trim "$line")"
@@ -73,31 +81,68 @@ while IFS= read -r line || [[ -n "$line" ]]; do
   key="$(trim "$key")"
   value="$(trim "$value")"
 
-  if [[ "$value" == \"*\" && "$value" == *\" ]]; then
-    value="${value:1:-1}"
-  elif [[ "$value" == \'*\' && "$value" == *\' ]]; then
-    value="${value:1:-1}"
+  [[ $debug -eq 1 ]] && echo "[DEBUG] Found key: '$key'" >&2
+
+  if [[ ${#value} -ge 2 ]]; then
+    if [[ "$value" == \"*\" && "$value" == *\" ]]; then
+      value="${value:1:-1}"
+    elif [[ "$value" == \'*\' && "$value" == *\' ]]; then
+      value="${value:1:-1}"
+    fi
   fi
 
   if is_allowed "$key"; then
     if [[ "$key" == "AZURE_OPENAI_TEST_DEPLOYMENTS" ]]; then
       value="${value//, /,}"
       value="${value// ,/,}"
-      value="${value//\t/}"
+      value="${value//$'\t'/}"
     fi
     if [[ -z "$value" ]]; then
       echo "Skipping $key (empty value)." >&2
       continue
     fi
+    # Set secret for GitHub Actions
     gh secret set "$key" --body "$value" >/dev/null
-    echo "Set secret $key."
+    # Set secret for Codespaces
+    gh secret set "$key" --body "$value" --app codespaces >/dev/null
+    # Display value (truncate API keys for security)
+    if [[ "$key" == *"API_KEY"* ]]; then
+      display_value="${value:0:10}..."
+    else
+      display_value="$value"
+    fi
+    echo "Set $key = $display_value (actions + codespaces)"
+    set_keys+=("$key")
     set_count=$((set_count + 1))
   fi
 done < "$env_file"
+
+# Check for missing variables from allowlist
+missing_keys=()
+for allowed in "${allowlist[@]}"; do
+  found=0
+  for set_key in "${set_keys[@]}"; do
+    if [[ "$allowed" == "$set_key" ]]; then
+      found=1
+      break
+    fi
+  done
+  if [[ $found -eq 0 ]]; then
+    missing_keys+=("$allowed")
+  fi
+done
+
+if [[ ${#missing_keys[@]} -gt 0 ]]; then
+  echo ""
+  echo "Warning: The following variables are in the allowlist but missing from .env:" >&2
+  for missing in "${missing_keys[@]}"; do
+    echo "  - $missing" >&2
+  done
+fi
 
 if [[ $set_count -eq 0 ]]; then
   echo "No secrets were set. Ensure your .env contains the expected keys." >&2
   exit 1
 fi
 
-echo "Done. $set_count secrets set from $env_file."
+echo "Done. $set_count secrets set for both Actions and Codespaces from $env_file."

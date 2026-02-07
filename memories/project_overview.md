@@ -1,7 +1,7 @@
 # Project Overview
 
 ## Description
-**Cisharpai** is a unified .NET client library designed to provide a common interface for interacting with various Large Language Model (LLM) providers. It abstracts the differences between provider APIs (OpenAI, Azure OpenAI, Anthropic), allowing developers to switch providers with minimal code changes.
+**Cisharpai** is a unified .NET client library designed to provide a common interface for interacting with various Large Language Model (LLM) providers. It abstracts the differences between provider APIs (OpenAI, Azure OpenAI, Azure AI Inference, Anthropic, Cohere), allowing developers to switch providers with minimal code changes.
 
 ## Foundation Principles & Design Guidelines
 
@@ -35,16 +35,52 @@ Each supported provider has its own project providing concrete implementations o
 *   **`src/Cisharpai.OpenAi/`**: Connector for standard OpenAI API. Supports legacy Chat Completions API (GPT-4, etc.), reasoning models (o1/o3/o4), and the Responses API (GPT-5) with status/incomplete handling.
     *   `OpenAiChatCompletionClient.cs`: Implements `IChatCompletionClient`. Routes to the correct endpoint/format based on model detection.
     *   `OpenAiEmbeddingClient.cs`: Implements `IEmbeddingClient`.
-*   **`src/Cisharpai.AzureOpenAi/`**: Connector for Azure OpenAI Service. Supports both legacy models and reasoning/GPT-5 models (uses `max_completion_tokens` instead of `max_tokens`). Supports API key and Azure AD (TokenCredential) authentication.
-    *   `AzureOpenAiChatCompletionClient.cs`: Implements `IChatCompletionClient` with Azure-specific auth/routing. Detects reasoning models (o1/o3/o4/gpt-5) and uses appropriate request format.
+*   **`src/Cisharpai.Azure/`**: Consolidated connector for all Azure AI services. Uses HttpClient directly (no SDK dependencies except Azure.Identity for authentication).
+    *   **`Common/`**: Shared utilities for all Azure services.
+        *   `AzureClientOptionsBase.cs`: Base class for Azure client configuration (Endpoint, ApiKey, ApiVersion).
+        *   `AzureAuthenticationHandler.cs`: DelegatingHandler supporting both API key (`api-key` header) and Azure AD (Bearer token) authentication. Uses scope `https://cognitiveservices.azure.com/.default`.
+        *   `AzureErrorMapper.cs`: Static utility for mapping HTTP status codes to user-friendly error messages.
+    *   **`AzureOpenAi/`**: Connector for Azure OpenAI Service. Supports both legacy models and reasoning/GPT-5 models (uses `max_completion_tokens` instead of `max_tokens`).
+        *   `AzureOpenAiChatCompletionClient.cs`: Implements `IChatCompletionClient` with Azure-specific auth/routing. Detects reasoning models (o1/o3/o4/gpt-5) and uses appropriate request format. Endpoint: `openai/deployments/{deployment}/chat/completions?api-version=...`.
+        *   `AzureOpenAiEmbeddingClient.cs`: Implements `IEmbeddingClient`. Supports text-embedding-ada-002, text-embedding-3-small, text-embedding-3-large deployments. Endpoint: `openai/deployments/{deployment}/embeddings?api-version=...`.
+        *   `AzureOpenAiClientOptions.cs`: Configuration with DeploymentName, extends AzureClientOptionsBase. Default API version: `2024-02-01`.
+        *   `Models/`: Request/response DTOs for Azure OpenAI API.
+    *   **`AzureAiInference/`**: Connector for Azure AI Inference (model-as-a-service). Supports Phi-3, Llama-3, Mistral, and other Azure AI model catalog offerings, including reasoning models (o1/o3/o4/GPT-5). Uses HttpClient directly (not the Azure.AI.Inference SDK).
+        *   `AzureAiInferenceChatCompletionClient.cs`: Implements `IChatCompletionClient`. Detects reasoning models (o1/o3/o4/gpt-5) and uses appropriate request format (`max_completion_tokens` instead of `max_tokens`, no `Temperature`). Endpoint: `models/chat/completions?api-version=...`.
+        *   `AzureAiInferenceEmbeddingClient.cs`: Implements `IEmbeddingClient`. Endpoint: `models/embeddings?api-version=...`.
+        *   `AzureAiInferenceClientOptions.cs`: Configuration with ModelId, extends AzureClientOptionsBase. Default API version: `2024-05-01-preview`.
+        *   `Models/`: Request/response DTOs for Azure AI Inference API.
+    *   **`Extensions/`**: DI service collection extensions.
+        *   `AzureOpenAiServiceCollectionExtensions.cs`: `AddAzureOpenAiClient()` for registering Azure OpenAI client.
+        *   `AzureAiInferenceServiceCollectionExtensions.cs`: `AddAzureAiInferenceChatCompletion()` and `AddAzureAiInferenceEmbeddings()` for registering Azure AI Inference clients.
 *   **`src/Cisharpai.Anthropic/`**: Connector for Anthropic (Claude) API.
     *   `AnthropicChatCompletionClient.cs`: Implements `IChatCompletionClient`.
 *   **`src/Cisharpai.Cohere/`**: Connector for Cohere API.
     *   `CohereEmbeddingClient.cs`: Implements `IEmbeddingClient`. Supports input types (search_query, search_document, classification, clustering).
 
 ### Testing
+*   **`src/Cisharpai.Tests.Common/`**: Shared test utilities referenced by all test projects.
+    *   `DotEnvLoader.cs`: Static utility class to load environment variables from a `.env` file. Searches current and parent directories.
+    *   `TestEnvironmentVariables.cs`: Constants for environment variable names used in integration tests.
 *   **`src/Cisharpai.Tests/`**: Unit tests.
+    *   `Azure/Common/`: Tests for shared Azure authentication handler and client options.
+    *   `Azure/AzureOpenAi/`: Tests for Azure OpenAI client.
+    *   `Azure/AzureAiInference/`: Tests for Azure AI Inference client.
 *   **`src/Cisharpai.Integration.Tests/`**: Integration tests verifying connection to real APIs.
+    *   `EnvironmentConfigurationTests.cs`: Single test that validates all required environment variables for all providers. If any are missing, it fails with a clear error message showing which variables are missing and provides example `.env` file content to fix it.
+    *   `DotEnv.cs`: Helper class that delegates to `DotEnvLoader` and re-exports `TestEnvironmentVariables` constants for backwards compatibility.
     *   `OpenAi/OpenAiChatCompletionIntegrationTests.cs`: Tests OpenAI models (gpt-4.1-nano, gpt-5-nano).
     *   `Anthropic/AnthropicChatCompletionIntegrationTests.cs`: Tests Anthropic models (claude-opus-4-5, claude-sonnet-4-5, claude-haiku-4-5).
     *   `AzureOpenAi/AzureOpenAiChatCompletionIntegrationTests.cs`: Tests Azure OpenAI deployments (from `AZURE_OPENAI_TEST_DEPLOYMENTS` env var, comma-separated).
+    *   `AzureAiInference/AzureAiInferenceChatCompletionIntegrationTests.cs`: Tests Azure AI Inference models (from `AZURE_INFERENCE_TEST_MODELS` env var, comma-separated).
+
+# Integration tests
+
+Important: Integration tests has a separate project `src/Cisharpai.Integration.Tests/DotEnv.cs` that is compiled only for .NET 10 to limit the number of call to real provdier.
+
+**Maintenance Note:** When adding or modifying environment variables for integration tests, update the following files to keep them in sync:
+1. `src/Cisharpai.Tests.Common/TestEnvironmentVariables.cs` - Add the constant for the new variable
+2. `src/Cisharpai.Integration.Tests/DotEnv.cs` - Re-export the constant from `TestEnvironmentVariables` for backwards compatibility
+3. `src/Cisharpai.Integration.Tests/EnvironmentConfigurationTests.cs` - Add to the validation array
+4. `scripts/gh-secrets-from-dotenv.zsh` - Add to the `allowlist` array (for GitHub Actions/Codespaces secrets)
+5. `memories/project_overview.md` - Update the `.env` example above
