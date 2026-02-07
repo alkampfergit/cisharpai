@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Cisharpai.Features;
 using Cisharpai.Models;
 using Cisharpai.OpenAi.Models;
 
@@ -9,6 +10,8 @@ public sealed class OpenAiEmbeddingClient : IEmbeddingClient
     private const string EmbeddingsEndpoint = "embeddings";
 
     private readonly LlmHttpClient _client;
+
+    public IFeatureCollection Features { get; } = new FeatureCollection();
 
     public OpenAiEmbeddingClient(HttpClient httpClient)
     {

@@ -1,3 +1,4 @@
+using Cisharpai.Features;
 using Cisharpai.Models;
 using Cisharpai.Azure.AzureAiInference.Models;
 
@@ -11,6 +12,8 @@ public sealed class AzureAiInferenceChatCompletionClient : IChatCompletionClient
 {
     private readonly LlmHttpClient _client;
     private readonly AzureAiInferenceClientOptions _options;
+
+    public IFeatureCollection Features { get; } = new FeatureCollection();
 
     public AzureAiInferenceChatCompletionClient(
         HttpClient httpClient,

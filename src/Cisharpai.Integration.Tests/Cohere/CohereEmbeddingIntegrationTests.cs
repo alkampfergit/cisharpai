@@ -12,8 +12,9 @@ public sealed class CohereEmbeddingIntegrationTests
         DotEnv.Load();
     }
 
-    [Test]
-    public async Task GetEmbeddingsAsync_ReturnsValidResponse()
+    [TestCase("embed-english-v3.0")]
+    [TestCase("embed-v4.0")]
+    public async Task GetEmbeddingsAsync_ReturnsValidResponse(string model)
     {
         var apiKey = Environment.GetEnvironmentVariable(DotEnv.CohereTestApiKey);
         Assert.That(apiKey, Is.Not.Null.And.Not.Empty,
@@ -31,7 +32,7 @@ public sealed class CohereEmbeddingIntegrationTests
 
         var request = new EmbeddingRequest(
             Input: ["Hello world"],
-            Model: "embed-english-v3.0",
+            Model: model,
             InputType: EmbeddingInputType.Document,
             IncludeRawResponse: true);
 
@@ -44,8 +45,9 @@ public sealed class CohereEmbeddingIntegrationTests
         Assert.That(response.Dimensions, Is.GreaterThan(0));
     }
 
-    [Test]
-    public async Task GetEmbeddingsAsync_ReturnsCorrectDimensionCount()
+    [TestCase("embed-english-v3.0", 1024)]
+    [TestCase("embed-v4.0", 1536)]
+    public async Task GetEmbeddingsAsync_ReturnsCorrectDimensionCount(string model, int expectedDimensions)
     {
         var apiKey = Environment.GetEnvironmentVariable(DotEnv.CohereTestApiKey);
         Assert.That(apiKey, Is.Not.Null.And.Not.Empty,
@@ -63,13 +65,13 @@ public sealed class CohereEmbeddingIntegrationTests
 
         var request = new EmbeddingRequest(
             Input: ["Hello world"],
-            Model: "embed-english-v3.0",
+            Model: model,
             InputType: EmbeddingInputType.Document);
 
         var response = await client.GetEmbeddingsAsync(request);
 
         Assert.That(response.IsSuccess, Is.True, $"Request failed: {response.ErrorMessage}");
-        Assert.That(response.Dimensions, Is.EqualTo(1024));
+        Assert.That(response.Dimensions, Is.EqualTo(expectedDimensions));
     }
 
     [TestCase(EmbeddingInputType.Query)]
