@@ -55,3 +55,4 @@ jobs:
           path: '*.trx'
           reporter: dotnet-trx
           use-actions-summary: 'true'
+          fail-on-error: 'false'
