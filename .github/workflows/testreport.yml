@@ -5,6 +5,12 @@ on:
     workflows: ['Cisharpai CI']
     types:
       - completed
+  workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Workflow run ID to fetch test results from'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -12,34 +18,35 @@ permissions:
   checks: write
 
 concurrency:
-  group: test-report-${{ github.event.workflow_run.id }}
+  group: test-report-${{ github.event.workflow_run.id || github.run_id }}
   cancel-in-progress: true
 
 jobs:
   report:
-    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event.workflow_run.conclusion == 'failure' }}
+    if: >
+      (github.event_name == 'workflow_dispatch') ||
+      (github.event.workflow_run.conclusion == 'success') ||
+      (github.event.workflow_run.conclusion == 'failure')
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Log triggering workflow
         run: |
           echo "Triggered by workflow run:"
-          echo "  Run ID: ${{ github.event.workflow_run.id }}"
-          echo "  Run URL: ${{ github.event.workflow_run.html_url }}"
-          echo "  Head SHA: ${{ github.event.workflow_run.head_sha }}"
-          echo "  Conclusion: ${{ github.event.workflow_run.conclusion }}"
+          echo "  Run ID: ${{ github.event.workflow_run.id || inputs.run_id }}"
+          echo "  Event:  ${{ github.event_name }}"
 
       - name: Download test results from triggering run
         uses: actions/download-artifact@v4
         with:
           name: TestResults
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: ${{ github.event.workflow_run.id }}
+          run-id: ${{ github.event.workflow_run.id || inputs.run_id }}
 
       - name: Publish test report
         uses: dorny/test-reporter@b082adf0eced0765477756c2a610396589b8c637
