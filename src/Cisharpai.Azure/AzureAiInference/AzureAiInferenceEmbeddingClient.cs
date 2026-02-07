@@ -1,4 +1,6 @@
 using System.Text.Json;
+using Cisharpai.Features;
+using Cisharpai.Features.Embeddings;
 using Cisharpai.Models;
 using Cisharpai.Azure.AzureAiInference.Models;
 
@@ -8,10 +10,12 @@ namespace Cisharpai.Azure.AzureAiInference;
 /// Azure AI Inference embedding client using HttpClient.
 /// Supports Azure AI model-as-a-service offerings for text embeddings.
 /// </summary>
-public sealed class AzureAiInferenceEmbeddingClient : IEmbeddingClient
+public sealed class AzureAiInferenceEmbeddingClient : IEmbeddingClient, IImageEmbeddingFeature
 {
     private readonly LlmHttpClient _client;
     private readonly AzureAiInferenceClientOptions _options;
+
+    public IFeatureCollection Features { get; }
 
     public AzureAiInferenceEmbeddingClient(
         HttpClient httpClient,
@@ -19,6 +23,10 @@ public sealed class AzureAiInferenceEmbeddingClient : IEmbeddingClient
     {
         _client = new LlmHttpClient(httpClient);
         _options = options;
+
+        var features = new FeatureCollection();
+        features.Set<IImageEmbeddingFeature>(this);
+        Features = features;
     }
 
     public async Task<EmbeddingResponse> GetEmbeddingsAsync(
@@ -70,6 +78,44 @@ public sealed class AzureAiInferenceEmbeddingClient : IEmbeddingClient
         catch (Exception ex)
         {
             return EmbeddingResponse.Error($"Unexpected error: {ex.Message}");
+        }
+    }
+
+    public async Task<EmbeddingResponse> GetImageEmbeddingAsync(
+        string imagePath,
+        string model,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(imagePath))
+            throw new ArgumentException("Image path is required.", nameof(imagePath));
+
+        try
+        {
+            var imageBytes = await File.ReadAllBytesAsync(imagePath, cancellationToken);
+            var base64Image = Convert.ToBase64String(imageBytes);
+
+            var providerRequest = new AzureAiInferenceImageEmbeddingRequest
+            {
+                Model = !string.IsNullOrWhiteSpace(model) ? model : _options.ModelId,
+                Input = [new AzureAiInferenceImageInput { Image = base64Image }]
+            };
+
+            var uri = $"models/embeddings?api-version={_options.ApiVersion}";
+
+            var raw = await _client.PostAsync<
+                AzureAiInferenceImageEmbeddingRequest,
+                AzureAiInferenceEmbeddingResponse>(
+                uri, providerRequest, cancellationToken);
+
+            return MapResponse(raw, null);
+        }
+        catch (LlmHttpRequestException ex)
+        {
+            return EmbeddingResponse.Error(ex.Message, ex.ResponseBody);
+        }
+        catch (Exception ex)
+        {
+            return EmbeddingResponse.Error(ex.Message);
         }
     }
 

@@ -1,3 +1,4 @@
+using Cisharpai.Features;
 using Cisharpai.Models;
 using Cisharpai.OpenAi.Models;
 
@@ -10,6 +11,8 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient
 
     private readonly LlmHttpClient _client;
     private readonly OpenAiClientOptions _options;
+
+    public IFeatureCollection Features { get; } = new FeatureCollection();
 
     public OpenAiChatCompletionClient(HttpClient httpClient, OpenAiClientOptions options)
     {

@@ -1,3 +1,4 @@
+using Cisharpai.Features;
 using Cisharpai.Models;
 using Cisharpai.Anthropic.Models;
 
@@ -6,6 +7,8 @@ namespace Cisharpai.Anthropic;
 public sealed class AnthropicChatCompletionClient : IChatCompletionClient
 {
     private readonly LlmHttpClient _client;
+
+    public IFeatureCollection Features { get; } = new FeatureCollection();
 
     public AnthropicChatCompletionClient(HttpClient httpClient)
     {
