@@ -27,7 +27,7 @@ Contains the abstractions and shared logic. This is the only dependency needed f
     *   `FeatureCollection.cs`: Thread-safe implementation backed by `ConcurrentDictionary<Type, object>`.
     *   `Embeddings/IImageEmbeddingFeature.cs`: Optional feature for embedding images via `GetImageEmbeddingAsync(imagePath, model)`.
     *   `Embeddings/IMultimodalEmbeddingFeature.cs`: Optional feature for multimodal embedding (text + images in a single request) via `GetMultimodalEmbeddingsAsync(inputs, model, inputType, outputDimension, ...)`. Supports Cohere Embed v4 mixed-modality inputs and Matryoshka dimension control.
-    *   `Chat/IJsonOutputFeature.cs`: Optional feature for JSON output enforcement on chat completion clients via `GetChatCompletionWithJsonOutputAsync(request, jsonOutputOptions)`. Supports JSON Mode (`json_object`) and Structured Outputs (`json_schema`). Registered on OpenAI, Azure OpenAI, and Azure AI Inference clients. Not supported by Anthropic.
+    *   `Chat/IJsonOutputFeature.cs`: Optional feature for JSON output enforcement on chat completion clients via `GetChatCompletionWithJsonOutputAsync(request, jsonOutputOptions)`. Supports JSON Mode (`json_object`) and Structured Outputs (`json_schema`). Registered on OpenAI, Azure OpenAI, Azure AI Inference, and Anthropic clients.
 *   **`Models/`**:
     *   **`ChatCompletionRequest.cs`**: Unified request model (Messages, Model, Temperature, MaxTokens, IncludeRawResponse, ExtraParameters). The `ExtraParameters` property (`JsonElement?`) allows passing arbitrary JSON that is deeply merged into the provider-specific request body, enabling use of new model features without DTO changes.
     *   **`ChatCompletionResponse.cs`**: Unified response model (Content, Usage stats, optional Status/IncompleteReason for Responses API, IsSuccess/ErrorMessage for error handling, RawResponseJson/RawRequestJson for debug inspection, optional Refusal for Structured Outputs safety refusals). Provider clients never throw exceptions; errors are returned via `IsSuccess = false` and `ErrorMessage`. Includes a static `Error()` factory method.
@@ -67,8 +67,9 @@ Each supported provider has its own project providing concrete implementations o
     *   **`Extensions/`**: DI service collection extensions.
         *   `AzureOpenAiServiceCollectionExtensions.cs`: `AddAzureOpenAiClient()` for registering Azure OpenAI client.
         *   `AzureAiInferenceServiceCollectionExtensions.cs`: `AddAzureAiInferenceChatCompletion()` and `AddAzureAiInferenceEmbeddings()` for registering Azure AI Inference clients.
-*   **`src/Cisharpai.Anthropic/`**: Connector for Anthropic (Claude) API.
-    *   `AnthropicChatCompletionClient.cs`: Implements `IChatCompletionClient`. Does not support `IJsonOutputFeature` (Anthropic API does not expose json_object/json_schema response format).
+*   **`src/Cisharpai.Anthropic/`**: Connector for Anthropic (Claude) API. Supports structured outputs via `output_config.format` parameter.
+    *   `AnthropicChatCompletionClient.cs`: Implements `IChatCompletionClient` and `IJsonOutputFeature`. Supports JSON Mode (via system message injection) and Structured Outputs (`json_schema` via `output_config.format`). Handles refusal via `stop_reason: "refusal"`.
+    *   `Models/AnthropicOutputConfig.cs`: DTOs for `output_config.format` parameter: `AnthropicOutputConfig`, `AnthropicOutputFormat`.
 *   **`src/Cisharpai.Cohere/`**: Connector for Cohere API. Supports Embed v3 and v4 models.
     *   `CohereEmbeddingClient.cs`: Implements `IEmbeddingClient`, `IImageEmbeddingFeature`, and `IMultimodalEmbeddingFeature`. Supports text embeddings, single image embedding, and Embed v4 multimodal embedding (mixed text+image inputs, Matryoshka output dimensions, batch images). Images are sent as data URIs.
     *   `ImageDataUriHelper.cs`: Internal utility for converting image file paths to data URI format (`data:image/{mime};base64,...`). Supports PNG, JPEG, WebP, GIF.
@@ -125,7 +126,7 @@ Project documentation pages.
     *   `TestEnvironmentVariables.cs`: Constants for environment variable names used in integration tests.
 *   **`src/Cisharpai.Tests/`**: Unit tests.
     *   `Features/FeatureCollectionTests.cs`: Tests for `FeatureCollection` (Get/Set/enumeration/thread-safety).
-    *   `Features/FeatureDiscoveryTests.cs`: Tests verifying feature discovery across all 8 client implementations (including IJsonOutputFeature on OpenAI, Azure OpenAI, Azure AI Inference; absence on Anthropic, Cohere).
+    *   `Features/FeatureDiscoveryTests.cs`: Tests verifying feature discovery across all 8 client implementations (including IJsonOutputFeature on OpenAI, Azure OpenAI, Azure AI Inference, and Anthropic; absence on Cohere).
     *   `Cohere/CohereImageEmbeddingTests.cs`: Tests for Cohere image embedding request/response mapping and data URI format.
     *   `Cohere/CohereMultimodalEmbeddingTests.cs`: Tests for Cohere Embed v4 multimodal embedding (text-only, image-only, mixed, batch, output_dimension, input types, raw response, error handling, image tokens).
     *   `Cohere/ImageDataUriHelperTests.cs`: Tests for data URI helper (MIME type mapping for PNG/JPEG/WebP/GIF, base64 encoding).
@@ -137,6 +138,7 @@ Project documentation pages.
     *   `Azure/AzureOpenAi/AzureOpenAiJsonOutputTests.cs`: Tests for Azure OpenAI JSON output request building (JSON Mode, Structured Outputs, refusal, feature discovery, endpoint/header verification).
     *   `Azure/AzureAiInference/`: Tests for Azure AI Inference client.
     *   `Azure/AzureAiInference/AzureAiInferenceJsonOutputTests.cs`: Tests for Azure AI Inference JSON output request building (JSON Mode, Structured Outputs, schema parsing, feature discovery, endpoint/model verification).
+    *   `Anthropic/AnthropicJsonOutputTests.cs`: Tests for Anthropic JSON output request building (JSON Mode system message injection, Structured Outputs via output_config, schema parsing, refusal handling, feature discovery).
 *   **`src/Cisharpai.Integration.Tests/`**: Integration tests verifying connection to real APIs.
     *   `EnvironmentConfigurationTests.cs`: Single test that validates all required environment variables for all providers. If any are missing, it fails with a clear error message showing which variables are missing and provides example `.env` file content to fix it.
     *   `DotEnv.cs`: Helper class that delegates to `DotEnvLoader` and re-exports `TestEnvironmentVariables` constants for backwards compatibility.
@@ -144,6 +146,7 @@ Project documentation pages.
     *   `OpenAi/OpenAiEmbeddingIntegrationTests.cs`: Tests OpenAI embedding models.
     *   `OpenAi/OpenAiJsonOutputIntegrationTests.cs`: Integration tests for OpenAI JSON Mode (gpt-4.1-nano, gpt-5-nano) and Structured Outputs (simple/complex schemas, feature discovery).
     *   `Anthropic/AnthropicChatCompletionIntegrationTests.cs`: Tests Anthropic models (claude-opus-4-5, claude-sonnet-4-5, claude-haiku-4-5).
+    *   `Anthropic/AnthropicJsonOutputIntegrationTests.cs`: Integration tests for Anthropic JSON Mode and Structured Outputs (simple/complex schemas, feature discovery).
     *   `AzureOpenAi/AzureOpenAiChatCompletionIntegrationTests.cs`: Tests Azure OpenAI deployments (from `AZURE_OPENAI_TEST_DEPLOYMENTS` env var, comma-separated).
     *   `AzureOpenAi/AzureOpenAiEmbeddingIntegrationTests.cs`: Tests Azure OpenAI embedding deployments (from `AZURE_OPENAI_TEST_EMBEDDING_DEPLOYMENT` env var).
     *   `AzureOpenAi/AzureOpenAiJsonOutputIntegrationTests.cs`: Integration tests for Azure OpenAI JSON Mode and Structured Outputs (graceful handling for unsupported deployments, feature discovery).

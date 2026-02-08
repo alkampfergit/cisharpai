@@ -25,4 +25,7 @@ public sealed class AnthropicChatResponse
     public List<AnthropicContentBlock> Content { get; set; } = [];
 
     public AnthropicUsage Usage { get; set; } = new();
+
+    [JsonPropertyName("stop_reason")]
+    public string? StopReason { get; set; }
 }
