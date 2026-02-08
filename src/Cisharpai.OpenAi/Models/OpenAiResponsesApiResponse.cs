@@ -48,6 +48,9 @@ public sealed class OpenAiResponseContent
 
     [JsonPropertyName("text")]
     public string Text { get; set; } = string.Empty;
+
+    [JsonPropertyName("refusal")]
+    public string? Refusal { get; set; }
 }
 
 public sealed class OpenAiResponsesUsage

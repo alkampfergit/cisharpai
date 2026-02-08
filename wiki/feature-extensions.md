@@ -78,7 +78,7 @@ public async Task ProcessInputs(IEmbeddingClient client)
 - Define `IImageEmbeddingFeature` for multimodal embedding.
 - Add a follow-up to extend `IImageEmbeddingFeature` with `Stream` input.
 - Define `IToolCallingFeature` (if we want to extract that from core chat in the future, or advanced tool features).
-- Define `IJsonModeFeature` for constrained output discovery.
+- Define `IJsonOutputFeature` for JSON Mode and Structured Outputs (see [json-output.md](json-output.md)).
 
 ### Phase 3: Provider Implementation
 - **Cohere**: Implement `IImageEmbeddingFeature` in `CohereEmbeddingClient`.

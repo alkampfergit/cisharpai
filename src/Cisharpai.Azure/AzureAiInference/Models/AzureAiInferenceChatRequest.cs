@@ -7,6 +7,9 @@ public sealed class AzureAiInferenceChatMessage
     public string Role { get; set; } = string.Empty;
 
     public string Content { get; set; } = string.Empty;
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Refusal { get; set; }
 }
 
 public sealed class AzureAiInferenceChatRequest
@@ -30,6 +33,10 @@ public sealed class AzureAiInferenceChatRequest
     public double? PresencePenalty { get; set; }
 
     public List<string>? Stop { get; set; }
+
+    [JsonPropertyName("response_format")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AzureAiInferenceResponseFormat? ResponseFormat { get; set; }
 }
 
 public sealed class AzureAiInferenceReasoningChatRequest
@@ -40,4 +47,8 @@ public sealed class AzureAiInferenceReasoningChatRequest
 
     [JsonPropertyName("max_completion_tokens")]
     public int? MaxCompletionTokens { get; set; }
+
+    [JsonPropertyName("response_format")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AzureAiInferenceResponseFormat? ResponseFormat { get; set; }
 }
