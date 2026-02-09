@@ -21,7 +21,7 @@ public sealed class AnthropicChatCompletionClientTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
-        var client = new AnthropicChatCompletionClient(httpClient);
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
 
         var request = new ChatCompletionRequest(
             Messages:
@@ -51,7 +51,7 @@ public sealed class AnthropicChatCompletionClientTests
             }));
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
-        var client = new AnthropicChatCompletionClient(httpClient);
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
 
         var request = new ChatCompletionRequest(
             Messages: [new LlmMessage(LlmRole.User, "Hello")],
@@ -77,7 +77,7 @@ public sealed class AnthropicChatCompletionClientTests
             }));
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
-        var client = new AnthropicChatCompletionClient(httpClient);
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
 
         var response = await client.GetChatCompletionAsync(new ChatCompletionRequest(
             Messages: [new LlmMessage(LlmRole.User, "Hello")],
@@ -98,7 +98,7 @@ public sealed class AnthropicChatCompletionClientTests
             }));
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
-        var client = new AnthropicChatCompletionClient(httpClient);
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
 
         var response = await client.GetChatCompletionAsync(new ChatCompletionRequest(
             Messages: [new LlmMessage(LlmRole.User, "Hello")],
@@ -118,7 +118,7 @@ public sealed class AnthropicChatCompletionClientTests
             }));
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
-        var client = new AnthropicChatCompletionClient(httpClient);
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
 
         var response = await client.GetChatCompletionAsync(new ChatCompletionRequest(
             Messages: [new LlmMessage(LlmRole.User, "Hello")],

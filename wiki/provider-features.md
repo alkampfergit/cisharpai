@@ -11,19 +11,21 @@ This page lists every feature supported by each provider integration in Cisharpa
 | JSON Output | `IJsonOutputFeature` | Force JSON Mode or Structured Outputs on chat responses |
 | Image Embeddings | `IImageEmbeddingFeature` | Generate vector embeddings from a single image |
 | Multimodal Embeddings | `IMultimodalEmbeddingFeature` | Embed mixed text + image inputs in a single request |
+| Grounded Chat (RAG) | `IGroundedChatFeature` | Chat with document grounding and citations |
 
 ## Support Matrix
 
 | Feature | OpenAI | Azure OpenAI | Azure AI Inference | Anthropic | Cohere |
 |---------|--------|--------------|-------------------|-----------|--------|
-| Chat Completions | Yes | Yes | Yes | Yes | -- |
+| Chat Completions | Yes | Yes | Yes | Yes | Yes |
 | Text Embeddings | Yes | Yes | Yes | -- | Yes |
-| JSON Mode | Yes | Yes | Yes | Yes | -- |
-| Structured Outputs | Yes | Yes | Yes | Yes | -- |
+| JSON Mode | Yes | Yes | Yes | Yes | Yes |
+| Structured Outputs | Yes | Yes | Yes | Yes | Yes |
 | Image Embeddings | -- | -- | Yes | -- | Yes |
 | Multimodal Embeddings | -- | -- | -- | -- | Yes |
 | Reasoning Models | Yes | Yes | Yes | -- | -- |
 | Responses API (GPT-5) | Yes | -- | -- | -- | -- |
+| Grounded Chat (RAG) | -- | -- | -- | -- | Yes |
 
 ## Provider Details
 
@@ -83,10 +85,14 @@ This page lists every feature supported by each provider integration in Cisharpa
 
 | Capability | Details |
 |------------|---------|
+| Chat Completions | Command family models (command-a-03-2025, command-r-plus-08-2024, command-r-08-2024) |
 | Text Embeddings | Embed v3 and v4 models |
+| JSON Mode | Via `response_format` type `json_object` |
+| Structured Outputs | Via `response_format` with `json_schema` parameter |
 | Image Embeddings | Single image via data URI (`data:image/{mime};base64,...`) |
 | Multimodal Embeddings | Embed v4 mixed text + image inputs, Matryoshka dimension control, batch images |
 | Supported Formats | PNG, JPEG, WebP, GIF |
+| Grounded Chat (RAG) | Document grounding via `documents` array, `citation_options` mode (ACCURATE/FAST/ENABLED), citation character offsets |
 | Input Types | search_query, search_document, classification, clustering |
 
 ## Feature Discovery
@@ -114,6 +120,13 @@ if (embedClient.Features.Get<IImageEmbeddingFeature>() is { } imageFeature)
 if (embedClient.Features.Get<IMultimodalEmbeddingFeature>() is { } multimodalFeature)
 {
     var response = await multimodalFeature.GetMultimodalEmbeddingsAsync(inputs, model);
+}
+
+// Grounded chat (RAG)
+if (chatClient.Features.Get<IGroundedChatFeature>() is { } groundedFeature)
+{
+    var response = await groundedFeature.GetGroundedChatCompletionAsync(request, options);
+    // response.Citations contains source references
 }
 ```
 

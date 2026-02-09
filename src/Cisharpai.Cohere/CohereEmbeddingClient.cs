@@ -12,16 +12,18 @@ public sealed class CohereEmbeddingClient : IEmbeddingClient, IImageEmbeddingFea
     private const string EmbedEndpoint = "embed";
 
     private readonly LlmHttpClient _client;
+    private readonly CohereClientOptions _options;
 
     public IFeatureCollection Features { get; }
 
-    public CohereEmbeddingClient(HttpClient httpClient)
+    public CohereEmbeddingClient(HttpClient httpClient, CohereClientOptions options)
     {
         _client = new LlmHttpClient(httpClient, new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
         });
+        _options = options;
 
         var features = new FeatureCollection();
         features.Set<IImageEmbeddingFeature>(this);
@@ -33,11 +35,16 @@ public sealed class CohereEmbeddingClient : IEmbeddingClient, IImageEmbeddingFea
         EmbeddingRequest request,
         CancellationToken cancellationToken = default)
     {
+        var model = request.Model
+            ?? _options.DefaultModel
+            ?? throw new InvalidOperationException(
+                "Model must be specified either in the request or via DefaultModel in options.");
+
         try
         {
             var providerRequest = new CohereEmbedRequest
             {
-                Model = request.Model,
+                Model = model,
                 Texts = request.Input.ToList(),
                 InputType = MapInputType(request.InputType),
                 EmbeddingTypes = ["float"],

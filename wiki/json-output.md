@@ -72,8 +72,8 @@ var response = await jsonFeature.GetChatCompletionWithJsonOutputAsync(request, o
 | OpenAI (GPT-5) | Yes | Yes | Via `text.format` in Responses API |
 | Azure OpenAI | Yes | Yes | Requires api-version 2024-08-01-preview+ for json_schema |
 | Azure AI Inference | Yes | Varies | Depends on deployed model (Phi, Llama, Mistral) |
-| Anthropic | Not supported | Not supported | `IJsonOutputFeature` not registered |
-| Cohere | N/A | N/A | Embedding-only provider, no chat interface |
+| Anthropic | Yes | Yes | Via system message injection (JSON Mode) and `output_config.format` (Structured Outputs) |
+| Cohere | Yes | Yes | Via `response_format` type `json_object` with optional `json_schema` |
 
 ## JSON Schema Guidelines
 
@@ -124,6 +124,8 @@ Currently, `IJsonOutputFeature` is registered on:
 - `OpenAiChatCompletionClient`
 - `AzureOpenAiChatCompletionClient`
 - `AzureAiInferenceChatCompletionClient`
+- `AnthropicChatCompletionClient`
+- `CohereChatCompletionClient`
 
 ## ExtraParameters Escape Hatch
 

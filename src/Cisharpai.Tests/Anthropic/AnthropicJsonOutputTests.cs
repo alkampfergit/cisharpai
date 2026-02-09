@@ -65,7 +65,7 @@ public sealed class AnthropicJsonOutputTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
-        var client = new AnthropicChatCompletionClient(httpClient);
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
 
         var request = new ChatCompletionRequest(
             Messages: [new LlmMessage(LlmRole.User, "Give me a person")],
@@ -94,7 +94,7 @@ public sealed class AnthropicJsonOutputTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
-        var client = new AnthropicChatCompletionClient(httpClient);
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
 
         var request = new ChatCompletionRequest(
             Messages:
@@ -128,7 +128,7 @@ public sealed class AnthropicJsonOutputTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
-        var client = new AnthropicChatCompletionClient(httpClient);
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
 
         var request = new ChatCompletionRequest(
             Messages:
@@ -162,7 +162,7 @@ public sealed class AnthropicJsonOutputTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
-        var client = new AnthropicChatCompletionClient(httpClient);
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
 
         var request = new ChatCompletionRequest(
             Messages: [new LlmMessage(LlmRole.User, "Give me a person")],
@@ -196,7 +196,7 @@ public sealed class AnthropicJsonOutputTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
-        var client = new AnthropicChatCompletionClient(httpClient);
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
 
         var request = new ChatCompletionRequest(
             Messages: [new LlmMessage(LlmRole.User, "Give me a person")],
@@ -230,7 +230,7 @@ public sealed class AnthropicJsonOutputTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
-        var client = new AnthropicChatCompletionClient(httpClient);
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
 
         var request = new ChatCompletionRequest(
             Messages: [new LlmMessage(LlmRole.User, "Give me a person")],
@@ -271,7 +271,7 @@ public sealed class AnthropicJsonOutputTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
-        var client = new AnthropicChatCompletionClient(httpClient);
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
 
         var request = new ChatCompletionRequest(
             Messages: [new LlmMessage(LlmRole.User, "Give me a person")],
@@ -304,7 +304,7 @@ public sealed class AnthropicJsonOutputTests
             }));
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
-        var client = new AnthropicChatCompletionClient(httpClient);
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
 
         var request = new ChatCompletionRequest(
             Messages: [new LlmMessage(LlmRole.User, "Give me something dangerous")],
@@ -331,7 +331,7 @@ public sealed class AnthropicJsonOutputTests
             }));
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
-        var client = new AnthropicChatCompletionClient(httpClient);
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
 
         var request = new ChatCompletionRequest(
             Messages: [new LlmMessage(LlmRole.User, "Give me a person")],
@@ -380,7 +380,7 @@ public sealed class AnthropicJsonOutputTests
             }));
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
-        var client = new AnthropicChatCompletionClient(httpClient);
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
 
         var request = new ChatCompletionRequest(
             Messages: [new LlmMessage(LlmRole.User, "Give me a person")],
@@ -403,7 +403,7 @@ public sealed class AnthropicJsonOutputTests
             }));
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
-        var client = new AnthropicChatCompletionClient(httpClient);
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
 
         var request = new ChatCompletionRequest(
             Messages: [new LlmMessage(LlmRole.User, "Give me a person")],
@@ -447,7 +447,7 @@ public sealed class AnthropicJsonOutputTests
             }));
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
-        var client = new AnthropicChatCompletionClient(httpClient);
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
 
         var request = new ChatCompletionRequest(
             Messages: [new LlmMessage(LlmRole.User, "Give me a person")],
@@ -470,7 +470,7 @@ public sealed class AnthropicJsonOutputTests
             }));
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
-        var client = new AnthropicChatCompletionClient(httpClient);
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
 
         var request = new ChatCompletionRequest(
             Messages: [new LlmMessage(LlmRole.User, "Give me a person")],
@@ -491,7 +491,7 @@ public sealed class AnthropicJsonOutputTests
     public void Features_GetJsonOutputFeature_ReturnsSelf()
     {
         using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
-        var client = new AnthropicChatCompletionClient(httpClient);
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
 
         var feature = client.Features.Get<IJsonOutputFeature>();
 

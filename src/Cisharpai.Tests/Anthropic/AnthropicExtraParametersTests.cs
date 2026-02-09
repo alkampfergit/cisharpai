@@ -21,7 +21,7 @@ public sealed class AnthropicExtraParametersTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
-        var client = new AnthropicChatCompletionClient(httpClient);
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
 
         var extra = JsonDocument.Parse("""{"top_k":40,"stream":true}""").RootElement;
         var request = new ChatCompletionRequest(
@@ -53,7 +53,7 @@ public sealed class AnthropicExtraParametersTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
-        var client = new AnthropicChatCompletionClient(httpClient);
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
 
         var extra = JsonDocument.Parse("""{"max_tokens":8192}""").RootElement;
         var request = new ChatCompletionRequest(
@@ -78,7 +78,7 @@ public sealed class AnthropicExtraParametersTests
             }));
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
-        var client = new AnthropicChatCompletionClient(httpClient);
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
 
         var extra = JsonDocument.Parse("""{"top_k":40}""").RootElement;
         var request = new ChatCompletionRequest(

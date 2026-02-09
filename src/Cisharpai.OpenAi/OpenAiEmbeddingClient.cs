@@ -10,23 +10,30 @@ public sealed class OpenAiEmbeddingClient : IEmbeddingClient
     private const string EmbeddingsEndpoint = "embeddings";
 
     private readonly LlmHttpClient _client;
+    private readonly OpenAiClientOptions _options;
 
     public IFeatureCollection Features { get; } = new FeatureCollection();
 
-    public OpenAiEmbeddingClient(HttpClient httpClient)
+    public OpenAiEmbeddingClient(HttpClient httpClient, OpenAiClientOptions options)
     {
         _client = new LlmHttpClient(httpClient);
+        _options = options;
     }
 
     public async Task<EmbeddingResponse> GetEmbeddingsAsync(
         EmbeddingRequest request,
         CancellationToken cancellationToken = default)
     {
+        var model = request.Model
+            ?? _options.DefaultModel
+            ?? throw new InvalidOperationException(
+                "Model must be specified either in the request or via DefaultModel in options.");
+
         try
         {
             var providerRequest = new OpenAiEmbeddingRequest
             {
-                Model = request.Model,
+                Model = model,
                 Input = request.Input.Count == 1 ? request.Input[0] : (object)request.Input,
                 EncodingFormat = request.EncodingFormat,
                 Dimensions = request.Dimensions

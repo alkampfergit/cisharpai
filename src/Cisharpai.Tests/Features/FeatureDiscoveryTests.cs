@@ -35,7 +35,7 @@ public sealed class FeatureDiscoveryTests
     public void OpenAiEmbeddingClient_Features_IsNotNull()
     {
         using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.openai.com/v1/") };
-        var client = new OpenAiEmbeddingClient(httpClient);
+        var client = new OpenAiEmbeddingClient(httpClient, new OpenAiClientOptions());
 
         Assert.That(client.Features, Is.Not.Null);
     }
@@ -44,7 +44,7 @@ public sealed class FeatureDiscoveryTests
     public void OpenAiEmbeddingClient_DoesNotExposeImageEmbeddingFeature()
     {
         using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.openai.com/v1/") };
-        var client = new OpenAiEmbeddingClient(httpClient);
+        var client = new OpenAiEmbeddingClient(httpClient, new OpenAiClientOptions());
 
         Assert.That(client.Features.Get<IImageEmbeddingFeature>(), Is.Null);
     }
@@ -55,7 +55,7 @@ public sealed class FeatureDiscoveryTests
     public void AnthropicChatCompletionClient_Features_IsNotNull()
     {
         using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
-        var client = new AnthropicChatCompletionClient(httpClient);
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
 
         Assert.That(client.Features, Is.Not.Null);
     }
@@ -64,7 +64,7 @@ public sealed class FeatureDiscoveryTests
     public void AnthropicChatCompletionClient_DoesNotExposeImageEmbeddingFeature()
     {
         using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
-        var client = new AnthropicChatCompletionClient(httpClient);
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
 
         Assert.That(client.Features.Get<IImageEmbeddingFeature>(), Is.Null);
     }
@@ -75,7 +75,7 @@ public sealed class FeatureDiscoveryTests
     public void CohereEmbeddingClient_Features_IsNotNull()
     {
         using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereEmbeddingClient(httpClient);
+        var client = new CohereEmbeddingClient(httpClient, new CohereClientOptions());
 
         Assert.That(client.Features, Is.Not.Null);
     }
@@ -84,7 +84,7 @@ public sealed class FeatureDiscoveryTests
     public void CohereEmbeddingClient_ExposesImageEmbeddingFeature()
     {
         using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereEmbeddingClient(httpClient);
+        var client = new CohereEmbeddingClient(httpClient, new CohereClientOptions());
 
         var feature = client.Features.Get<IImageEmbeddingFeature>();
 
@@ -183,7 +183,7 @@ public sealed class FeatureDiscoveryTests
     public void CohereEmbeddingClient_ExposesMultimodalEmbeddingFeature()
     {
         using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereEmbeddingClient(httpClient);
+        var client = new CohereEmbeddingClient(httpClient, new CohereClientOptions());
 
         var feature = client.Features.Get<IMultimodalEmbeddingFeature>();
 
@@ -197,7 +197,7 @@ public sealed class FeatureDiscoveryTests
     public void FeatureDiscovery_ViaInterface_WorksForCohereClient()
     {
         using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        IEmbeddingClient client = new CohereEmbeddingClient(httpClient);
+        IEmbeddingClient client = new CohereEmbeddingClient(httpClient, new CohereClientOptions());
 
         var imageFeature = client.Features.Get<IImageEmbeddingFeature>();
 
@@ -208,7 +208,7 @@ public sealed class FeatureDiscoveryTests
     public void FeatureDiscovery_ViaInterface_ReturnsNullForOpenAiClient()
     {
         using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.openai.com/v1/") };
-        IEmbeddingClient client = new OpenAiEmbeddingClient(httpClient);
+        IEmbeddingClient client = new OpenAiEmbeddingClient(httpClient, new OpenAiClientOptions());
 
         var imageFeature = client.Features.Get<IImageEmbeddingFeature>();
 
@@ -219,7 +219,7 @@ public sealed class FeatureDiscoveryTests
     public void FeatureDiscovery_ViaInterface_WorksForCohereMultimodal()
     {
         using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        IEmbeddingClient client = new CohereEmbeddingClient(httpClient);
+        IEmbeddingClient client = new CohereEmbeddingClient(httpClient, new CohereClientOptions());
 
         var multimodalFeature = client.Features.Get<IMultimodalEmbeddingFeature>();
 
@@ -270,7 +270,7 @@ public sealed class FeatureDiscoveryTests
     public void AnthropicChatCompletionClient_ExposesJsonOutputFeature()
     {
         using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
-        var client = new AnthropicChatCompletionClient(httpClient);
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
 
         var feature = client.Features.Get<IJsonOutputFeature>();
 
@@ -282,9 +282,115 @@ public sealed class FeatureDiscoveryTests
     public void CohereEmbeddingClient_DoesNotExposeJsonOutputFeature()
     {
         using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereEmbeddingClient(httpClient);
+        var client = new CohereEmbeddingClient(httpClient, new CohereClientOptions());
 
         Assert.That(client.Features.Get<IJsonOutputFeature>(), Is.Null);
+    }
+
+    // --- Grounded Chat Feature discovery ---
+
+    [Test]
+    public void CohereChatCompletionClient_ExposesGroundedChatFeature()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.cohere.com/v2/") };
+        var client = new CohereChatCompletionClient(httpClient, new CohereClientOptions());
+
+        var feature = client.Features.Get<IGroundedChatFeature>();
+
+        Assert.That(feature, Is.Not.Null);
+        Assert.That(feature, Is.SameAs(client));
+    }
+
+    [Test]
+    public void FeatureDiscovery_ViaInterface_WorksForCohereGroundedChat()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.cohere.com/v2/") };
+        IChatCompletionClient client = new CohereChatCompletionClient(httpClient, new CohereClientOptions());
+
+        var groundedFeature = client.Features.Get<IGroundedChatFeature>();
+
+        Assert.That(groundedFeature, Is.Not.Null);
+    }
+
+    [Test]
+    public void OpenAiChatCompletionClient_DoesNotExposeGroundedChatFeature()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.openai.com/v1/") };
+        var client = new OpenAiChatCompletionClient(httpClient, new OpenAiClientOptions());
+
+        Assert.That(client.Features.Get<IGroundedChatFeature>(), Is.Null);
+    }
+
+    [Test]
+    public void AnthropicChatCompletionClient_DoesNotExposeGroundedChatFeature()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
+
+        Assert.That(client.Features.Get<IGroundedChatFeature>(), Is.Null);
+    }
+
+    [Test]
+    public void AzureOpenAiChatCompletionClient_DoesNotExposeGroundedChatFeature()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://test.openai.azure.com/") };
+        var options = new AzureOpenAiClientOptions { DeploymentName = "test", ApiKey = "key" };
+        var client = new AzureOpenAiChatCompletionClient(httpClient, options);
+
+        Assert.That(client.Features.Get<IGroundedChatFeature>(), Is.Null);
+    }
+
+    [Test]
+    public void AzureAiInferenceChatCompletionClient_DoesNotExposeGroundedChatFeature()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://test.inference.azure.com/") };
+        var options = new AzureAiInferenceClientOptions { ModelId = "test-model", ApiKey = "key" };
+        var client = new AzureAiInferenceChatCompletionClient(httpClient, options);
+
+        Assert.That(client.Features.Get<IGroundedChatFeature>(), Is.Null);
+    }
+
+    // --- Cohere chat client: exposes JSON output feature ---
+
+    [Test]
+    public void CohereChatCompletionClient_Features_IsNotNull()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.cohere.com/v2/") };
+        var client = new CohereChatCompletionClient(httpClient, new CohereClientOptions());
+
+        Assert.That(client.Features, Is.Not.Null);
+    }
+
+    [Test]
+    public void CohereChatCompletionClient_ExposesJsonOutputFeature()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.cohere.com/v2/") };
+        var client = new CohereChatCompletionClient(httpClient, new CohereClientOptions());
+
+        var feature = client.Features.Get<IJsonOutputFeature>();
+
+        Assert.That(feature, Is.Not.Null);
+        Assert.That(feature, Is.SameAs(client));
+    }
+
+    [Test]
+    public void CohereChatCompletionClient_DoesNotExposeImageEmbeddingFeature()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.cohere.com/v2/") };
+        var client = new CohereChatCompletionClient(httpClient, new CohereClientOptions());
+
+        Assert.That(client.Features.Get<IImageEmbeddingFeature>(), Is.Null);
+    }
+
+    [Test]
+    public void FeatureDiscovery_ViaInterface_WorksForCohereJsonOutput()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.cohere.com/v2/") };
+        IChatCompletionClient client = new CohereChatCompletionClient(httpClient, new CohereClientOptions());
+
+        var jsonFeature = client.Features.Get<IJsonOutputFeature>();
+
+        Assert.That(jsonFeature, Is.Not.Null);
     }
 
     [Test]

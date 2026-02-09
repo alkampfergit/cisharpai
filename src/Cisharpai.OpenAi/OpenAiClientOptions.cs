@@ -11,4 +11,6 @@ public sealed class OpenAiClientOptions
     public string? ReasoningEffort { get; set; }
 
     public string? TextVerbosity { get; set; }
+
+    public string? DefaultModel { get; set; }
 }

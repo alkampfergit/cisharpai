@@ -21,7 +21,7 @@ public sealed class CohereMultimodalEmbeddingTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereEmbeddingClient(httpClient);
+        var client = new CohereEmbeddingClient(httpClient, new CohereClientOptions());
 
         var inputs = new List<MultimodalEmbeddingInput>
         {
@@ -59,7 +59,7 @@ public sealed class CohereMultimodalEmbeddingTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereEmbeddingClient(httpClient);
+        var client = new CohereEmbeddingClient(httpClient, new CohereClientOptions());
 
         var imagePath = CreateTestImage(".png");
         try
@@ -99,7 +99,7 @@ public sealed class CohereMultimodalEmbeddingTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereEmbeddingClient(httpClient);
+        var client = new CohereEmbeddingClient(httpClient, new CohereClientOptions());
 
         var imagePath = CreateTestImage(".png");
         try
@@ -140,7 +140,7 @@ public sealed class CohereMultimodalEmbeddingTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereEmbeddingClient(httpClient);
+        var client = new CohereEmbeddingClient(httpClient, new CohereClientOptions());
 
         var inputs = new List<MultimodalEmbeddingInput>
         {
@@ -169,7 +169,7 @@ public sealed class CohereMultimodalEmbeddingTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereEmbeddingClient(httpClient);
+        var client = new CohereEmbeddingClient(httpClient, new CohereClientOptions());
 
         var inputs = new List<MultimodalEmbeddingInput>
         {
@@ -200,7 +200,7 @@ public sealed class CohereMultimodalEmbeddingTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereEmbeddingClient(httpClient);
+        var client = new CohereEmbeddingClient(httpClient, new CohereClientOptions());
 
         var inputs = new List<MultimodalEmbeddingInput>
         {
@@ -223,7 +223,7 @@ public sealed class CohereMultimodalEmbeddingTests
             }));
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereEmbeddingClient(httpClient);
+        var client = new CohereEmbeddingClient(httpClient, new CohereClientOptions());
 
         var inputs = new List<MultimodalEmbeddingInput>
         {
@@ -248,7 +248,7 @@ public sealed class CohereMultimodalEmbeddingTests
             }));
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereEmbeddingClient(httpClient);
+        var client = new CohereEmbeddingClient(httpClient, new CohereClientOptions());
 
         var inputs = new List<MultimodalEmbeddingInput>
         {
@@ -272,7 +272,7 @@ public sealed class CohereMultimodalEmbeddingTests
             }));
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereEmbeddingClient(httpClient);
+        var client = new CohereEmbeddingClient(httpClient, new CohereClientOptions());
 
         var inputs = new List<MultimodalEmbeddingInput>
         {
@@ -299,7 +299,7 @@ public sealed class CohereMultimodalEmbeddingTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereEmbeddingClient(httpClient);
+        var client = new CohereEmbeddingClient(httpClient, new CohereClientOptions());
 
         var inputs = new List<MultimodalEmbeddingInput>
         {

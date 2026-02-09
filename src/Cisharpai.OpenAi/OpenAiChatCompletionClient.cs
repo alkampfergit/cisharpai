@@ -30,9 +30,12 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         ChatCompletionRequest request,
         CancellationToken cancellationToken = default)
     {
+        var model = ResolveModel(request.Model);
+        request = request with { Model = model };
+
         try
         {
-            var modelType = DetectModelType(request.Model);
+            var modelType = DetectModelType(model);
 
             return modelType switch
             {
@@ -56,11 +59,14 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         JsonOutputOptions jsonOutputOptions,
         CancellationToken cancellationToken = default)
     {
+        var model = ResolveModel(request.Model);
+        request = request with { Model = model };
+
         try
         {
             jsonOutputOptions.Validate();
 
-            var modelType = DetectModelType(request.Model);
+            var modelType = DetectModelType(model);
 
             return modelType switch
             {
@@ -382,6 +388,14 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         LlmRole.Assistant => "assistant",
         _ => throw new ArgumentOutOfRangeException(nameof(role), role, null)
     };
+
+    private string ResolveModel(string? model)
+    {
+        return model
+            ?? _options.DefaultModel
+            ?? throw new InvalidOperationException(
+                "Model must be specified either in the request or via DefaultModel in options.");
+    }
 
     internal static OpenAiModelType DetectModelType(string model)
     {
