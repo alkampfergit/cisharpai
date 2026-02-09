@@ -60,7 +60,7 @@ public sealed class AzureAiInferenceClientOptionsTests
     }
 
     [Test]
-    public void Validate_MissingApiKey_ThrowsInvalidOperationException()
+    public void Validate_MissingApiKey_DoesNotThrow_WhenOnlyValidatingStructure()
     {
         var options = new AzureAiInferenceClientOptions
         {
@@ -69,8 +69,48 @@ public sealed class AzureAiInferenceClientOptionsTests
             ModelId = "Phi-3-mini-4k-instruct"
         };
 
-        var ex = Assert.Throws<InvalidOperationException>(() => options.Validate());
-        Assert.That(ex.Message, Does.Contain("ApiKey"));
+        Assert.DoesNotThrow(() => options.Validate());
+    }
+
+    [Test]
+    public void ValidateAuthentication_NoApiKeyNoCredential_Throws()
+    {
+        var options = new AzureAiInferenceClientOptions
+        {
+            Endpoint = "https://my-resource.services.ai.azure.com/models",
+            ApiKey = null,
+            ModelId = "Phi-3-mini-4k-instruct"
+        };
+
+        var ex = Assert.Throws<InvalidOperationException>(
+            () => options.ValidateAuthentication(hasTokenCredential: false));
+        Assert.That(ex.Message, Does.Contain("ApiKey").Or.Contain("TokenCredential"));
+    }
+
+    [Test]
+    public void ValidateAuthentication_NoApiKeyWithCredential_DoesNotThrow()
+    {
+        var options = new AzureAiInferenceClientOptions
+        {
+            Endpoint = "https://my-resource.services.ai.azure.com/models",
+            ApiKey = null,
+            ModelId = "Phi-3-mini-4k-instruct"
+        };
+
+        Assert.DoesNotThrow(() => options.ValidateAuthentication(hasTokenCredential: true));
+    }
+
+    [Test]
+    public void ValidateAuthentication_WithApiKeyNoCredential_DoesNotThrow()
+    {
+        var options = new AzureAiInferenceClientOptions
+        {
+            Endpoint = "https://my-resource.services.ai.azure.com/models",
+            ApiKey = "my-api-key",
+            ModelId = "Phi-3-mini-4k-instruct"
+        };
+
+        Assert.DoesNotThrow(() => options.ValidateAuthentication(hasTokenCredential: false));
     }
 
     [Test]

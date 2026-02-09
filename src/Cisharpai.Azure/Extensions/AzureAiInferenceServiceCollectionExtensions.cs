@@ -22,6 +22,7 @@ public static class AzureAiInferenceServiceCollectionExtensions
         var options = new AzureAiInferenceClientOptions();
         configure(options);
         options.Validate();
+        options.ValidateAuthentication(credential is not null);
 
         services.AddSingleton(options);
 
@@ -57,6 +58,7 @@ public static class AzureAiInferenceServiceCollectionExtensions
         var options = new AzureAiInferenceClientOptions();
         configure(options);
         options.Validate();
+        options.ValidateAuthentication(credential is not null);
 
         services.AddSingleton(options);
 

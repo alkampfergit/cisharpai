@@ -33,9 +33,19 @@ public sealed class AzureOpenAiClientOptions : AzureClientOptionsBase
             throw new InvalidOperationException("DeploymentName is required.");
         }
 
-        if (string.IsNullOrWhiteSpace(ApiKey))
+    }
+
+    /// <summary>
+    /// Validates that either an API key or a token credential is configured for authentication.
+    /// Called by DI extensions where both options and credential are available.
+    /// </summary>
+    /// <param name="hasTokenCredential">Whether a TokenCredential was provided.</param>
+    /// <exception cref="InvalidOperationException">Thrown when neither authentication method is configured.</exception>
+    internal void ValidateAuthentication(bool hasTokenCredential)
+    {
+        if (!hasTokenCredential && string.IsNullOrWhiteSpace(ApiKey))
         {
-            throw new InvalidOperationException("ApiKey is required.");
+            throw new InvalidOperationException("Either ApiKey or a TokenCredential is required for authentication.");
         }
     }
 }
