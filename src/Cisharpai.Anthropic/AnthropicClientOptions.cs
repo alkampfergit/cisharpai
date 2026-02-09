@@ -7,4 +7,6 @@ public sealed class AnthropicClientOptions
     public string ApiKey { get; set; } = string.Empty;
 
     public string? ApiVersion { get; set; }
+
+    public string? DefaultModel { get; set; }
 }

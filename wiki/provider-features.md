@@ -11,6 +11,7 @@ This page lists every feature supported by each provider integration in Cisharpa
 | JSON Output | `IJsonOutputFeature` | Force JSON Mode or Structured Outputs on chat responses |
 | Image Embeddings | `IImageEmbeddingFeature` | Generate vector embeddings from a single image |
 | Multimodal Embeddings | `IMultimodalEmbeddingFeature` | Embed mixed text + image inputs in a single request |
+| Grounded Chat (RAG) | `IGroundedChatFeature` | Chat with document grounding and citations |
 
 ## Support Matrix
 
@@ -24,6 +25,7 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Multimodal Embeddings | -- | -- | -- | -- | Yes |
 | Reasoning Models | Yes | Yes | Yes | -- | -- |
 | Responses API (GPT-5) | Yes | -- | -- | -- | -- |
+| Grounded Chat (RAG) | -- | -- | -- | -- | Yes |
 
 ## Provider Details
 
@@ -90,6 +92,7 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Image Embeddings | Single image via data URI (`data:image/{mime};base64,...`) |
 | Multimodal Embeddings | Embed v4 mixed text + image inputs, Matryoshka dimension control, batch images |
 | Supported Formats | PNG, JPEG, WebP, GIF |
+| Grounded Chat (RAG) | Document grounding via `documents` array, `citation_options` mode (ACCURATE/FAST/ENABLED), citation character offsets |
 | Input Types | search_query, search_document, classification, clustering |
 
 ## Feature Discovery
@@ -117,6 +120,13 @@ if (embedClient.Features.Get<IImageEmbeddingFeature>() is { } imageFeature)
 if (embedClient.Features.Get<IMultimodalEmbeddingFeature>() is { } multimodalFeature)
 {
     var response = await multimodalFeature.GetMultimodalEmbeddingsAsync(inputs, model);
+}
+
+// Grounded chat (RAG)
+if (chatClient.Features.Get<IGroundedChatFeature>() is { } groundedFeature)
+{
+    var response = await groundedFeature.GetGroundedChatCompletionAsync(request, options);
+    // response.Citations contains source references
 }
 ```
 

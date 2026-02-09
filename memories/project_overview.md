@@ -27,15 +27,22 @@ Contains the abstractions and shared logic. This is the only dependency needed f
     *   `FeatureCollection.cs`: Thread-safe implementation backed by `ConcurrentDictionary<Type, object>`.
     *   `Embeddings/IImageEmbeddingFeature.cs`: Optional feature for embedding images via `GetImageEmbeddingAsync(imagePath, model)`.
     *   `Embeddings/IMultimodalEmbeddingFeature.cs`: Optional feature for multimodal embedding (text + images in a single request) via `GetMultimodalEmbeddingsAsync(inputs, model, inputType, outputDimension, ...)`. Supports Cohere Embed v4 mixed-modality inputs and Matryoshka dimension control.
-    *   `Chat/IJsonOutputFeature.cs`: Optional feature for JSON output enforcement on chat completion clients via `GetChatCompletionWithJsonOutputAsync(request, jsonOutputOptions)`. Supports JSON Mode (`json_object`) and Structured Outputs (`json_schema`). Registered on OpenAI, Azure OpenAI, Azure AI Inference, and Anthropic clients.
+    *   `Chat/IJsonOutputFeature.cs`: Optional feature for JSON output enforcement on chat completion clients via `GetChatCompletionWithJsonOutputAsync(request, jsonOutputOptions)`. Supports JSON Mode (`json_object`) and Structured Outputs (`json_schema`). Registered on OpenAI, Azure OpenAI, Azure AI Inference, Anthropic, and Cohere clients.
+    *   `Chat/IGroundedChatFeature.cs`: Optional feature for grounded chat (RAG) with document citations via `GetGroundedChatCompletionAsync(request, groundedChatOptions)`. Passes documents and returns citations with character offsets. Currently registered on Cohere client only.
 *   **`Models/`**:
-    *   **`ChatCompletionRequest.cs`**: Unified request model (Messages, Model, Temperature, MaxTokens, IncludeRawResponse, ExtraParameters). The `ExtraParameters` property (`JsonElement?`) allows passing arbitrary JSON that is deeply merged into the provider-specific request body, enabling use of new model features without DTO changes.
+    *   **`ChatCompletionRequest.cs`**: Unified request model (Messages, Model?, Temperature, MaxTokens, IncludeRawResponse, ExtraParameters). `Model` is optional (`string?`, defaults to `null`); when omitted, the provider client falls back to `DefaultModel` from its options. The `ExtraParameters` property (`JsonElement?`) allows passing arbitrary JSON that is deeply merged into the provider-specific request body, enabling use of new model features without DTO changes.
     *   **`ChatCompletionResponse.cs`**: Unified response model (Content, Usage stats, optional Status/IncompleteReason for Responses API, IsSuccess/ErrorMessage for error handling, RawResponseJson/RawRequestJson for debug inspection, optional Refusal for Structured Outputs safety refusals). Provider clients never throw exceptions; errors are returned via `IsSuccess = false` and `ErrorMessage`. Includes a static `Error()` factory method.
     *   **`JsonOutputMode.cs`**: Enum defining JSON output modes: `JsonMode` (json_object, valid JSON without schema enforcement) and `JsonSchema` (json_schema, strict schema-conforming output).
     *   **`JsonOutputOptions.cs`**: Configuration record for JSON output behavior (Mode, SchemaName, SchemaDescription, JsonSchema, Strict). Includes `Validate()` method that throws `ArgumentException` when `JsonSchema` mode is used without required schema fields.
-    *   **`EmbeddingRequest.cs`**: Unified request model for embedding operations (Input, Model, InputType, Dimensions, EncodingFormat, ExtraParameters).
+    *   **`EmbeddingRequest.cs`**: Unified request model for embedding operations (Input, Model?, InputType, Dimensions, EncodingFormat, ExtraParameters). `Model` is optional (`string?`, defaults to `null`); when omitted, the provider client falls back to `DefaultModel` from its options.
     *   **`EmbeddingResponse.cs`**: Unified response model for embeddings (Embeddings, Base64Embeddings, Model, TotalTokens, Dimensions, RawResponseJson, RawRequestJson, IsSuccess/ErrorMessage).
     *   **`MultimodalEmbeddingInput.cs`**: Models for multimodal embedding. `EmbeddingContentPart` (abstract base), `TextEmbeddingContent(Text)`, `ImageEmbeddingContent(ImagePath)`, and `MultimodalEmbeddingInput(Content)` for composing mixed text+image inputs.
+    *   **`CitationMode.cs`**: Enum defining citation modes for grounded chat: `Accurate`, `Fast`, `Enabled`.
+    *   **`DocumentChunk.cs`**: Represents a document chunk for RAG (Id, Data as key-value dict, or Text as plain string). Includes `Validate()` ensuring exactly one of Data/Text is set.
+    *   **`CitationSource.cs`**: Represents a source document backing a citation (Id, optional Data dictionary).
+    *   **`Citation.cs`**: Represents a citation in a grounded response (Start/End character offsets, Text, Sources).
+    *   **`GroundedChatOptions.cs`**: Configuration record for grounded chat (Documents, CitationMode). Includes `Validate()`.
+    *   **`GroundedChatCompletionResponse.cs`**: Wraps `ChatCompletionResponse` with `Citations`. Convenience `IsSuccess`, `Content`, `ErrorMessage` properties. Static `Error()` factory.
     *   **`LlmMessage.cs`**: Represents a message in the conversation (Role, Content).
 *   **`JsonDeepMerge.cs`**: Static utility for deeply merging a JSON override document into a base JSON document. Objects are merged recursively; arrays and scalars are replaced by overrides.
 *   **`LlmHttpClient.cs`**: Internal helper for handling HTTP requests to the providers. Supports optional `extraParameters` (`JsonElement?`) that are deeply merged into the serialized request payload before sending. `PostWithRawAsync` returns both raw response JSON and raw request JSON for debug inspection.
@@ -46,6 +53,8 @@ Each supported provider has its own project providing concrete implementations o
 *   **`src/Cisharpai.OpenAi/`**: Connector for standard OpenAI API. Supports legacy Chat Completions API (GPT-4, etc.), reasoning models (o1/o3/o4), and the Responses API (GPT-5) with status/incomplete handling.
     *   `OpenAiChatCompletionClient.cs`: Implements `IChatCompletionClient` and `IJsonOutputFeature`. Routes to the correct endpoint/format based on model detection. Supports JSON Mode and Structured Outputs across legacy, reasoning, and GPT-5 (Responses API) model paths. Extracts refusal from structured output responses.
     *   `OpenAiEmbeddingClient.cs`: Implements `IEmbeddingClient`.
+    *   `OpenAiModels.cs`: Static class with well-known model ID constants. Nested `Chat` class (Gpt4_1, Gpt4_1Mini, Gpt4_1Nano, Gpt4o, Gpt4oMini, Gpt4_5, O3, O3Mini, O3Pro, O4Mini, O1, O1Mini) and `Embedding` class (TextEmbedding3Small, TextEmbedding3Large, TextEmbeddingAda002).
+    *   `OpenAiClientOptions.cs`: Configuration with BaseUrl, ApiKey, Organization, ReasoningEffort, TextVerbosity, and `DefaultModel` (optional, used when `ChatCompletionRequest.Model` is null).
     *   `Models/OpenAiResponseFormat.cs`: DTOs for `response_format` parameter: `OpenAiResponseFormat`, `OpenAiJsonSchemaSpec` (Chat Completions API), `OpenAiTextFormat` (Responses API with flattened schema structure).
 *   **`src/Cisharpai.Azure/`**: Consolidated connector for all Azure AI services. Uses HttpClient directly (no SDK dependencies except Azure.Identity for authentication).
     *   **`Common/`**: Shared utilities for all Azure services.
@@ -69,15 +78,21 @@ Each supported provider has its own project providing concrete implementations o
         *   `AzureAiInferenceServiceCollectionExtensions.cs`: `AddAzureAiInferenceChatCompletion()` and `AddAzureAiInferenceEmbeddings()` for registering Azure AI Inference clients.
 *   **`src/Cisharpai.Anthropic/`**: Connector for Anthropic (Claude) API. Supports structured outputs via `output_config.format` parameter.
     *   `AnthropicChatCompletionClient.cs`: Implements `IChatCompletionClient` and `IJsonOutputFeature`. Supports JSON Mode (via system message injection) and Structured Outputs (`json_schema` via `output_config.format`). Handles refusal via `stop_reason: "refusal"`.
+    *   `AnthropicModels.cs`: Static class with well-known model ID constants. Nested `Chat` class (ClaudeOpus4_5, ClaudeSonnet4_5, ClaudeHaiku4_5, ClaudeSonnet4, ClaudeHaiku4, ClaudeOpus3).
+    *   `AnthropicClientOptions.cs`: Configuration with BaseUrl, ApiKey, ApiVersion, and `DefaultModel` (optional, used when `ChatCompletionRequest.Model` is null).
     *   `Models/AnthropicOutputConfig.cs`: DTOs for `output_config.format` parameter: `AnthropicOutputConfig`, `AnthropicOutputFormat`.
 *   **`src/Cisharpai.Cohere/`**: Connector for Cohere API. Supports Embed v3/v4 models and Chat v2 API.
-    *   `CohereChatCompletionClient.cs`: Implements `IChatCompletionClient` and `IJsonOutputFeature`. Supports JSON Mode and Structured Outputs via `response_format` with `json_object` type and optional `json_schema`. Uses system message injection for JSON Mode. Endpoint: `chat`.
+    *   `CohereChatCompletionClient.cs`: Implements `IChatCompletionClient`, `IJsonOutputFeature`, and `IGroundedChatFeature`. Supports JSON Mode and Structured Outputs via `response_format` with `json_object` type and optional `json_schema`. Supports grounded chat (RAG) via `documents` array and `citation_options`. Uses system message injection for JSON Mode. Endpoint: `chat`.
     *   `CohereEmbeddingClient.cs`: Implements `IEmbeddingClient`, `IImageEmbeddingFeature`, and `IMultimodalEmbeddingFeature`. Supports text embeddings, single image embedding, and Embed v4 multimodal embedding (mixed text+image inputs, Matryoshka output dimensions, batch images). Images are sent as data URIs.
+    *   `CohereModels.cs`: Static class with well-known model ID constants. Nested `Chat` class (CommandA, CommandRPlus, CommandR) and `Embedding` class (EmbedV4, EmbedEnglishV3, EmbedMultilingualV3, EmbedEnglishLightV3, EmbedMultilingualLightV3).
+    *   `CohereClientOptions.cs`: Configuration with BaseUrl, ApiKey, and `DefaultModel` (optional, used when `ChatCompletionRequest.Model` or `EmbeddingRequest.Model` is null).
     *   `CohereServiceCollectionExtensions.cs`: DI registration with `AddCohereEmbeddingClient()` and `AddCohereChatClient()` methods.
     *   `ImageDataUriHelper.cs`: Internal utility for converting image file paths to data URI format (`data:image/{mime};base64,...`). Supports PNG, JPEG, WebP, GIF.
-    *   `Models/CohereChatRequest.cs`: Request DTOs for Cohere v2 chat API: `CohereChatMessage`, `CohereChatRequest`.
-    *   `Models/CohereChatResponse.cs`: Response DTOs: `CohereChatContentBlock`, `CohereChatResponseMessage`, `CohereChatTokens`, `CohereChatBilledUnits`, `CohereChatUsage`, `CohereChatResponse`.
+    *   `Models/CohereChatRequest.cs`: Request DTOs for Cohere v2 chat API: `CohereChatMessage`, `CohereChatRequest` (with `Documents` and `CitationOptions` for RAG).
+    *   `Models/CohereChatResponse.cs`: Response DTOs: `CohereChatContentBlock`, `CohereChatResponseMessage` (with optional `Citations`), `CohereChatTokens`, `CohereChatBilledUnits`, `CohereChatUsage`, `CohereChatResponse`.
     *   `Models/CohereChatResponseFormat.cs`: DTO for `response_format` parameter with `json_object` type and optional `json_schema`.
+    *   `Models/CohereChatDocument.cs`: DTO for `documents` array entries: `CohereChatDocument` (Id, Data as JsonElement) and `CohereCitationOptions` (Mode string).
+    *   `Models/CohereChatCitation.cs`: Response DTOs for citations: `CohereChatCitation` (Start, End, Text, Sources, Type) and `CohereChatCitationSource` (Type, Id, Document dict).
     *   `Models/CohereEmbedInput.cs`: DTOs for Embed v4 `inputs` parameter: `CohereEmbedInput`, `CohereEmbedContentPart`, `CohereImageUrl`.
     *   `Models/CohereEmbedRequest.cs`: Request DTO with `Texts`, `Images`, `Inputs` (v4, mutually exclusive), `InputType`, `EmbeddingTypes`, `OutputDimension` (v4 Matryoshka).
     *   `Models/CohereEmbedResponse.cs`: Response DTO with `CohereEmbeddings`, `CohereBilledUnits` (includes `ImageTokens` for v4), `CohereImageMetadata`.
@@ -98,6 +113,7 @@ Interactive demo application showcasing all provider integrations through a scen
     *   `AzureAiInferenceChatScenario.cs`: Azure AI Inference chat completion demo.
     *   `CohereEmbeddingScenario.cs`: Cohere embedding demo.
     *   `CohereChatScenario.cs`: Cohere chat completion demo.
+    *   `CohereGroundedChatScenario.cs`: Cohere grounded chat (RAG) with documents and citations demo.
     *   `OpenAiJsonOutputScenario.cs`: OpenAI JSON Mode and Structured Outputs demo.
 
 ### Wiki (`wiki/`)
@@ -109,7 +125,8 @@ Project documentation pages.
 *   `embeddings.md`: Comprehensive embeddings guide across providers.
 *   `feature-extensions.md`: Feature Collection Pattern documentation.
 *   `json-output.md`: JSON Mode and Structured Outputs documentation (quick start, provider support matrix, schema guidelines, refusal handling, troubleshooting).
-*   `provider-features.md`: Provider Feature Matrix — lists every feature (chat, embeddings, JSON output, image embeddings, multimodal embeddings) supported by each provider. Must be updated when features are added or removed.
+*   `grounded-chat.md`: Grounded Chat (RAG) documentation (quick start, document formats, citation modes, working with citations, provider support).
+*   `provider-features.md`: Provider Feature Matrix — lists every feature (chat, embeddings, JSON output, image embeddings, multimodal embeddings, grounded chat) supported by each provider. Must be updated when features are added or removed.
 
 ### CI/CD & Build
 
@@ -133,15 +150,21 @@ Project documentation pages.
     *   `TestEnvironmentVariables.cs`: Constants for environment variable names used in integration tests.
 *   **`src/Cisharpai.Tests/`**: Unit tests.
     *   `Features/FeatureCollectionTests.cs`: Tests for `FeatureCollection` (Get/Set/enumeration/thread-safety).
-    *   `Features/FeatureDiscoveryTests.cs`: Tests verifying feature discovery across all 9 client implementations (including IJsonOutputFeature on OpenAI, Azure OpenAI, Azure AI Inference, Anthropic, and Cohere chat; absence on Cohere embedding).
+    *   `Features/FeatureDiscoveryTests.cs`: Tests verifying feature discovery across all 9 client implementations (including IJsonOutputFeature and IGroundedChatFeature on Cohere chat; absence of IGroundedChatFeature on other providers).
     *   `Cohere/CohereImageEmbeddingTests.cs`: Tests for Cohere image embedding request/response mapping and data URI format.
     *   `Cohere/CohereMultimodalEmbeddingTests.cs`: Tests for Cohere Embed v4 multimodal embedding (text-only, image-only, mixed, batch, output_dimension, input types, raw response, error handling, image tokens).
     *   `Cohere/CohereChatCompletionTests.cs`: Tests for Cohere chat completion request/response mapping (messages, roles, snake_case naming, tokens, raw response, error handling).
     *   `Cohere/CohereJsonOutputTests.cs`: Tests for Cohere JSON output request building (JSON Mode response_format, system message injection, Structured Outputs with json_schema, markdown fence stripping, feature discovery).
+    *   `Cohere/CohereGroundedChatTests.cs`: Tests for Cohere grounded chat request building (documents array, key-value/plain-text formats, citation_options modes, snake_case naming, no response_format), response mapping (citations, sources, content, tokens), error handling, and feature discovery.
     *   `Cohere/ImageDataUriHelperTests.cs`: Tests for data URI helper (MIME type mapping for PNG/JPEG/WebP/GIF, base64 encoding).
     *   `Azure/AzureAiInference/AzureAiInferenceImageEmbeddingTests.cs`: Tests for Azure AI Inference image embedding.
     *   `Models/JsonOutputOptionsTests.cs`: Tests for `JsonOutputOptions` validation (JsonMode valid with/without schema, JsonSchema validation scenarios, Strict defaults).
+    *   `Models/GroundedChatOptionsTests.cs`: Tests for `GroundedChatOptions` validation (with/without documents, null documents, default CitationMode).
+    *   `Models/DocumentChunkTests.cs`: Tests for `DocumentChunk` validation (Data-only, Text-only, both, neither, empty).
     *   `OpenAi/OpenAiJsonOutputTests.cs`: Tests for OpenAI JSON output request building (JSON Mode for legacy/reasoning/GPT-5, Structured Outputs, refusal handling, system message injection, feature discovery).
+    *   `OpenAi/OpenAiDefaultModelTests.cs`: Tests for OpenAI default model resolution (fallback to DefaultModel, request override, no-model exception, model constants validation).
+    *   `Anthropic/AnthropicDefaultModelTests.cs`: Tests for Anthropic default model resolution (fallback to DefaultModel, request override, no-model exception, model constants validation).
+    *   `Cohere/CohereDefaultModelTests.cs`: Tests for Cohere default model resolution (chat and embedding clients, fallback to DefaultModel, request override, no-model exception, model constants validation).
     *   `Azure/Common/`: Tests for shared Azure authentication handler and client options.
     *   `Azure/AzureOpenAi/`: Tests for Azure OpenAI client.
     *   `Azure/AzureOpenAi/AzureOpenAiJsonOutputTests.cs`: Tests for Azure OpenAI JSON output request building (JSON Mode, Structured Outputs, refusal, feature discovery, endpoint/header verification).
@@ -166,6 +189,7 @@ Project documentation pages.
     *   `Cohere/CohereMultimodalEmbeddingIntegrationTests.cs`: Integration tests for Cohere Embed v4 multimodal embedding (text-only, image-only, mixed text+image, output dimension control, batch inputs, feature discovery).
     *   `Cohere/CohereChatCompletionIntegrationTests.cs`: Integration tests for Cohere chat completion (command-a-03-2025, command-r-plus-08-2024).
     *   `Cohere/CohereJsonOutputIntegrationTests.cs`: Integration tests for Cohere JSON Mode and Structured Outputs (simple/complex schemas, feature discovery).
+    *   `Cohere/CohereGroundedChatIntegrationTests.cs`: Integration tests for Cohere grounded chat with key-value and plain-text documents, citation offset verification, fast mode, feature discovery.
 
 # Integration tests
 

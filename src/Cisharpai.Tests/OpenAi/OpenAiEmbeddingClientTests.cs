@@ -21,7 +21,7 @@ public sealed class OpenAiEmbeddingClientTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.openai.com/v1/") };
-        var client = new OpenAiEmbeddingClient(httpClient);
+        var client = new OpenAiEmbeddingClient(httpClient, new OpenAiClientOptions());
 
         var request = new EmbeddingRequest(
             Input: ["Hello world"],
@@ -47,7 +47,7 @@ public sealed class OpenAiEmbeddingClientTests
             }));
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.openai.com/v1/") };
-        var client = new OpenAiEmbeddingClient(httpClient);
+        var client = new OpenAiEmbeddingClient(httpClient, new OpenAiClientOptions());
 
         var request = new EmbeddingRequest(
             Input: ["Hello world"],
@@ -75,7 +75,7 @@ public sealed class OpenAiEmbeddingClientTests
             }));
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.openai.com/v1/") };
-        var client = new OpenAiEmbeddingClient(httpClient);
+        var client = new OpenAiEmbeddingClient(httpClient, new OpenAiClientOptions());
 
         await client.GetEmbeddingsAsync(new EmbeddingRequest(
             Input: ["Hi"],
@@ -98,7 +98,7 @@ public sealed class OpenAiEmbeddingClientTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.openai.com/v1/") };
-        var client = new OpenAiEmbeddingClient(httpClient);
+        var client = new OpenAiEmbeddingClient(httpClient, new OpenAiClientOptions());
 
         await client.GetEmbeddingsAsync(new EmbeddingRequest(
             Input: ["Single text"],
@@ -122,7 +122,7 @@ public sealed class OpenAiEmbeddingClientTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.openai.com/v1/") };
-        var client = new OpenAiEmbeddingClient(httpClient);
+        var client = new OpenAiEmbeddingClient(httpClient, new OpenAiClientOptions());
 
         await client.GetEmbeddingsAsync(new EmbeddingRequest(
             Input: ["First text", "Second text"],
@@ -143,7 +143,7 @@ public sealed class OpenAiEmbeddingClientTests
             }));
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.openai.com/v1/") };
-        var client = new OpenAiEmbeddingClient(httpClient);
+        var client = new OpenAiEmbeddingClient(httpClient, new OpenAiClientOptions());
 
         var response = await client.GetEmbeddingsAsync(new EmbeddingRequest(
             Input: ["First", "Second"],
@@ -168,7 +168,7 @@ public sealed class OpenAiEmbeddingClientTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.openai.com/v1/") };
-        var client = new OpenAiEmbeddingClient(httpClient);
+        var client = new OpenAiEmbeddingClient(httpClient, new OpenAiClientOptions());
 
         await client.GetEmbeddingsAsync(new EmbeddingRequest(
             Input: ["Test"],
@@ -193,7 +193,7 @@ public sealed class OpenAiEmbeddingClientTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.openai.com/v1/") };
-        var client = new OpenAiEmbeddingClient(httpClient);
+        var client = new OpenAiEmbeddingClient(httpClient, new OpenAiClientOptions());
 
         await client.GetEmbeddingsAsync(new EmbeddingRequest(
             Input: ["Test"],
@@ -213,7 +213,7 @@ public sealed class OpenAiEmbeddingClientTests
             }));
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.openai.com/v1/") };
-        var client = new OpenAiEmbeddingClient(httpClient);
+        var client = new OpenAiEmbeddingClient(httpClient, new OpenAiClientOptions());
 
         var response = await client.GetEmbeddingsAsync(new EmbeddingRequest(
             Input: ["Hi"],
@@ -235,7 +235,7 @@ public sealed class OpenAiEmbeddingClientTests
             }));
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.openai.com/v1/") };
-        var client = new OpenAiEmbeddingClient(httpClient);
+        var client = new OpenAiEmbeddingClient(httpClient, new OpenAiClientOptions());
 
         var response = await client.GetEmbeddingsAsync(new EmbeddingRequest(
             Input: ["Hi"],
@@ -256,7 +256,7 @@ public sealed class OpenAiEmbeddingClientTests
             }));
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.openai.com/v1/") };
-        var client = new OpenAiEmbeddingClient(httpClient);
+        var client = new OpenAiEmbeddingClient(httpClient, new OpenAiClientOptions());
 
         var response = await client.GetEmbeddingsAsync(new EmbeddingRequest(
             Input: ["Hi"],
@@ -279,7 +279,7 @@ public sealed class OpenAiEmbeddingClientTests
             }));
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.openai.com/v1/") };
-        var client = new OpenAiEmbeddingClient(httpClient);
+        var client = new OpenAiEmbeddingClient(httpClient, new OpenAiClientOptions());
 
         var response = await client.GetEmbeddingsAsync(new EmbeddingRequest(
             Input: ["Hi"],
@@ -299,7 +299,7 @@ public sealed class OpenAiEmbeddingClientTests
             }));
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.openai.com/v1/") };
-        var client = new OpenAiEmbeddingClient(httpClient);
+        var client = new OpenAiEmbeddingClient(httpClient, new OpenAiClientOptions());
 
         var response = await client.GetEmbeddingsAsync(new EmbeddingRequest(
             Input: ["Hello world"],

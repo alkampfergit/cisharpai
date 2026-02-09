@@ -79,7 +79,7 @@ public sealed class CohereChatCompletionTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereChatCompletionClient(httpClient);
+        var client = new CohereChatCompletionClient(httpClient, new CohereClientOptions());
 
         var request = new ChatCompletionRequest(
             Messages: [new LlmMessage(LlmRole.User, "Hello")],
@@ -110,7 +110,7 @@ public sealed class CohereChatCompletionTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereChatCompletionClient(httpClient);
+        var client = new CohereChatCompletionClient(httpClient, new CohereClientOptions());
 
         var request = new ChatCompletionRequest(
             Messages:
@@ -149,7 +149,7 @@ public sealed class CohereChatCompletionTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereChatCompletionClient(httpClient);
+        var client = new CohereChatCompletionClient(httpClient, new CohereClientOptions());
 
         var request = new ChatCompletionRequest(
             Messages:
@@ -187,7 +187,7 @@ public sealed class CohereChatCompletionTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereChatCompletionClient(httpClient);
+        var client = new CohereChatCompletionClient(httpClient, new CohereClientOptions());
 
         var request = new ChatCompletionRequest(
             Messages: [new LlmMessage(LlmRole.User, "Hello")],
@@ -216,7 +216,7 @@ public sealed class CohereChatCompletionTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereChatCompletionClient(httpClient);
+        var client = new CohereChatCompletionClient(httpClient, new CohereClientOptions());
 
         var request = new ChatCompletionRequest(
             Messages: [new LlmMessage(LlmRole.User, "Hello")],
@@ -246,7 +246,7 @@ public sealed class CohereChatCompletionTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereChatCompletionClient(httpClient);
+        var client = new CohereChatCompletionClient(httpClient, new CohereClientOptions());
 
         var request = new ChatCompletionRequest(
             Messages: [new LlmMessage(LlmRole.User, "Hello")],
@@ -272,7 +272,7 @@ public sealed class CohereChatCompletionTests
             }));
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereChatCompletionClient(httpClient);
+        var client = new CohereChatCompletionClient(httpClient, new CohereClientOptions());
 
         var request = new ChatCompletionRequest(
             Messages: [new LlmMessage(LlmRole.User, "Hello")],
@@ -297,7 +297,7 @@ public sealed class CohereChatCompletionTests
             }));
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereChatCompletionClient(httpClient);
+        var client = new CohereChatCompletionClient(httpClient, new CohereClientOptions());
 
         var request = new ChatCompletionRequest(
             Messages: [new LlmMessage(LlmRole.User, "Hello")],
@@ -318,7 +318,7 @@ public sealed class CohereChatCompletionTests
             }));
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereChatCompletionClient(httpClient);
+        var client = new CohereChatCompletionClient(httpClient, new CohereClientOptions());
 
         var request = new ChatCompletionRequest(
             Messages: [new LlmMessage(LlmRole.User, "Hello")],
@@ -343,7 +343,7 @@ public sealed class CohereChatCompletionTests
             }));
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereChatCompletionClient(httpClient);
+        var client = new CohereChatCompletionClient(httpClient, new CohereClientOptions());
 
         var request = new ChatCompletionRequest(
             Messages: [new LlmMessage(LlmRole.User, "Hello")],
@@ -369,7 +369,7 @@ public sealed class CohereChatCompletionTests
             }));
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereChatCompletionClient(httpClient);
+        var client = new CohereChatCompletionClient(httpClient, new CohereClientOptions());
 
         var request = new ChatCompletionRequest(
             Messages: [new LlmMessage(LlmRole.User, "Hello")],
@@ -392,7 +392,7 @@ public sealed class CohereChatCompletionTests
             }));
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereChatCompletionClient(httpClient);
+        var client = new CohereChatCompletionClient(httpClient, new CohereClientOptions());
 
         var request = new ChatCompletionRequest(
             Messages: [new LlmMessage(LlmRole.User, "Hello")],

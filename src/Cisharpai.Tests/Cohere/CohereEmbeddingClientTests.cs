@@ -21,7 +21,7 @@ public sealed class CohereEmbeddingClientTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereEmbeddingClient(httpClient);
+        var client = new CohereEmbeddingClient(httpClient, new CohereClientOptions());
 
         var request = new EmbeddingRequest(
             Input: ["Hello world"],
@@ -48,7 +48,7 @@ public sealed class CohereEmbeddingClientTests
             }));
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereEmbeddingClient(httpClient);
+        var client = new CohereEmbeddingClient(httpClient, new CohereClientOptions());
 
         var request = new EmbeddingRequest(
             Input: ["Hello world"],
@@ -75,7 +75,7 @@ public sealed class CohereEmbeddingClientTests
             }));
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereEmbeddingClient(httpClient);
+        var client = new CohereEmbeddingClient(httpClient, new CohereClientOptions());
 
         await client.GetEmbeddingsAsync(new EmbeddingRequest(
             Input: ["Hi"],
@@ -94,7 +94,7 @@ public sealed class CohereEmbeddingClientTests
             }));
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereEmbeddingClient(httpClient);
+        var client = new CohereEmbeddingClient(httpClient, new CohereClientOptions());
 
         var response = await client.GetEmbeddingsAsync(new EmbeddingRequest(
             Input: ["First", "Second"],
@@ -122,7 +122,7 @@ public sealed class CohereEmbeddingClientTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereEmbeddingClient(httpClient);
+        var client = new CohereEmbeddingClient(httpClient, new CohereClientOptions());
 
         await client.GetEmbeddingsAsync(new EmbeddingRequest(
             Input: ["Test"],
@@ -147,7 +147,7 @@ public sealed class CohereEmbeddingClientTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereEmbeddingClient(httpClient);
+        var client = new CohereEmbeddingClient(httpClient, new CohereClientOptions());
 
         await client.GetEmbeddingsAsync(new EmbeddingRequest(
             Input: ["Test"],
@@ -168,7 +168,7 @@ public sealed class CohereEmbeddingClientTests
             }));
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereEmbeddingClient(httpClient);
+        var client = new CohereEmbeddingClient(httpClient, new CohereClientOptions());
 
         var response = await client.GetEmbeddingsAsync(new EmbeddingRequest(
             Input: ["Hi"],
@@ -189,7 +189,7 @@ public sealed class CohereEmbeddingClientTests
             }));
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereEmbeddingClient(httpClient);
+        var client = new CohereEmbeddingClient(httpClient, new CohereClientOptions());
 
         var response = await client.GetEmbeddingsAsync(new EmbeddingRequest(
             Input: ["Hi"],

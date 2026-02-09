@@ -20,7 +20,7 @@ public sealed class CohereImageEmbeddingTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereEmbeddingClient(httpClient);
+        var client = new CohereEmbeddingClient(httpClient, new CohereClientOptions());
 
         var imagePath = CreateTestImage();
         try
@@ -49,7 +49,7 @@ public sealed class CohereImageEmbeddingTests
             }));
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereEmbeddingClient(httpClient);
+        var client = new CohereEmbeddingClient(httpClient, new CohereClientOptions());
 
         var imagePath = CreateTestImage();
         try
@@ -79,7 +79,7 @@ public sealed class CohereImageEmbeddingTests
             }));
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereEmbeddingClient(httpClient);
+        var client = new CohereEmbeddingClient(httpClient, new CohereClientOptions());
 
         var imagePath = CreateTestImage();
         try
@@ -109,7 +109,7 @@ public sealed class CohereImageEmbeddingTests
         });
 
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereEmbeddingClient(httpClient);
+        var client = new CohereEmbeddingClient(httpClient, new CohereClientOptions());
 
         var imagePath = CreateTestImage();
         try
@@ -130,7 +130,7 @@ public sealed class CohereImageEmbeddingTests
     public void GetImageEmbeddingAsync_EmptyPath_ThrowsArgumentException()
     {
         using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereEmbeddingClient(httpClient);
+        var client = new CohereEmbeddingClient(httpClient, new CohereClientOptions());
 
         Assert.ThrowsAsync<ArgumentException>(() => client.GetImageEmbeddingAsync("", "embed-v4.0"));
     }

@@ -13,4 +13,6 @@ public sealed class CohereChatRequest
     public double? Temperature { get; set; }
     public int? MaxTokens { get; set; }
     public CohereChatResponseFormat? ResponseFormat { get; set; }
+    public List<CohereChatDocument>? Documents { get; set; }
+    public CohereCitationOptions? CitationOptions { get; set; }
 }

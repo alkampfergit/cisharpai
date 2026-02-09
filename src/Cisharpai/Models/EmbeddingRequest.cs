@@ -7,7 +7,7 @@ namespace Cisharpai.Models;
 /// </summary>
 public sealed record EmbeddingRequest(
     IReadOnlyList<string> Input,
-    string Model,
+    string? Model = null,
     EmbeddingInputType? InputType = null,
     int? Dimensions = null,
     string? EncodingFormat = null,

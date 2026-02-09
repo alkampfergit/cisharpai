@@ -4,7 +4,7 @@ namespace Cisharpai.Models;
 
 public sealed record ChatCompletionRequest(
     IReadOnlyList<LlmMessage> Messages,
-    string Model,
+    string? Model = null,
     double? Temperature = null,
     int? MaxTokens = null,
     bool IncludeRawResponse = false,

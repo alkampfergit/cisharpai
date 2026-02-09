@@ -9,12 +9,14 @@ namespace Cisharpai.Anthropic;
 public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJsonOutputFeature
 {
     private readonly LlmHttpClient _client;
+    private readonly AnthropicClientOptions _options;
 
     public IFeatureCollection Features { get; }
 
-    public AnthropicChatCompletionClient(HttpClient httpClient)
+    public AnthropicChatCompletionClient(HttpClient httpClient, AnthropicClientOptions options)
     {
         _client = new LlmHttpClient(httpClient);
+        _options = options;
 
         var features = new FeatureCollection();
         features.Set<IJsonOutputFeature>(this);
@@ -25,6 +27,8 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         ChatCompletionRequest request,
         CancellationToken cancellationToken = default)
     {
+        request = request with { Model = ResolveModel(request.Model) };
+
         try
         {
             var providerRequest = BuildRequest(request);
@@ -46,6 +50,8 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         JsonOutputOptions jsonOutputOptions,
         CancellationToken cancellationToken = default)
     {
+        request = request with { Model = ResolveModel(request.Model) };
+
         try
         {
             jsonOutputOptions.Validate();
@@ -76,6 +82,14 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         }
     }
 
+    private string ResolveModel(string? model)
+    {
+        return model
+            ?? _options.DefaultModel
+            ?? throw new InvalidOperationException(
+                "Model must be specified either in the request or via DefaultModel in options.");
+    }
+
     private AnthropicChatRequest BuildRequest(ChatCompletionRequest request)
     {
         var systemMessage = request.Messages
@@ -83,7 +97,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
 
         return new AnthropicChatRequest
         {
-            Model = request.Model,
+            Model = request.Model!,
             Temperature = request.Temperature,
             MaxTokens = request.MaxTokens ?? 1024,
             System = systemMessage,
