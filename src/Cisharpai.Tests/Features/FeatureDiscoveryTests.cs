@@ -267,12 +267,15 @@ public sealed class FeatureDiscoveryTests
     }
 
     [Test]
-    public void AnthropicChatCompletionClient_DoesNotExposeJsonOutputFeature()
+    public void AnthropicChatCompletionClient_ExposesJsonOutputFeature()
     {
         using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
         var client = new AnthropicChatCompletionClient(httpClient);
 
-        Assert.That(client.Features.Get<IJsonOutputFeature>(), Is.Null);
+        var feature = client.Features.Get<IJsonOutputFeature>();
+
+        Assert.That(feature, Is.Not.Null);
+        Assert.That(feature, Is.SameAs(client));
     }
 
     [Test]

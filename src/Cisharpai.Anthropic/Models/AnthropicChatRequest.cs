@@ -21,4 +21,8 @@ public sealed class AnthropicChatRequest
 
     [JsonPropertyName("max_tokens")]
     public int MaxTokens { get; set; } = 1024;
+
+    [JsonPropertyName("output_config")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AnthropicOutputConfig? OutputConfig { get; set; }
 }

@@ -16,6 +16,7 @@ I want to create a library where the user can use the same interface based on Ht
 - Projects multitarget .NET 8.0 and .NET 10
 - Single test project multitarget .NET 8.0 and .NET 10
 - You will write test for every functionality you add.
+- Do not consider task finished if tests are not green.
 - After you modifiy the code if needed update  [project_overview.md](../memories/project_overview.md) file in memory folder to reflect the changes you made.
 
 # Testing rules
