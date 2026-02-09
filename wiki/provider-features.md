@@ -16,10 +16,10 @@ This page lists every feature supported by each provider integration in Cisharpa
 
 | Feature | OpenAI | Azure OpenAI | Azure AI Inference | Anthropic | Cohere |
 |---------|--------|--------------|-------------------|-----------|--------|
-| Chat Completions | Yes | Yes | Yes | Yes | -- |
+| Chat Completions | Yes | Yes | Yes | Yes | Yes |
 | Text Embeddings | Yes | Yes | Yes | -- | Yes |
-| JSON Mode | Yes | Yes | Yes | Yes | -- |
-| Structured Outputs | Yes | Yes | Yes | Yes | -- |
+| JSON Mode | Yes | Yes | Yes | Yes | Yes |
+| Structured Outputs | Yes | Yes | Yes | Yes | Yes |
 | Image Embeddings | -- | -- | Yes | -- | Yes |
 | Multimodal Embeddings | -- | -- | -- | -- | Yes |
 | Reasoning Models | Yes | Yes | Yes | -- | -- |
@@ -83,7 +83,10 @@ This page lists every feature supported by each provider integration in Cisharpa
 
 | Capability | Details |
 |------------|---------|
+| Chat Completions | Command family models (command-a-03-2025, command-r-plus-08-2024, command-r-08-2024) |
 | Text Embeddings | Embed v3 and v4 models |
+| JSON Mode | Via `response_format` type `json_object` |
+| Structured Outputs | Via `response_format` with `json_schema` parameter |
 | Image Embeddings | Single image via data URI (`data:image/{mime};base64,...`) |
 | Multimodal Embeddings | Embed v4 mixed text + image inputs, Matryoshka dimension control, batch images |
 | Supported Formats | PNG, JPEG, WebP, GIF |

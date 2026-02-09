@@ -29,4 +29,29 @@ public static class CohereServiceCollectionExtensions
 
         return builder;
     }
+
+    public static IHttpClientBuilder AddCohereChatClient(
+        this IServiceCollection services,
+        Action<CohereClientOptions> configure)
+    {
+        var options = new CohereClientOptions();
+        configure(options);
+
+        services.AddSingleton(options);
+        services.AddTransient<CohereAuthenticationHandler>();
+
+        var builder = services.AddHttpClient<CohereChatCompletionClient>(client =>
+            {
+                client.BaseAddress = new Uri(options.BaseUrl);
+                client.Timeout = TimeSpan.FromMinutes(2);
+            })
+            .AddHttpMessageHandler<CohereAuthenticationHandler>();
+
+        builder.AddCisharpaiResilienceHandler();
+
+        services.AddSingleton<IChatCompletionClient>(sp =>
+            sp.GetRequiredService<CohereChatCompletionClient>());
+
+        return builder;
+    }
 }

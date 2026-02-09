@@ -70,9 +70,14 @@ Each supported provider has its own project providing concrete implementations o
 *   **`src/Cisharpai.Anthropic/`**: Connector for Anthropic (Claude) API. Supports structured outputs via `output_config.format` parameter.
     *   `AnthropicChatCompletionClient.cs`: Implements `IChatCompletionClient` and `IJsonOutputFeature`. Supports JSON Mode (via system message injection) and Structured Outputs (`json_schema` via `output_config.format`). Handles refusal via `stop_reason: "refusal"`.
     *   `Models/AnthropicOutputConfig.cs`: DTOs for `output_config.format` parameter: `AnthropicOutputConfig`, `AnthropicOutputFormat`.
-*   **`src/Cisharpai.Cohere/`**: Connector for Cohere API. Supports Embed v3 and v4 models.
+*   **`src/Cisharpai.Cohere/`**: Connector for Cohere API. Supports Embed v3/v4 models and Chat v2 API.
+    *   `CohereChatCompletionClient.cs`: Implements `IChatCompletionClient` and `IJsonOutputFeature`. Supports JSON Mode and Structured Outputs via `response_format` with `json_object` type and optional `json_schema`. Uses system message injection for JSON Mode. Endpoint: `chat`.
     *   `CohereEmbeddingClient.cs`: Implements `IEmbeddingClient`, `IImageEmbeddingFeature`, and `IMultimodalEmbeddingFeature`. Supports text embeddings, single image embedding, and Embed v4 multimodal embedding (mixed text+image inputs, Matryoshka output dimensions, batch images). Images are sent as data URIs.
+    *   `CohereServiceCollectionExtensions.cs`: DI registration with `AddCohereEmbeddingClient()` and `AddCohereChatClient()` methods.
     *   `ImageDataUriHelper.cs`: Internal utility for converting image file paths to data URI format (`data:image/{mime};base64,...`). Supports PNG, JPEG, WebP, GIF.
+    *   `Models/CohereChatRequest.cs`: Request DTOs for Cohere v2 chat API: `CohereChatMessage`, `CohereChatRequest`.
+    *   `Models/CohereChatResponse.cs`: Response DTOs: `CohereChatContentBlock`, `CohereChatResponseMessage`, `CohereChatTokens`, `CohereChatBilledUnits`, `CohereChatUsage`, `CohereChatResponse`.
+    *   `Models/CohereChatResponseFormat.cs`: DTO for `response_format` parameter with `json_object` type and optional `json_schema`.
     *   `Models/CohereEmbedInput.cs`: DTOs for Embed v4 `inputs` parameter: `CohereEmbedInput`, `CohereEmbedContentPart`, `CohereImageUrl`.
     *   `Models/CohereEmbedRequest.cs`: Request DTO with `Texts`, `Images`, `Inputs` (v4, mutually exclusive), `InputType`, `EmbeddingTypes`, `OutputDimension` (v4 Matryoshka).
     *   `Models/CohereEmbedResponse.cs`: Response DTO with `CohereEmbeddings`, `CohereBilledUnits` (includes `ImageTokens` for v4), `CohereImageMetadata`.
@@ -92,6 +97,7 @@ Interactive demo application showcasing all provider integrations through a scen
     *   `AzureOpenAiChatScenario.cs`: Azure OpenAI chat completion demo.
     *   `AzureAiInferenceChatScenario.cs`: Azure AI Inference chat completion demo.
     *   `CohereEmbeddingScenario.cs`: Cohere embedding demo.
+    *   `CohereChatScenario.cs`: Cohere chat completion demo.
     *   `OpenAiJsonOutputScenario.cs`: OpenAI JSON Mode and Structured Outputs demo.
 
 ### Wiki (`wiki/`)
@@ -127,9 +133,11 @@ Project documentation pages.
     *   `TestEnvironmentVariables.cs`: Constants for environment variable names used in integration tests.
 *   **`src/Cisharpai.Tests/`**: Unit tests.
     *   `Features/FeatureCollectionTests.cs`: Tests for `FeatureCollection` (Get/Set/enumeration/thread-safety).
-    *   `Features/FeatureDiscoveryTests.cs`: Tests verifying feature discovery across all 8 client implementations (including IJsonOutputFeature on OpenAI, Azure OpenAI, Azure AI Inference, and Anthropic; absence on Cohere).
+    *   `Features/FeatureDiscoveryTests.cs`: Tests verifying feature discovery across all 9 client implementations (including IJsonOutputFeature on OpenAI, Azure OpenAI, Azure AI Inference, Anthropic, and Cohere chat; absence on Cohere embedding).
     *   `Cohere/CohereImageEmbeddingTests.cs`: Tests for Cohere image embedding request/response mapping and data URI format.
     *   `Cohere/CohereMultimodalEmbeddingTests.cs`: Tests for Cohere Embed v4 multimodal embedding (text-only, image-only, mixed, batch, output_dimension, input types, raw response, error handling, image tokens).
+    *   `Cohere/CohereChatCompletionTests.cs`: Tests for Cohere chat completion request/response mapping (messages, roles, snake_case naming, tokens, raw response, error handling).
+    *   `Cohere/CohereJsonOutputTests.cs`: Tests for Cohere JSON output request building (JSON Mode response_format, system message injection, Structured Outputs with json_schema, markdown fence stripping, feature discovery).
     *   `Cohere/ImageDataUriHelperTests.cs`: Tests for data URI helper (MIME type mapping for PNG/JPEG/WebP/GIF, base64 encoding).
     *   `Azure/AzureAiInference/AzureAiInferenceImageEmbeddingTests.cs`: Tests for Azure AI Inference image embedding.
     *   `Models/JsonOutputOptionsTests.cs`: Tests for `JsonOutputOptions` validation (JsonMode valid with/without schema, JsonSchema validation scenarios, Strict defaults).
@@ -156,6 +164,8 @@ Project documentation pages.
     *   `Cohere/CohereEmbeddingIntegrationTests.cs`: Integration tests for Cohere text embedding.
     *   `Cohere/CohereImageEmbeddingIntegrationTests.cs`: Integration tests for Cohere image embedding via feature discovery.
     *   `Cohere/CohereMultimodalEmbeddingIntegrationTests.cs`: Integration tests for Cohere Embed v4 multimodal embedding (text-only, image-only, mixed text+image, output dimension control, batch inputs, feature discovery).
+    *   `Cohere/CohereChatCompletionIntegrationTests.cs`: Integration tests for Cohere chat completion (command-a-03-2025, command-r-plus-08-2024).
+    *   `Cohere/CohereJsonOutputIntegrationTests.cs`: Integration tests for Cohere JSON Mode and Structured Outputs (simple/complex schemas, feature discovery).
 
 # Integration tests
 

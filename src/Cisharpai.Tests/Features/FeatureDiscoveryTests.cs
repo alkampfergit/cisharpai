@@ -287,6 +287,49 @@ public sealed class FeatureDiscoveryTests
         Assert.That(client.Features.Get<IJsonOutputFeature>(), Is.Null);
     }
 
+    // --- Cohere chat client: exposes JSON output feature ---
+
+    [Test]
+    public void CohereChatCompletionClient_Features_IsNotNull()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.cohere.com/v2/") };
+        var client = new CohereChatCompletionClient(httpClient);
+
+        Assert.That(client.Features, Is.Not.Null);
+    }
+
+    [Test]
+    public void CohereChatCompletionClient_ExposesJsonOutputFeature()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.cohere.com/v2/") };
+        var client = new CohereChatCompletionClient(httpClient);
+
+        var feature = client.Features.Get<IJsonOutputFeature>();
+
+        Assert.That(feature, Is.Not.Null);
+        Assert.That(feature, Is.SameAs(client));
+    }
+
+    [Test]
+    public void CohereChatCompletionClient_DoesNotExposeImageEmbeddingFeature()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.cohere.com/v2/") };
+        var client = new CohereChatCompletionClient(httpClient);
+
+        Assert.That(client.Features.Get<IImageEmbeddingFeature>(), Is.Null);
+    }
+
+    [Test]
+    public void FeatureDiscovery_ViaInterface_WorksForCohereJsonOutput()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.cohere.com/v2/") };
+        IChatCompletionClient client = new CohereChatCompletionClient(httpClient);
+
+        var jsonFeature = client.Features.Get<IJsonOutputFeature>();
+
+        Assert.That(jsonFeature, Is.Not.Null);
+    }
+
     [Test]
     public void FeatureDiscovery_ViaInterface_WorksForOpenAiJsonOutput()
     {
