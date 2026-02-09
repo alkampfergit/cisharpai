@@ -103,6 +103,7 @@ Project documentation pages.
 *   `embeddings.md`: Comprehensive embeddings guide across providers.
 *   `feature-extensions.md`: Feature Collection Pattern documentation.
 *   `json-output.md`: JSON Mode and Structured Outputs documentation (quick start, provider support matrix, schema guidelines, refusal handling, troubleshooting).
+*   `provider-features.md`: Provider Feature Matrix — lists every feature (chat, embeddings, JSON output, image embeddings, multimodal embeddings) supported by each provider. Must be updated when features are added or removed.
 
 ### CI/CD & Build
 
@@ -166,3 +167,7 @@ Important: Integration tests has a separate project `src/Cisharpai.Integration.T
 3. `src/Cisharpai.Integration.Tests/EnvironmentConfigurationTests.cs` - Add to the validation array
 4. `scripts/gh-secrets-from-dotenv.zsh` - Add to the `allowlist` array (for GitHub Actions/Codespaces secrets)
 5. `memories/project_overview.md` - Update the `.env` example above
+
+**Maintenance Note:** When adding or removing a feature on any provider (e.g., implementing a new feature interface like `IJsonOutputFeature`, `IImageEmbeddingFeature`, `IMultimodalEmbeddingFeature`, or adding a new provider), update these files:
+1. `wiki/provider-features.md` - Update the support matrix table and the provider details section
+2. `memories/project_overview.md` - Update the project structure to reflect the new capability

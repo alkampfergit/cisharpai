@@ -6,6 +6,7 @@ Welcome to the Cisharpai wiki. This is the starting point for learning how to us
 
 - [Getting started](getting-started.md)
 - [OpenAI quickstart](openai.md)
+- [Provider Feature Matrix](provider-features.md)
 
 ## What is Cisharpai?
 
