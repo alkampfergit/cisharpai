@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http;
+using System.Reflection;
 using System.Text.Json;
 
 namespace Cisharpai.Tests.Core;
@@ -259,6 +260,46 @@ public sealed class LlmHttpClientTests
         Assert.That(ex!.StatusCode, Is.EqualTo(HttpStatusCode.BadGateway));
         Assert.That(ex.ResponseBody, Does.Contain("Failed to read response body"));
         Assert.That(ex.ResponseBody, Does.Contain("Connection reset"));
+    }
+
+    [Test]
+    public void Constructor_WithoutCustomOptions_SharesStaticDefaultOptions()
+    {
+        using var httpClient1 = new HttpClient { BaseAddress = new Uri("https://test.com") };
+        using var httpClient2 = new HttpClient { BaseAddress = new Uri("https://test.com") };
+
+        var client1 = new LlmHttpClient(httpClient1);
+        var client2 = new LlmHttpClient(httpClient2);
+
+        var field = typeof(LlmHttpClient).GetField(
+            "_serializerOptions", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
+        var options1 = field.GetValue(client1);
+        var options2 = field.GetValue(client2);
+
+        Assert.That(options1, Is.SameAs(options2),
+            "Multiple LlmHttpClient instances without custom options should share the same static JsonSerializerOptions");
+    }
+
+    [Test]
+    public void Constructor_WithCustomOptions_DoesNotUseStaticDefault()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://test.com") };
+
+        var customOptions = new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+        };
+
+        var client = new LlmHttpClient(httpClient, customOptions);
+
+        var field = typeof(LlmHttpClient).GetField(
+            "_serializerOptions", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
+        var actual = field.GetValue(client);
+
+        Assert.That(actual, Is.SameAs(customOptions),
+            "LlmHttpClient with custom options should use the provided instance");
     }
 
     private sealed class TestResponse

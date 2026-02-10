@@ -6,6 +6,12 @@ namespace Cisharpai;
 
 public sealed class LlmHttpClient
 {
+    private static readonly JsonSerializerOptions DefaultSerializerOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+
     private readonly HttpClient _httpClient;
     private readonly JsonSerializerOptions _serializerOptions;
 
@@ -14,11 +20,7 @@ public sealed class LlmHttpClient
         JsonSerializerOptions? serializerOptions = null)
     {
         _httpClient = httpClient;
-        _serializerOptions = serializerOptions ?? new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-        };
+        _serializerOptions = serializerOptions ?? DefaultSerializerOptions;
     }
 
     public async Task<TResponse> PostAsync<TRequest, TResponse>(
