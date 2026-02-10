@@ -12,17 +12,19 @@ public static class CohereServiceCollectionExtensions
         var options = new CohereClientOptions();
         configure(options);
 
-        services.AddSingleton(options);
-        services.AddTransient<CohereAuthenticationHandler>();
-
         var builder = services.AddHttpClient<CohereEmbeddingClient>(client =>
             {
                 client.BaseAddress = new Uri(options.BaseUrl);
                 client.Timeout = TimeSpan.FromMinutes(2);
             })
-            .AddHttpMessageHandler<CohereAuthenticationHandler>();
+            .AddHttpMessageHandler(() => new CohereAuthenticationHandler(options));
 
         builder.AddCisharpaiResilienceHandler();
+
+        services.AddTransient(sp =>
+            new CohereEmbeddingClient(
+                sp.GetRequiredService<IHttpClientFactory>().CreateClient(typeof(CohereEmbeddingClient).Name),
+                options));
 
         services.AddSingleton<IEmbeddingClient>(sp =>
             sp.GetRequiredService<CohereEmbeddingClient>());
@@ -37,17 +39,19 @@ public static class CohereServiceCollectionExtensions
         var options = new CohereClientOptions();
         configure(options);
 
-        services.AddSingleton(options);
-        services.AddTransient<CohereAuthenticationHandler>();
-
         var builder = services.AddHttpClient<CohereChatCompletionClient>(client =>
             {
                 client.BaseAddress = new Uri(options.BaseUrl);
                 client.Timeout = TimeSpan.FromMinutes(2);
             })
-            .AddHttpMessageHandler<CohereAuthenticationHandler>();
+            .AddHttpMessageHandler(() => new CohereAuthenticationHandler(options));
 
         builder.AddCisharpaiResilienceHandler();
+
+        services.AddTransient(sp =>
+            new CohereChatCompletionClient(
+                sp.GetRequiredService<IHttpClientFactory>().CreateClient(typeof(CohereChatCompletionClient).Name),
+                options));
 
         services.AddSingleton<IChatCompletionClient>(sp =>
             sp.GetRequiredService<CohereChatCompletionClient>());

@@ -12,17 +12,19 @@ public static class OpenAiServiceCollectionExtensions
         var options = new OpenAiClientOptions();
         configure(options);
 
-        services.AddSingleton(options);
-        services.AddTransient<OpenAiAuthenticationHandler>();
-
         var builder = services.AddHttpClient<OpenAiChatCompletionClient>(client =>
             {
                 client.BaseAddress = new Uri(options.BaseUrl);
                 client.Timeout = TimeSpan.FromMinutes(2);
             })
-            .AddHttpMessageHandler<OpenAiAuthenticationHandler>();
+            .AddHttpMessageHandler(() => new OpenAiAuthenticationHandler(options));
 
         builder.AddCisharpaiResilienceHandler();
+
+        services.AddTransient(sp =>
+            new OpenAiChatCompletionClient(
+                sp.GetRequiredService<IHttpClientFactory>().CreateClient(typeof(OpenAiChatCompletionClient).Name),
+                options));
 
         services.AddSingleton<IChatCompletionClient>(sp =>
             sp.GetRequiredService<OpenAiChatCompletionClient>());
@@ -37,17 +39,19 @@ public static class OpenAiServiceCollectionExtensions
         var options = new OpenAiClientOptions();
         configure(options);
 
-        services.AddSingleton(options);
-        services.AddTransient<OpenAiAuthenticationHandler>();
-
         var builder = services.AddHttpClient<OpenAiEmbeddingClient>(client =>
             {
                 client.BaseAddress = new Uri(options.BaseUrl);
                 client.Timeout = TimeSpan.FromMinutes(2);
             })
-            .AddHttpMessageHandler<OpenAiAuthenticationHandler>();
+            .AddHttpMessageHandler(() => new OpenAiAuthenticationHandler(options));
 
         builder.AddCisharpaiResilienceHandler();
+
+        services.AddTransient(sp =>
+            new OpenAiEmbeddingClient(
+                sp.GetRequiredService<IHttpClientFactory>().CreateClient(typeof(OpenAiEmbeddingClient).Name),
+                options));
 
         services.AddSingleton<IEmbeddingClient>(sp =>
             sp.GetRequiredService<OpenAiEmbeddingClient>());

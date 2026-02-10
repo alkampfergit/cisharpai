@@ -24,11 +24,6 @@ public static class AzureOpenAiServiceCollectionExtensions
         options.Validate();
         options.ValidateAuthentication(credential is not null);
 
-        services.AddSingleton(options);
-
-        if (credential is not null)
-            services.AddSingleton(credential);
-
         var builder = services.AddHttpClient<AzureOpenAiChatCompletionClient>(client =>
             {
                 client.BaseAddress = new Uri(options.Endpoint);
@@ -36,6 +31,11 @@ public static class AzureOpenAiServiceCollectionExtensions
             .AddHttpMessageHandler(() => new AzureAuthenticationHandler(options, credential));
 
         builder.AddCisharpaiResilienceHandler();
+
+        services.AddTransient(sp =>
+            new AzureOpenAiChatCompletionClient(
+                sp.GetRequiredService<IHttpClientFactory>().CreateClient(typeof(AzureOpenAiChatCompletionClient).Name),
+                options));
 
         services.AddSingleton<IChatCompletionClient>(sp =>
             sp.GetRequiredService<AzureOpenAiChatCompletionClient>());
@@ -60,11 +60,6 @@ public static class AzureOpenAiServiceCollectionExtensions
         options.Validate();
         options.ValidateAuthentication(credential is not null);
 
-        services.AddSingleton(options);
-
-        if (credential is not null)
-            services.AddSingleton(credential);
-
         var builder = services.AddHttpClient<AzureOpenAiEmbeddingClient>(client =>
             {
                 client.BaseAddress = new Uri(options.Endpoint);
@@ -72,6 +67,11 @@ public static class AzureOpenAiServiceCollectionExtensions
             .AddHttpMessageHandler(() => new AzureAuthenticationHandler(options, credential));
 
         builder.AddCisharpaiResilienceHandler();
+
+        services.AddTransient(sp =>
+            new AzureOpenAiEmbeddingClient(
+                sp.GetRequiredService<IHttpClientFactory>().CreateClient(typeof(AzureOpenAiEmbeddingClient).Name),
+                options));
 
         services.AddSingleton<IEmbeddingClient>(sp =>
             sp.GetRequiredService<AzureOpenAiEmbeddingClient>());

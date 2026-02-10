@@ -24,11 +24,6 @@ public static class AzureAiInferenceServiceCollectionExtensions
         options.Validate();
         options.ValidateAuthentication(credential is not null);
 
-        services.AddSingleton(options);
-
-        if (credential is not null)
-            services.AddSingleton(credential);
-
         var builder = services.AddHttpClient<AzureAiInferenceChatCompletionClient>(client =>
             {
                 client.BaseAddress = new Uri(options.Endpoint);
@@ -36,6 +31,11 @@ public static class AzureAiInferenceServiceCollectionExtensions
             .AddHttpMessageHandler(() => new AzureAuthenticationHandler(options, credential));
 
         builder.AddCisharpaiResilienceHandler();
+
+        services.AddTransient(sp =>
+            new AzureAiInferenceChatCompletionClient(
+                sp.GetRequiredService<IHttpClientFactory>().CreateClient(typeof(AzureAiInferenceChatCompletionClient).Name),
+                options));
 
         services.AddSingleton<IChatCompletionClient>(sp =>
             sp.GetRequiredService<AzureAiInferenceChatCompletionClient>());
@@ -60,11 +60,6 @@ public static class AzureAiInferenceServiceCollectionExtensions
         options.Validate();
         options.ValidateAuthentication(credential is not null);
 
-        services.AddSingleton(options);
-
-        if (credential is not null)
-            services.AddSingleton(credential);
-
         var builder = services.AddHttpClient<AzureAiInferenceEmbeddingClient>(client =>
             {
                 client.BaseAddress = new Uri(options.Endpoint);
@@ -72,6 +67,11 @@ public static class AzureAiInferenceServiceCollectionExtensions
             .AddHttpMessageHandler(() => new AzureAuthenticationHandler(options, credential));
 
         builder.AddCisharpaiResilienceHandler();
+
+        services.AddTransient(sp =>
+            new AzureAiInferenceEmbeddingClient(
+                sp.GetRequiredService<IHttpClientFactory>().CreateClient(typeof(AzureAiInferenceEmbeddingClient).Name),
+                options));
 
         services.AddSingleton<IEmbeddingClient>(sp =>
             sp.GetRequiredService<AzureAiInferenceEmbeddingClient>());

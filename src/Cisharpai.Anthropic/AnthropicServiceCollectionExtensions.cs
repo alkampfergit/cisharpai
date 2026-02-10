@@ -12,16 +12,18 @@ public static class AnthropicServiceCollectionExtensions
         var options = new AnthropicClientOptions();
         configure(options);
 
-        services.AddSingleton(options);
-        services.AddTransient<AnthropicAuthenticationHandler>();
-
         var builder = services.AddHttpClient<AnthropicChatCompletionClient>(client =>
             {
                 client.BaseAddress = new Uri(options.BaseUrl);
             })
-            .AddHttpMessageHandler<AnthropicAuthenticationHandler>();
+            .AddHttpMessageHandler(() => new AnthropicAuthenticationHandler(options));
 
         builder.AddCisharpaiResilienceHandler();
+
+        services.AddTransient(sp =>
+            new AnthropicChatCompletionClient(
+                sp.GetRequiredService<IHttpClientFactory>().CreateClient(typeof(AnthropicChatCompletionClient).Name),
+                options));
 
         services.AddSingleton<IChatCompletionClient>(sp =>
             sp.GetRequiredService<AnthropicChatCompletionClient>());
