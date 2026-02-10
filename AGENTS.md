@@ -2,6 +2,10 @@
 
 This project uses **bd** (beads) for issue tracking. Run `bd onboard` to get started.
 
+## RULES
+
+- NEVER read the .beads/issues.jsonl directly always use bd commandline (see below)
+
 ## Quick Reference
 
 ```bash

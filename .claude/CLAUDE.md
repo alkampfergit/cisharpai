@@ -1,3 +1,5 @@
+@../AGENTS.md
+
 # cisharp ai
 
 A small library to interact with various llm using simply HttpClient in C#.

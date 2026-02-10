@@ -130,6 +130,92 @@ public sealed class AnthropicChatCompletionClientTests
         Assert.That(response.Model, Is.EqualTo(string.Empty));
     }
 
+    [Test]
+    public async Task GetChatCompletionAsync_WithMaxTokensNull_UsesDefaultMaxTokens()
+    {
+        string? capturedBody = null;
+        var handler = new MockHttpMessageHandler(async (request, _) =>
+        {
+            capturedBody = await request.Content!.ReadAsStringAsync();
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(AnthropicResponseJson, System.Text.Encoding.UTF8, "application/json")
+            };
+        });
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
+
+        var request = new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "Hello")],
+            Model: "claude-sonnet-4-20250514",
+            MaxTokens: null);
+
+        await client.GetChatCompletionAsync(request);
+
+        var doc = JsonDocument.Parse(capturedBody!);
+        Assert.That(doc.RootElement.TryGetProperty("max_tokens", out var maxTokens), Is.True,
+            "max_tokens must always be sent because Anthropic API requires it");
+        Assert.That(maxTokens.GetInt32(), Is.EqualTo(AnthropicChatCompletionClient.DefaultMaxTokens));
+    }
+
+    [Test]
+    public async Task GetChatCompletionAsync_WithMaxTokensSet_PassesThroughToRequest()
+    {
+        string? capturedBody = null;
+        var handler = new MockHttpMessageHandler(async (request, _) =>
+        {
+            capturedBody = await request.Content!.ReadAsStringAsync();
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(AnthropicResponseJson, System.Text.Encoding.UTF8, "application/json")
+            };
+        });
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
+
+        var request = new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "Hello")],
+            Model: "claude-sonnet-4-20250514",
+            MaxTokens: 2048);
+
+        await client.GetChatCompletionAsync(request);
+
+        var doc = JsonDocument.Parse(capturedBody!);
+        Assert.That(doc.RootElement.TryGetProperty("max_tokens", out var maxTokens), Is.True);
+        Assert.That(maxTokens.GetInt32(), Is.EqualTo(2048));
+    }
+
+    [Test]
+    public async Task GetChatCompletionAsync_WithMaxTokensNotSet_DoesNotDefaultTo1024()
+    {
+        string? capturedBody = null;
+        var handler = new MockHttpMessageHandler(async (request, _) =>
+        {
+            capturedBody = await request.Content!.ReadAsStringAsync();
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(AnthropicResponseJson, System.Text.Encoding.UTF8, "application/json")
+            };
+        });
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
+
+        var request = new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "Hello")],
+            Model: "claude-sonnet-4-20250514");
+
+        await client.GetChatCompletionAsync(request);
+
+        var doc = JsonDocument.Parse(capturedBody!);
+        Assert.That(doc.RootElement.TryGetProperty("max_tokens", out var maxTokens), Is.True);
+        Assert.That(maxTokens.GetInt32(), Is.Not.EqualTo(1024),
+            "max_tokens must not silently default to 1024");
+        Assert.That(maxTokens.GetInt32(), Is.EqualTo(AnthropicChatCompletionClient.DefaultMaxTokens));
+    }
+
     private const string AnthropicResponseJson = """
         {
             "model": "claude-sonnet-4-20250514",

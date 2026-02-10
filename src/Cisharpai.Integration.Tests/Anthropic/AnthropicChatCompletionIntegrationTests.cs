@@ -52,6 +52,36 @@ public sealed class AnthropicChatCompletionIntegrationTests
     }
 
     [TestCase("claude-haiku-4-5-20251001")]
+    public async Task GetChatCompletionAsync_WithoutMaxTokens_ReturnsValidResponse(string model)
+    {
+        var apiKey = Environment.GetEnvironmentVariable(DotEnv.AnthropicTestApiKey);
+        Assert.That(apiKey, Is.Not.Null.And.Not.Empty,
+            $"Environment variable {DotEnv.AnthropicTestApiKey} must be set. " +
+            "Add it to a .env file in any parent directory.");
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddAnthropicClient(options =>
+        {
+            options.ApiKey = apiKey!;
+        });
+
+        await using var provider = services.BuildServiceProvider();
+        var client = provider.GetRequiredService<IChatCompletionClient>();
+
+        // Explicitly NOT setting MaxTokens — should still work
+        var request = new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "Say hello")],
+            Model: model,
+            Temperature: 0);
+
+        var response = await client.GetChatCompletionAsync(request);
+
+        Assert.That(response.IsSuccess, Is.True, $"Request failed: {response.ErrorMessage}");
+        Assert.That(response.Content, Is.Not.Null.And.Not.Empty);
+    }
+
+    [TestCase("claude-haiku-4-5-20251001")]
     public async Task GetChatCompletionAsync_VeryLowMaxTokens_ReturnsIncompleteResponse(string model)
     {
         var apiKey = Environment.GetEnvironmentVariable(DotEnv.AnthropicTestApiKey);
