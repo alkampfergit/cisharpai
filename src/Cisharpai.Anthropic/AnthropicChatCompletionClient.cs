@@ -146,6 +146,8 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         if (refusal is not null)
             content = string.Empty;
 
+        var incompleteReason = raw.StopReason == "max_tokens" ? "max_tokens" : null;
+
         return new ChatCompletionResponse(
             Content: content,
             Model: raw.Model,
@@ -153,6 +155,8 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
             CompletionTokens: raw.Usage.OutputTokens,
             RawResponseJson: rawResponseJson,
             RawRequestJson: rawRequestJson,
+            Status: raw.StopReason,
+            IncompleteReason: incompleteReason,
             Refusal: refusal);
     }
 

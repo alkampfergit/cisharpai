@@ -216,6 +216,50 @@ public sealed class AnthropicChatCompletionClientTests
         Assert.That(maxTokens.GetInt32(), Is.EqualTo(AnthropicChatCompletionClient.DefaultMaxTokens));
     }
 
+    [Test]
+    public async Task GetChatCompletionAsync_StopReasonMaxTokens_PopulatesIncompleteReason()
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(AnthropicMaxTokensResponseJson, System.Text.Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
+
+        var response = await client.GetChatCompletionAsync(new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "Write a long essay")],
+            Model: "claude-sonnet-4-20250514",
+            MaxTokens: 10));
+
+        Assert.That(response.IsSuccess, Is.True, "Truncated responses are still successful (content is usable)");
+        Assert.That(response.Content, Is.EqualTo("This is truncated"));
+        Assert.That(response.IncompleteReason, Is.EqualTo("max_tokens"));
+        Assert.That(response.Status, Is.EqualTo("max_tokens"));
+    }
+
+    [Test]
+    public async Task GetChatCompletionAsync_StopReasonEndTurn_NoIncompleteReason()
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(AnthropicResponseJson, System.Text.Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
+
+        var response = await client.GetChatCompletionAsync(new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "Hello")],
+            Model: "claude-sonnet-4-20250514"));
+
+        Assert.That(response.IsSuccess, Is.True);
+        Assert.That(response.IncompleteReason, Is.Null);
+        Assert.That(response.Status, Is.EqualTo("end_turn"));
+    }
+
     private const string AnthropicResponseJson = """
         {
             "model": "claude-sonnet-4-20250514",
@@ -228,7 +272,25 @@ public sealed class AnthropicChatCompletionClientTests
             "usage": {
                 "input_tokens": 15,
                 "output_tokens": 25
-            }
+            },
+            "stop_reason": "end_turn"
+        }
+        """;
+
+    private const string AnthropicMaxTokensResponseJson = """
+        {
+            "model": "claude-sonnet-4-20250514",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "This is truncated"
+                }
+            ],
+            "usage": {
+                "input_tokens": 15,
+                "output_tokens": 10
+            },
+            "stop_reason": "max_tokens"
         }
         """;
 }
