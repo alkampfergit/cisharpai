@@ -302,6 +302,108 @@ public sealed class LlmHttpClientTests
             "LlmHttpClient with custom options should use the provided instance");
     }
 
+    [Test]
+    public async Task PostAsync_MergesExtraParameters_IntoRequestBody()
+    {
+        string? capturedBody = null;
+        var handler = new MockHttpMessageHandler(async (request, _) =>
+        {
+            capturedBody = await request.Content!.ReadAsStringAsync();
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{}", System.Text.Encoding.UTF8, "application/json")
+            };
+        });
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://test.com") };
+        var client = new LlmHttpClient(httpClient);
+
+        var extra = JsonDocument.Parse("{\"customParam\":\"value\",\"nested\":{\"key\":123}}").RootElement;
+
+        await client.PostAsync<object, JsonElement>("api/test", new { Name = "test" }, extraParameters: extra);
+
+        Assert.That(capturedBody, Does.Contain("\"name\""));
+        Assert.That(capturedBody, Does.Contain("\"customParam\":\"value\""));
+        Assert.That(capturedBody, Does.Contain("\"nested\""));
+        Assert.That(capturedBody, Does.Contain("\"key\":123"));
+    }
+
+    [Test]
+    public async Task PostAsync_ExtraParametersNull_SendsOriginalPayloadOnly()
+    {
+        string? capturedBody = null;
+        var handler = new MockHttpMessageHandler(async (request, _) =>
+        {
+            capturedBody = await request.Content!.ReadAsStringAsync();
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{}", System.Text.Encoding.UTF8, "application/json")
+            };
+        });
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://test.com") };
+        var client = new LlmHttpClient(httpClient);
+
+        await client.PostAsync<object, JsonElement>("api/test", new { Name = "test" }, extraParameters: null);
+
+        Assert.That(capturedBody, Is.EqualTo("{\"name\":\"test\"}"));
+    }
+
+    [Test]
+    public void PostWithRawAsync_ThrowsOnNullResponseBody()
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+        {
+            var response = new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("null", System.Text.Encoding.UTF8, "application/json")
+            };
+            return Task.FromResult(response);
+        });
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://test.com") };
+        var client = new LlmHttpClient(httpClient);
+
+        Assert.ThrowsAsync<InvalidOperationException>(async () =>
+            await client.PostWithRawAsync<object, TestResponse>("api/test", new { }));
+    }
+
+    [Test]
+    public void PostAsync_ThrowsTaskCanceledException_WhenCancelled()
+    {
+        var handler = new MockHttpMessageHandler((_, ct) =>
+        {
+            ct.ThrowIfCancellationRequested();
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+        });
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://test.com") };
+        var client = new LlmHttpClient(httpClient);
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        Assert.ThrowsAsync<TaskCanceledException>(async () =>
+            await client.PostAsync<object, JsonElement>("api/test", new { }, cts.Token));
+    }
+
+    [Test]
+    public void PostWithRawAsync_ThrowsTaskCanceledException_WhenCancelled()
+    {
+        var handler = new MockHttpMessageHandler((_, ct) =>
+        {
+            ct.ThrowIfCancellationRequested();
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+        });
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://test.com") };
+        var client = new LlmHttpClient(httpClient);
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        Assert.ThrowsAsync<TaskCanceledException>(async () =>
+            await client.PostWithRawAsync<object, JsonElement>("api/test", new { }, cts.Token));
+    }
+
     private sealed class TestResponse
     {
         public string Name { get; set; } = string.Empty;
