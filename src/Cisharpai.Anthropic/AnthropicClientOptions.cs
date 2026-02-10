@@ -6,7 +6,7 @@ public sealed class AnthropicClientOptions
 
     public string ApiKey { get; set; } = string.Empty;
 
-    public string? ApiVersion { get; set; }
+    public string ApiVersion { get; set; } = "2023-06-01";
 
     public string? DefaultModel { get; set; }
 }
