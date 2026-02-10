@@ -28,7 +28,7 @@ public sealed record DocumentChunk(
     public void Validate()
     {
         var hasData = Data is not null && Data.Count > 0;
-        var hasText = !string.IsNullOrEmpty(Text);
+        var hasText = !string.IsNullOrWhiteSpace(Text);
 
         if (!hasData && !hasText)
             throw new ArgumentException(
