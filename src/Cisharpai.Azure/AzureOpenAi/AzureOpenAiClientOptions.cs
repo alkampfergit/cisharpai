@@ -13,6 +13,12 @@ public sealed class AzureOpenAiClientOptions : AzureClientOptionsBase
     public string DeploymentName { get; set; } = string.Empty;
 
     /// <summary>
+    /// Optional default model name used for model-type detection (e.g. reasoning vs legacy).
+    /// When <see cref="ChatCompletionRequest.Model"/> is null, this value is used as fallback.
+    /// </summary>
+    public string? DefaultModel { get; set; }
+
+    /// <summary>
     /// Initializes a new instance with the default API version.
     /// </summary>
     public AzureOpenAiClientOptions()

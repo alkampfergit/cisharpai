@@ -225,11 +225,12 @@ public sealed class AzureAiInferenceChatCompletionClient : IChatCompletionClient
         _ => throw new ArgumentOutOfRangeException(nameof(role), role, null)
     };
 
-    private static bool IsReasoningModel(string model) =>
-        model.StartsWith("o1", StringComparison.OrdinalIgnoreCase) ||
-        model.StartsWith("o3", StringComparison.OrdinalIgnoreCase) ||
-        model.StartsWith("o4", StringComparison.OrdinalIgnoreCase) ||
-        model.StartsWith("gpt-5", StringComparison.OrdinalIgnoreCase);
+    private static bool IsReasoningModel(string? model) =>
+        model is not null &&
+        (model.StartsWith("o1", StringComparison.OrdinalIgnoreCase) ||
+         model.StartsWith("o3", StringComparison.OrdinalIgnoreCase) ||
+         model.StartsWith("o4", StringComparison.OrdinalIgnoreCase) ||
+         model.StartsWith("gpt-5", StringComparison.OrdinalIgnoreCase));
 
     private static string? MapIncompleteReason(string? finishReason) => finishReason switch
     {

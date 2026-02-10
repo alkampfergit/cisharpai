@@ -65,7 +65,7 @@ Each supported provider has its own project providing concrete implementations o
         *   `AzureOpenAiChatCompletionClient.cs`: Implements `IChatCompletionClient` and `IJsonOutputFeature` with Azure-specific auth/routing. Detects reasoning models (o1/o3/o4/gpt-5) and uses appropriate request format. Supports JSON Mode and Structured Outputs. Endpoint: `openai/deployments/{deployment}/chat/completions?api-version=...`.
         *   `Models/AzureOpenAiResponseFormat.cs`: DTOs for `response_format` parameter: `AzureOpenAiResponseFormat`, `AzureOpenAiJsonSchemaSpec`.
         *   `AzureOpenAiEmbeddingClient.cs`: Implements `IEmbeddingClient`. Supports text-embedding-ada-002, text-embedding-3-small, text-embedding-3-large deployments. Endpoint: `openai/deployments/{deployment}/embeddings?api-version=...`.
-        *   `AzureOpenAiClientOptions.cs`: Configuration with DeploymentName, extends AzureClientOptionsBase. Default API version: `2024-02-01`.
+        *   `AzureOpenAiClientOptions.cs`: Configuration with DeploymentName and `DefaultModel` (optional, used for model-type detection when `ChatCompletionRequest.Model` is null), extends AzureClientOptionsBase. Default API version: `2024-02-01`.
         *   `Models/`: Request/response DTOs for Azure OpenAI API.
     *   **`AzureAiInference/`**: Connector for Azure AI Inference (model-as-a-service). Supports Phi-3, Llama-3, Mistral, and other Azure AI model catalog offerings, including reasoning models (o1/o3/o4/GPT-5). Uses HttpClient directly (not the Azure.AI.Inference SDK).
         *   `AzureAiInferenceChatCompletionClient.cs`: Implements `IChatCompletionClient` and `IJsonOutputFeature`. Detects reasoning models (o1/o3/o4/gpt-5) and uses appropriate request format (`max_completion_tokens` instead of `max_tokens`, no `Temperature`). Supports JSON Mode and Structured Outputs. Endpoint: `models/chat/completions?api-version=...`.
@@ -167,6 +167,7 @@ Project documentation pages.
     *   `Cohere/CohereDefaultModelTests.cs`: Tests for Cohere default model resolution (chat and embedding clients, fallback to DefaultModel, request override, no-model exception, model constants validation).
     *   `Azure/Common/`: Tests for shared Azure authentication handler and client options.
     *   `Azure/AzureOpenAi/`: Tests for Azure OpenAI client.
+    *   `Azure/AzureOpenAi/AzureOpenAiDefaultModelTests.cs`: Tests for Azure OpenAI default model resolution (fallback to DefaultModel for reasoning detection, request override, null model treated as legacy, JSON output with DefaultModel).
     *   `Azure/AzureOpenAi/AzureOpenAiJsonOutputTests.cs`: Tests for Azure OpenAI JSON output request building (JSON Mode, Structured Outputs, refusal, feature discovery, endpoint/header verification).
     *   `Azure/AzureAiInference/`: Tests for Azure AI Inference client.
     *   `Azure/AzureAiInference/AzureAiInferenceJsonOutputTests.cs`: Tests for Azure AI Inference JSON output request building (JSON Mode, Structured Outputs, schema parsing, feature discovery, endpoint/model verification).
