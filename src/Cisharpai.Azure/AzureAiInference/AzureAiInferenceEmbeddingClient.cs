@@ -77,7 +77,7 @@ public sealed class AzureAiInferenceEmbeddingClient : IEmbeddingClient, IImageEm
         }
         catch (Exception ex)
         {
-            return EmbeddingResponse.Error($"Unexpected error: {ex.Message}");
+            return EmbeddingResponse.Error(ex.Message);
         }
     }
 

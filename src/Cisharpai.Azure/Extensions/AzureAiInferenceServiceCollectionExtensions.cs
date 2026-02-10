@@ -22,11 +22,7 @@ public static class AzureAiInferenceServiceCollectionExtensions
         var options = new AzureAiInferenceClientOptions();
         configure(options);
         options.Validate();
-
-        services.AddSingleton(options);
-
-        if (credential is not null)
-            services.AddSingleton(credential);
+        options.ValidateAuthentication(credential is not null);
 
         var builder = services.AddHttpClient<AzureAiInferenceChatCompletionClient>(client =>
             {
@@ -35,6 +31,11 @@ public static class AzureAiInferenceServiceCollectionExtensions
             .AddHttpMessageHandler(() => new AzureAuthenticationHandler(options, credential));
 
         builder.AddCisharpaiResilienceHandler();
+
+        services.AddTransient(sp =>
+            new AzureAiInferenceChatCompletionClient(
+                sp.GetRequiredService<IHttpClientFactory>().CreateClient(typeof(AzureAiInferenceChatCompletionClient).Name),
+                options));
 
         services.AddSingleton<IChatCompletionClient>(sp =>
             sp.GetRequiredService<AzureAiInferenceChatCompletionClient>());
@@ -57,11 +58,7 @@ public static class AzureAiInferenceServiceCollectionExtensions
         var options = new AzureAiInferenceClientOptions();
         configure(options);
         options.Validate();
-
-        services.AddSingleton(options);
-
-        if (credential is not null)
-            services.AddSingleton(credential);
+        options.ValidateAuthentication(credential is not null);
 
         var builder = services.AddHttpClient<AzureAiInferenceEmbeddingClient>(client =>
             {
@@ -71,8 +68,77 @@ public static class AzureAiInferenceServiceCollectionExtensions
 
         builder.AddCisharpaiResilienceHandler();
 
+        services.AddTransient(sp =>
+            new AzureAiInferenceEmbeddingClient(
+                sp.GetRequiredService<IHttpClientFactory>().CreateClient(typeof(AzureAiInferenceEmbeddingClient).Name),
+                options));
+
         services.AddSingleton<IEmbeddingClient>(sp =>
             sp.GetRequiredService<AzureAiInferenceEmbeddingClient>());
+
+        return builder;
+    }
+
+    public static IHttpClientBuilder AddAzureAiInferenceChatCompletion(
+        this IServiceCollection services,
+        string key,
+        Action<AzureAiInferenceClientOptions> configure,
+        TokenCredential? credential = null)
+    {
+        var options = new AzureAiInferenceClientOptions();
+        configure(options);
+        options.Validate();
+        options.ValidateAuthentication(credential is not null);
+
+        var clientName = $"{nameof(AzureAiInferenceChatCompletionClient)}_{key}";
+
+        var builder = services.AddHttpClient(clientName, client =>
+            {
+                client.BaseAddress = new Uri(options.Endpoint);
+            })
+            .AddHttpMessageHandler(() => new AzureAuthenticationHandler(options, credential));
+
+        builder.AddCisharpaiResilienceHandler();
+
+        services.AddKeyedTransient<AzureAiInferenceChatCompletionClient>(key, (sp, _) =>
+            new AzureAiInferenceChatCompletionClient(
+                sp.GetRequiredService<IHttpClientFactory>().CreateClient(clientName),
+                options));
+
+        services.AddKeyedSingleton<IChatCompletionClient>(key, (sp, k) =>
+            sp.GetRequiredKeyedService<AzureAiInferenceChatCompletionClient>(k));
+
+        return builder;
+    }
+
+    public static IHttpClientBuilder AddAzureAiInferenceEmbeddings(
+        this IServiceCollection services,
+        string key,
+        Action<AzureAiInferenceClientOptions> configure,
+        TokenCredential? credential = null)
+    {
+        var options = new AzureAiInferenceClientOptions();
+        configure(options);
+        options.Validate();
+        options.ValidateAuthentication(credential is not null);
+
+        var clientName = $"{nameof(AzureAiInferenceEmbeddingClient)}_{key}";
+
+        var builder = services.AddHttpClient(clientName, client =>
+            {
+                client.BaseAddress = new Uri(options.Endpoint);
+            })
+            .AddHttpMessageHandler(() => new AzureAuthenticationHandler(options, credential));
+
+        builder.AddCisharpaiResilienceHandler();
+
+        services.AddKeyedTransient<AzureAiInferenceEmbeddingClient>(key, (sp, _) =>
+            new AzureAiInferenceEmbeddingClient(
+                sp.GetRequiredService<IHttpClientFactory>().CreateClient(clientName),
+                options));
+
+        services.AddKeyedSingleton<IEmbeddingClient>(key, (sp, k) =>
+            sp.GetRequiredKeyedService<AzureAiInferenceEmbeddingClient>(k));
 
         return builder;
     }

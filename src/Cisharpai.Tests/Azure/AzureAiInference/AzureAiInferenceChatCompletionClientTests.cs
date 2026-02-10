@@ -345,6 +345,34 @@ public sealed class AzureAiInferenceChatCompletionClientTests
         Assert.That(doc.RootElement.TryGetProperty("max_tokens", out _), Is.False);
     }
 
+    [Test]
+    public async Task GetChatCompletionAsync_NullModelAndNullModelId_DoesNotThrowNullReferenceException()
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(InferenceResponseJson, System.Text.Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler)
+        {
+            BaseAddress = new Uri("https://my-resource.services.ai.azure.com/")
+        };
+        var options = new AzureAiInferenceClientOptions
+        {
+            Endpoint = "https://my-resource.services.ai.azure.com/",
+            ModelId = null!,
+            ApiKey = "test-key"
+        };
+        var client = new AzureAiInferenceChatCompletionClient(httpClient, options);
+
+        // Should not throw NullReferenceException — should treat null model as legacy (non-reasoning)
+        var response = await client.GetChatCompletionAsync(new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "Hello")]));
+
+        Assert.That(response.IsSuccess, Is.True);
+    }
+
     private const string InferenceResponseJson = """
         {
             "id": "chatcmpl-123",

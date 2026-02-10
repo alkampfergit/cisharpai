@@ -22,11 +22,7 @@ public static class AzureOpenAiServiceCollectionExtensions
         var options = new AzureOpenAiClientOptions();
         configure(options);
         options.Validate();
-
-        services.AddSingleton(options);
-
-        if (credential is not null)
-            services.AddSingleton(credential);
+        options.ValidateAuthentication(credential is not null);
 
         var builder = services.AddHttpClient<AzureOpenAiChatCompletionClient>(client =>
             {
@@ -35,6 +31,11 @@ public static class AzureOpenAiServiceCollectionExtensions
             .AddHttpMessageHandler(() => new AzureAuthenticationHandler(options, credential));
 
         builder.AddCisharpaiResilienceHandler();
+
+        services.AddTransient(sp =>
+            new AzureOpenAiChatCompletionClient(
+                sp.GetRequiredService<IHttpClientFactory>().CreateClient(typeof(AzureOpenAiChatCompletionClient).Name),
+                options));
 
         services.AddSingleton<IChatCompletionClient>(sp =>
             sp.GetRequiredService<AzureOpenAiChatCompletionClient>());
@@ -57,11 +58,7 @@ public static class AzureOpenAiServiceCollectionExtensions
         var options = new AzureOpenAiClientOptions();
         configure(options);
         options.Validate();
-
-        services.AddSingleton(options);
-
-        if (credential is not null)
-            services.AddSingleton(credential);
+        options.ValidateAuthentication(credential is not null);
 
         var builder = services.AddHttpClient<AzureOpenAiEmbeddingClient>(client =>
             {
@@ -71,8 +68,77 @@ public static class AzureOpenAiServiceCollectionExtensions
 
         builder.AddCisharpaiResilienceHandler();
 
+        services.AddTransient(sp =>
+            new AzureOpenAiEmbeddingClient(
+                sp.GetRequiredService<IHttpClientFactory>().CreateClient(typeof(AzureOpenAiEmbeddingClient).Name),
+                options));
+
         services.AddSingleton<IEmbeddingClient>(sp =>
             sp.GetRequiredService<AzureOpenAiEmbeddingClient>());
+
+        return builder;
+    }
+
+    public static IHttpClientBuilder AddAzureOpenAiClient(
+        this IServiceCollection services,
+        string key,
+        Action<AzureOpenAiClientOptions> configure,
+        TokenCredential? credential = null)
+    {
+        var options = new AzureOpenAiClientOptions();
+        configure(options);
+        options.Validate();
+        options.ValidateAuthentication(credential is not null);
+
+        var clientName = $"{nameof(AzureOpenAiChatCompletionClient)}_{key}";
+
+        var builder = services.AddHttpClient(clientName, client =>
+            {
+                client.BaseAddress = new Uri(options.Endpoint);
+            })
+            .AddHttpMessageHandler(() => new AzureAuthenticationHandler(options, credential));
+
+        builder.AddCisharpaiResilienceHandler();
+
+        services.AddKeyedTransient<AzureOpenAiChatCompletionClient>(key, (sp, _) =>
+            new AzureOpenAiChatCompletionClient(
+                sp.GetRequiredService<IHttpClientFactory>().CreateClient(clientName),
+                options));
+
+        services.AddKeyedSingleton<IChatCompletionClient>(key, (sp, k) =>
+            sp.GetRequiredKeyedService<AzureOpenAiChatCompletionClient>(k));
+
+        return builder;
+    }
+
+    public static IHttpClientBuilder AddAzureOpenAiEmbeddingClient(
+        this IServiceCollection services,
+        string key,
+        Action<AzureOpenAiClientOptions> configure,
+        TokenCredential? credential = null)
+    {
+        var options = new AzureOpenAiClientOptions();
+        configure(options);
+        options.Validate();
+        options.ValidateAuthentication(credential is not null);
+
+        var clientName = $"{nameof(AzureOpenAiEmbeddingClient)}_{key}";
+
+        var builder = services.AddHttpClient(clientName, client =>
+            {
+                client.BaseAddress = new Uri(options.Endpoint);
+            })
+            .AddHttpMessageHandler(() => new AzureAuthenticationHandler(options, credential));
+
+        builder.AddCisharpaiResilienceHandler();
+
+        services.AddKeyedTransient<AzureOpenAiEmbeddingClient>(key, (sp, _) =>
+            new AzureOpenAiEmbeddingClient(
+                sp.GetRequiredService<IHttpClientFactory>().CreateClient(clientName),
+                options));
+
+        services.AddKeyedSingleton<IEmbeddingClient>(key, (sp, k) =>
+            sp.GetRequiredKeyedService<AzureOpenAiEmbeddingClient>(k));
 
         return builder;
     }

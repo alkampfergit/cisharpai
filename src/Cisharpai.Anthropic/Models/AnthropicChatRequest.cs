@@ -20,7 +20,7 @@ public sealed class AnthropicChatRequest
     public double? Temperature { get; set; }
 
     [JsonPropertyName("max_tokens")]
-    public int MaxTokens { get; set; } = 1024;
+    public int MaxTokens { get; set; }
 
     [JsonPropertyName("output_config")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

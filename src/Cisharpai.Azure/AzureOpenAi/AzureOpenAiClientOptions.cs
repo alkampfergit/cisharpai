@@ -13,6 +13,12 @@ public sealed class AzureOpenAiClientOptions : AzureClientOptionsBase
     public string DeploymentName { get; set; } = string.Empty;
 
     /// <summary>
+    /// Optional default model name used for model-type detection (e.g. reasoning vs legacy).
+    /// When <see cref="ChatCompletionRequest.Model"/> is null, this value is used as fallback.
+    /// </summary>
+    public string? DefaultModel { get; set; }
+
+    /// <summary>
     /// Initializes a new instance with the default API version.
     /// </summary>
     public AzureOpenAiClientOptions()
@@ -33,9 +39,19 @@ public sealed class AzureOpenAiClientOptions : AzureClientOptionsBase
             throw new InvalidOperationException("DeploymentName is required.");
         }
 
-        if (string.IsNullOrWhiteSpace(ApiKey))
+    }
+
+    /// <summary>
+    /// Validates that either an API key or a token credential is configured for authentication.
+    /// Called by DI extensions where both options and credential are available.
+    /// </summary>
+    /// <param name="hasTokenCredential">Whether a TokenCredential was provided.</param>
+    /// <exception cref="InvalidOperationException">Thrown when neither authentication method is configured.</exception>
+    internal void ValidateAuthentication(bool hasTokenCredential)
+    {
+        if (!hasTokenCredential && string.IsNullOrWhiteSpace(ApiKey))
         {
-            throw new InvalidOperationException("ApiKey is required.");
+            throw new InvalidOperationException("Either ApiKey or a TokenCredential is required for authentication.");
         }
     }
 }

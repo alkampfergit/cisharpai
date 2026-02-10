@@ -615,6 +615,39 @@ public sealed class OpenAiJsonOutputTests
 
     #endregion
 
+    #region Invalid Schema Tests
+
+    [Test]
+    public async Task JsonSchema_WithInvalidJson_ReturnsErrorResponse()
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(ChatCompletionsJsonResponseJson, System.Text.Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.openai.com/v1/") };
+        var client = new OpenAiChatCompletionClient(httpClient, new OpenAiClientOptions());
+
+        var invalidJson = "not valid json {{{";
+        var request = new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "Give me a person")],
+            Model: "gpt-4o-2024-08-06");
+
+        var jsonOptions = new JsonOutputOptions(
+            Mode: JsonOutputMode.JsonSchema,
+            SchemaName: "person",
+            JsonSchema: invalidJson);
+
+        var response = await client.GetChatCompletionWithJsonOutputAsync(request, jsonOptions);
+
+        Assert.That(response.IsSuccess, Is.False);
+        Assert.That(response.ErrorMessage, Does.Contain(invalidJson));
+        Assert.That(response.ErrorMessage, Does.Contain("invalid JSON"));
+    }
+
+    #endregion
+
     #region Feature Discovery Tests
 
     [Test]

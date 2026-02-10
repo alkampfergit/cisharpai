@@ -90,6 +90,12 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
                 "Model must be specified either in the request or via DefaultModel in options.");
     }
 
+    /// <summary>
+    /// Anthropic API requires max_tokens. When the caller does not specify a
+    /// value we fall back to this default so the request does not fail.
+    /// </summary>
+    public const int DefaultMaxTokens = 8192;
+
     private AnthropicChatRequest BuildRequest(ChatCompletionRequest request)
     {
         var systemMessage = request.Messages
@@ -99,7 +105,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         {
             Model = request.Model!,
             Temperature = request.Temperature,
-            MaxTokens = request.MaxTokens ?? 1024,
+            MaxTokens = request.MaxTokens ?? DefaultMaxTokens,
             System = systemMessage,
             Messages = request.Messages
                 .Where(m => m.Role != LlmRole.System)
@@ -140,6 +146,8 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         if (refusal is not null)
             content = string.Empty;
 
+        var incompleteReason = raw.StopReason == "max_tokens" ? "max_tokens" : null;
+
         return new ChatCompletionResponse(
             Content: content,
             Model: raw.Model,
@@ -147,6 +155,8 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
             CompletionTokens: raw.Usage.OutputTokens,
             RawResponseJson: rawResponseJson,
             RawRequestJson: rawRequestJson,
+            Status: raw.StopReason,
+            IncompleteReason: incompleteReason,
             Refusal: refusal);
     }
 

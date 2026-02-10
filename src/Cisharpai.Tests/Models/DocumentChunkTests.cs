@@ -64,4 +64,12 @@ public sealed class DocumentChunkTests
 
         Assert.Throws<ArgumentException>(() => chunk.Validate());
     }
+
+    [Test]
+    public void Validate_WhitespaceOnlyText_ThrowsArgumentException()
+    {
+        var chunk = new DocumentChunk(Text: "   ");
+
+        Assert.Throws<ArgumentException>(() => chunk.Validate());
+    }
 }

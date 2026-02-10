@@ -14,7 +14,7 @@ public sealed class AnthropicAuthenticationHandler : DelegatingHandler
         CancellationToken cancellationToken)
     {
         request.Headers.Add("x-api-key", _options.ApiKey);
-        request.Headers.Add("anthropic-version", _options.ApiVersion ?? "2023-06-01");
+        request.Headers.Add("anthropic-version", _options.ApiVersion);
 
         return base.SendAsync(request, cancellationToken);
     }

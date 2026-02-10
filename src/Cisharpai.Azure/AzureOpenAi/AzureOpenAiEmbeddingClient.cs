@@ -67,7 +67,7 @@ public sealed class AzureOpenAiEmbeddingClient : IEmbeddingClient
         }
         catch (Exception ex)
         {
-            return EmbeddingResponse.Error($"Unexpected error: {ex.Message}");
+            return EmbeddingResponse.Error(ex.Message);
         }
     }
 

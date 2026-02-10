@@ -332,6 +332,14 @@ public sealed class CohereGroundedChatTests
     }
 
     [Test]
+    public async Task GroundedChat_MapsCitationType()
+    {
+        var (response, _) = await ExecuteGroundedChat(GroundedResponseWithCitations);
+
+        Assert.That(response.Citations[0].Type, Is.EqualTo("TEXT_CONTENT"));
+    }
+
+    [Test]
     public async Task GroundedChat_NoCitations_ReturnsEmptyList()
     {
         var (response, _) = await ExecuteGroundedChat(GroundedResponseNoCitations);
@@ -450,6 +458,37 @@ public sealed class CohereGroundedChatTests
     #endregion
 
     #region Multiple Citations Tests
+
+    [Test]
+    public async Task GroundedChat_CitationTypeNull_WhenNotProvided()
+    {
+        const string responseWithoutCitationType = """
+            {
+                "id": "abc-no-type",
+                "finish_reason": "COMPLETE",
+                "message": {
+                    "role": "assistant",
+                    "content": [{ "type": "text", "text": "Paris is the capital." }],
+                    "citations": [
+                        {
+                            "start": 0,
+                            "end": 5,
+                            "text": "Paris",
+                            "sources": [{ "type": "document", "id": "doc-1" }]
+                        }
+                    ]
+                },
+                "usage": {
+                    "billed_units": { "input_tokens": 10, "output_tokens": 5 },
+                    "tokens": { "input_tokens": 10, "output_tokens": 5 }
+                }
+            }
+            """;
+
+        var (response, _) = await ExecuteGroundedChat(responseWithoutCitationType);
+
+        Assert.That(response.Citations[0].Type, Is.Null);
+    }
 
     [Test]
     public async Task GroundedChat_MultipleCitations_AllMapped()

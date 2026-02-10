@@ -49,4 +49,40 @@ public sealed class GroundedChatOptionsTests
 
         Assert.That(options.CitationMode, Is.EqualTo(CitationMode.Fast));
     }
+
+    [Test]
+    public void Validate_InvalidChunk_BothDataAndText_ThrowsArgumentException()
+    {
+        var options = new GroundedChatOptions(
+            Documents:
+            [
+                new DocumentChunk(
+                    Data: new Dictionary<string, string> { ["snippet"] = "Some text" },
+                    Text: "Also some text")
+            ]);
+
+        Assert.Throws<ArgumentException>(() => options.Validate());
+    }
+
+    [Test]
+    public void Validate_InvalidChunk_NeitherDataNorText_ThrowsArgumentException()
+    {
+        var options = new GroundedChatOptions(
+            Documents: [new DocumentChunk(Id: "doc-1")]);
+
+        Assert.Throws<ArgumentException>(() => options.Validate());
+    }
+
+    [Test]
+    public void Validate_MixOfValidAndInvalidChunks_ThrowsArgumentException()
+    {
+        var options = new GroundedChatOptions(
+            Documents:
+            [
+                new DocumentChunk(Text: "Valid chunk"),
+                new DocumentChunk(Id: "invalid-no-content")
+            ]);
+
+        Assert.Throws<ArgumentException>(() => options.Validate());
+    }
 }

@@ -23,4 +23,9 @@ public sealed record Citation(
     /// <summary>
     /// The source documents backing this citation.
     /// </summary>
-    IReadOnlyList<CitationSource> Sources);
+    IReadOnlyList<CitationSource> Sources,
+
+    /// <summary>
+    /// The citation type (e.g., "TEXT_CONTENT" for Cohere). Null if not provided by the provider.
+    /// </summary>
+    string? Type = null);

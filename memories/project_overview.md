@@ -40,7 +40,7 @@ Contains the abstractions and shared logic. This is the only dependency needed f
     *   **`CitationMode.cs`**: Enum defining citation modes for grounded chat: `Accurate`, `Fast`, `Enabled`.
     *   **`DocumentChunk.cs`**: Represents a document chunk for RAG (Id, Data as key-value dict, or Text as plain string). Includes `Validate()` ensuring exactly one of Data/Text is set.
     *   **`CitationSource.cs`**: Represents a source document backing a citation (Id, optional Data dictionary).
-    *   **`Citation.cs`**: Represents a citation in a grounded response (Start/End character offsets, Text, Sources).
+    *   **`Citation.cs`**: Represents a citation in a grounded response (Start/End character offsets, Text, Sources, optional Type for provider-specific citation type e.g. Cohere's "TEXT_CONTENT").
     *   **`GroundedChatOptions.cs`**: Configuration record for grounded chat (Documents, CitationMode). Includes `Validate()`.
     *   **`GroundedChatCompletionResponse.cs`**: Wraps `ChatCompletionResponse` with `Citations`. Convenience `IsSuccess`, `Content`, `ErrorMessage` properties. Static `Error()` factory.
     *   **`LlmMessage.cs`**: Represents a message in the conversation (Role, Content).
@@ -65,7 +65,7 @@ Each supported provider has its own project providing concrete implementations o
         *   `AzureOpenAiChatCompletionClient.cs`: Implements `IChatCompletionClient` and `IJsonOutputFeature` with Azure-specific auth/routing. Detects reasoning models (o1/o3/o4/gpt-5) and uses appropriate request format. Supports JSON Mode and Structured Outputs. Endpoint: `openai/deployments/{deployment}/chat/completions?api-version=...`.
         *   `Models/AzureOpenAiResponseFormat.cs`: DTOs for `response_format` parameter: `AzureOpenAiResponseFormat`, `AzureOpenAiJsonSchemaSpec`.
         *   `AzureOpenAiEmbeddingClient.cs`: Implements `IEmbeddingClient`. Supports text-embedding-ada-002, text-embedding-3-small, text-embedding-3-large deployments. Endpoint: `openai/deployments/{deployment}/embeddings?api-version=...`.
-        *   `AzureOpenAiClientOptions.cs`: Configuration with DeploymentName, extends AzureClientOptionsBase. Default API version: `2024-02-01`.
+        *   `AzureOpenAiClientOptions.cs`: Configuration with DeploymentName and `DefaultModel` (optional, used for model-type detection when `ChatCompletionRequest.Model` is null), extends AzureClientOptionsBase. Default API version: `2024-02-01`.
         *   `Models/`: Request/response DTOs for Azure OpenAI API.
     *   **`AzureAiInference/`**: Connector for Azure AI Inference (model-as-a-service). Supports Phi-3, Llama-3, Mistral, and other Azure AI model catalog offerings, including reasoning models (o1/o3/o4/GPT-5). Uses HttpClient directly (not the Azure.AI.Inference SDK).
         *   `AzureAiInferenceChatCompletionClient.cs`: Implements `IChatCompletionClient` and `IJsonOutputFeature`. Detects reasoning models (o1/o3/o4/gpt-5) and uses appropriate request format (`max_completion_tokens` instead of `max_tokens`, no `Temperature`). Supports JSON Mode and Structured Outputs. Endpoint: `models/chat/completions?api-version=...`.
@@ -73,9 +73,9 @@ Each supported provider has its own project providing concrete implementations o
         *   `AzureAiInferenceEmbeddingClient.cs`: Implements `IEmbeddingClient` and `IImageEmbeddingFeature`. Supports text and image embeddings. Endpoint: `models/embeddings?api-version=...`.
         *   `AzureAiInferenceClientOptions.cs`: Configuration with ModelId, extends AzureClientOptionsBase. Default API version: `2024-05-01-preview`.
         *   `Models/`: Request/response DTOs for Azure AI Inference API.
-    *   **`Extensions/`**: DI service collection extensions.
-        *   `AzureOpenAiServiceCollectionExtensions.cs`: `AddAzureOpenAiClient()` for registering Azure OpenAI client.
-        *   `AzureAiInferenceServiceCollectionExtensions.cs`: `AddAzureAiInferenceChatCompletion()` and `AddAzureAiInferenceEmbeddings()` for registering Azure AI Inference clients.
+    *   **`Extensions/`**: DI service collection extensions. Each extension method owns its options via closure (not registered in DI), enabling independent configuration when both chat and embedding clients are registered. Keyed overloads support .NET 8 keyed services.
+        *   `AzureOpenAiServiceCollectionExtensions.cs`: `AddAzureOpenAiClient()` and `AddAzureOpenAiEmbeddingClient()` for registering Azure OpenAI clients. Keyed overloads available.
+        *   `AzureAiInferenceServiceCollectionExtensions.cs`: `AddAzureAiInferenceChatCompletion()` and `AddAzureAiInferenceEmbeddings()` for registering Azure AI Inference clients. Keyed overloads available.
 *   **`src/Cisharpai.Anthropic/`**: Connector for Anthropic (Claude) API. Supports structured outputs via `output_config.format` parameter.
     *   `AnthropicChatCompletionClient.cs`: Implements `IChatCompletionClient` and `IJsonOutputFeature`. Supports JSON Mode (via system message injection) and Structured Outputs (`json_schema` via `output_config.format`). Handles refusal via `stop_reason: "refusal"`.
     *   `AnthropicModels.cs`: Static class with well-known model ID constants. Nested `Chat` class (ClaudeOpus4_5, ClaudeSonnet4_5, ClaudeHaiku4_5, ClaudeSonnet4, ClaudeHaiku4, ClaudeOpus3).
@@ -86,7 +86,7 @@ Each supported provider has its own project providing concrete implementations o
     *   `CohereEmbeddingClient.cs`: Implements `IEmbeddingClient`, `IImageEmbeddingFeature`, and `IMultimodalEmbeddingFeature`. Supports text embeddings, single image embedding, and Embed v4 multimodal embedding (mixed text+image inputs, Matryoshka output dimensions, batch images). Images are sent as data URIs.
     *   `CohereModels.cs`: Static class with well-known model ID constants. Nested `Chat` class (CommandA, CommandRPlus, CommandR) and `Embedding` class (EmbedV4, EmbedEnglishV3, EmbedMultilingualV3, EmbedEnglishLightV3, EmbedMultilingualLightV3).
     *   `CohereClientOptions.cs`: Configuration with BaseUrl, ApiKey, and `DefaultModel` (optional, used when `ChatCompletionRequest.Model` or `EmbeddingRequest.Model` is null).
-    *   `CohereServiceCollectionExtensions.cs`: DI registration with `AddCohereEmbeddingClient()` and `AddCohereChatClient()` methods.
+    *   `CohereServiceCollectionExtensions.cs`: DI registration with `AddCohereEmbeddingClient()` and `AddCohereChatClient()` methods. Each method owns its options via closure (not registered in DI), enabling independent configuration. Keyed overloads (`AddCohereEmbeddingClient(string key, ...)`) support .NET 8 keyed services for registering multiple clients of the same interface.
     *   `ImageDataUriHelper.cs`: Internal utility for converting image file paths to data URI format (`data:image/{mime};base64,...`). Supports PNG, JPEG, WebP, GIF.
     *   `Models/CohereChatRequest.cs`: Request DTOs for Cohere v2 chat API: `CohereChatMessage`, `CohereChatRequest` (with `Documents` and `CitationOptions` for RAG).
     *   `Models/CohereChatResponse.cs`: Response DTOs: `CohereChatContentBlock`, `CohereChatResponseMessage` (with optional `Citations`), `CohereChatTokens`, `CohereChatBilledUnits`, `CohereChatUsage`, `CohereChatResponse`.
@@ -151,6 +151,11 @@ Project documentation pages.
 *   **`src/Cisharpai.Tests/`**: Unit tests.
     *   `Features/FeatureCollectionTests.cs`: Tests for `FeatureCollection` (Get/Set/enumeration/thread-safety).
     *   `Features/FeatureDiscoveryTests.cs`: Tests verifying feature discovery across all 9 client implementations (including IJsonOutputFeature and IGroundedChatFeature on Cohere chat; absence of IGroundedChatFeature on other providers).
+    *   `DependencyInjection/CohereDiRegistrationTests.cs`: Tests that both Cohere chat and embedding clients resolve correctly with independent options.
+    *   `DependencyInjection/OpenAiDiRegistrationTests.cs`: Tests that both OpenAI chat and embedding clients resolve correctly with independent options.
+    *   `DependencyInjection/AzureOpenAiDiRegistrationTests.cs`: Tests that both Azure OpenAI chat and embedding clients resolve correctly with independent options.
+    *   `DependencyInjection/AzureAiInferenceDiRegistrationTests.cs`: Tests that both Azure AI Inference chat and embedding clients resolve correctly with independent options.
+    *   `DependencyInjection/AnthropicDiRegistrationTests.cs`: Tests that Anthropic chat client resolves correctly.
     *   `Cohere/CohereImageEmbeddingTests.cs`: Tests for Cohere image embedding request/response mapping and data URI format.
     *   `Cohere/CohereMultimodalEmbeddingTests.cs`: Tests for Cohere Embed v4 multimodal embedding (text-only, image-only, mixed, batch, output_dimension, input types, raw response, error handling, image tokens).
     *   `Cohere/CohereChatCompletionTests.cs`: Tests for Cohere chat completion request/response mapping (messages, roles, snake_case naming, tokens, raw response, error handling).
@@ -167,6 +172,7 @@ Project documentation pages.
     *   `Cohere/CohereDefaultModelTests.cs`: Tests for Cohere default model resolution (chat and embedding clients, fallback to DefaultModel, request override, no-model exception, model constants validation).
     *   `Azure/Common/`: Tests for shared Azure authentication handler and client options.
     *   `Azure/AzureOpenAi/`: Tests for Azure OpenAI client.
+    *   `Azure/AzureOpenAi/AzureOpenAiDefaultModelTests.cs`: Tests for Azure OpenAI default model resolution (fallback to DefaultModel for reasoning detection, request override, null model treated as legacy, JSON output with DefaultModel).
     *   `Azure/AzureOpenAi/AzureOpenAiJsonOutputTests.cs`: Tests for Azure OpenAI JSON output request building (JSON Mode, Structured Outputs, refusal, feature discovery, endpoint/header verification).
     *   `Azure/AzureAiInference/`: Tests for Azure AI Inference client.
     *   `Azure/AzureAiInference/AzureAiInferenceJsonOutputTests.cs`: Tests for Azure AI Inference JSON output request building (JSON Mode, Structured Outputs, schema parsing, feature discovery, endpoint/model verification).
