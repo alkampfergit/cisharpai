@@ -15,12 +15,16 @@ public sealed record GroundedChatOptions(
     CitationMode CitationMode = CitationMode.Accurate)
 {
     /// <summary>
-    /// Validates the options. Throws <see cref="ArgumentException"/> if Documents is null or empty.
+    /// Validates the options. Throws <see cref="ArgumentException"/> if Documents is null or empty,
+    /// or if any individual <see cref="DocumentChunk"/> is invalid.
     /// </summary>
     public void Validate()
     {
         if (Documents is null || Documents.Count == 0)
             throw new ArgumentException(
                 "At least one document is required for grounded chat.", nameof(Documents));
+
+        foreach (var document in Documents)
+            document.Validate();
     }
 }
