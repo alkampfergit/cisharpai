@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http;
 using System.Text.Json;
 
 namespace Cisharpai.Tests.Core;
@@ -214,9 +215,71 @@ public sealed class LlmHttpClientTests
             await client.PostWithRawAsync<object, JsonElement>("api/test", new { }));
     }
 
+    [Test]
+    public void PostAsync_PreservesExceptionInfo_WhenResponseBodyReadFails()
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+        {
+            var response = new HttpResponseMessage(HttpStatusCode.InternalServerError)
+            {
+                Content = new ThrowingHttpContent("Simulated read failure")
+            };
+            return Task.FromResult(response);
+        });
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://test.com") };
+        var client = new LlmHttpClient(httpClient);
+
+        var ex = Assert.ThrowsAsync<LlmHttpRequestException>(async () =>
+            await client.PostAsync<object, JsonElement>("api/test", new { }));
+
+        Assert.That(ex!.StatusCode, Is.EqualTo(HttpStatusCode.InternalServerError));
+        Assert.That(ex.ResponseBody, Does.Contain("Failed to read response body"));
+        Assert.That(ex.ResponseBody, Does.Contain("Simulated read failure"));
+    }
+
+    [Test]
+    public void PostWithRawAsync_PreservesExceptionInfo_WhenResponseBodyReadFails()
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+        {
+            var response = new HttpResponseMessage(HttpStatusCode.BadGateway)
+            {
+                Content = new ThrowingHttpContent("Connection reset")
+            };
+            return Task.FromResult(response);
+        });
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://test.com") };
+        var client = new LlmHttpClient(httpClient);
+
+        var ex = Assert.ThrowsAsync<LlmHttpRequestException>(async () =>
+            await client.PostWithRawAsync<object, JsonElement>("api/test", new { }));
+
+        Assert.That(ex!.StatusCode, Is.EqualTo(HttpStatusCode.BadGateway));
+        Assert.That(ex.ResponseBody, Does.Contain("Failed to read response body"));
+        Assert.That(ex.ResponseBody, Does.Contain("Connection reset"));
+    }
+
     private sealed class TestResponse
     {
         public string Name { get; set; } = string.Empty;
         public int Count { get; set; }
+    }
+
+    private sealed class ThrowingHttpContent : HttpContent
+    {
+        private readonly string _errorMessage;
+
+        public ThrowingHttpContent(string errorMessage) => _errorMessage = errorMessage;
+
+        protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context)
+            => throw new IOException(_errorMessage);
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = 0;
+            return false;
+        }
     }
 }

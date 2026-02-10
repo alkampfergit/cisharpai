@@ -34,7 +34,7 @@ public sealed class LlmHttpClient
             Content = new StringContent(json, Encoding.UTF8, "application/json")
         };
 
-        using var response = await _httpClient.SendAsync(request, cancellationToken)
+        using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
             .ConfigureAwait(false);
 
         if (!response.IsSuccessStatusCode)
@@ -45,9 +45,10 @@ public sealed class LlmHttpClient
                 responseBody = await response.Content.ReadAsStringAsync(cancellationToken)
                     .ConfigureAwait(false);
             }
-            catch
+            catch (Exception ex)
             {
-                // If we can't read the body, we still want to throw with whatever we have.
+                var detail = ex.InnerException?.Message ?? ex.Message;
+                responseBody = $"[Failed to read response body: {detail}]";
             }
 
             throw new LlmHttpRequestException(response.StatusCode, responseBody);
@@ -78,7 +79,7 @@ public sealed class LlmHttpClient
             Content = new StringContent(requestJson, Encoding.UTF8, "application/json")
         };
 
-        using var response = await _httpClient.SendAsync(request, cancellationToken)
+        using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
             .ConfigureAwait(false);
 
         if (!response.IsSuccessStatusCode)
@@ -89,9 +90,10 @@ public sealed class LlmHttpClient
                 responseBody = await response.Content.ReadAsStringAsync(cancellationToken)
                     .ConfigureAwait(false);
             }
-            catch
+            catch (Exception ex)
             {
-                // If we can't read the body, we still want to throw with whatever we have.
+                var detail = ex.InnerException?.Message ?? ex.Message;
+                responseBody = $"[Failed to read response body: {detail}]";
             }
 
             throw new LlmHttpRequestException(response.StatusCode, responseBody);
