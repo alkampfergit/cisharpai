@@ -22,4 +22,22 @@ public sealed class AnthropicDiRegistrationTests
         Assert.That(client, Is.Not.Null);
         Assert.That(client, Is.InstanceOf<AnthropicChatCompletionClient>());
     }
+
+    [Test]
+    public void KeyedChatClient_ResolvesByKey()
+    {
+        var services = new ServiceCollection();
+
+        services.AddAnthropicClient("claude", opt =>
+        {
+            opt.ApiKey = "test-key";
+        });
+
+        using var provider = services.BuildServiceProvider();
+
+        var client = provider.GetRequiredKeyedService<IChatCompletionClient>("claude");
+
+        Assert.That(client, Is.Not.Null);
+        Assert.That(client, Is.InstanceOf<AnthropicChatCompletionClient>());
+    }
 }

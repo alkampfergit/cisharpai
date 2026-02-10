@@ -56,4 +56,34 @@ public sealed class AzureOpenAiDiRegistrationTests
         Assert.That(client, Is.Not.Null);
         Assert.That(client, Is.InstanceOf<AzureOpenAiChatCompletionClient>());
     }
+
+    [Test]
+    public void KeyedClients_ResolveIndependentlyByKey()
+    {
+        var services = new ServiceCollection();
+
+        services.AddAzureOpenAiClient("primary", opt =>
+        {
+            opt.Endpoint = "https://primary.openai.azure.com/";
+            opt.ApiKey = "primary-key";
+            opt.DeploymentName = "gpt-4";
+        });
+
+        services.AddAzureOpenAiClient("secondary", opt =>
+        {
+            opt.Endpoint = "https://secondary.openai.azure.com/";
+            opt.ApiKey = "secondary-key";
+            opt.DeploymentName = "gpt-4o";
+        });
+
+        using var provider = services.BuildServiceProvider();
+
+        var primary = provider.GetRequiredKeyedService<IChatCompletionClient>("primary");
+        var secondary = provider.GetRequiredKeyedService<IChatCompletionClient>("secondary");
+
+        Assert.That(primary, Is.Not.Null);
+        Assert.That(secondary, Is.Not.Null);
+        Assert.That(primary, Is.Not.SameAs(secondary));
+        Assert.That(primary, Is.InstanceOf<AzureOpenAiChatCompletionClient>());
+    }
 }

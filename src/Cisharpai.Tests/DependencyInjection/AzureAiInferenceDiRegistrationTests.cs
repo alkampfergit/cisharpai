@@ -56,4 +56,34 @@ public sealed class AzureAiInferenceDiRegistrationTests
         Assert.That(client, Is.Not.Null);
         Assert.That(client, Is.InstanceOf<AzureAiInferenceChatCompletionClient>());
     }
+
+    [Test]
+    public void KeyedClients_ResolveIndependentlyByKey()
+    {
+        var services = new ServiceCollection();
+
+        services.AddAzureAiInferenceChatCompletion("phi", opt =>
+        {
+            opt.Endpoint = "https://phi.inference.azure.com/";
+            opt.ApiKey = "phi-key";
+            opt.ModelId = "phi-3";
+        });
+
+        services.AddAzureAiInferenceChatCompletion("llama", opt =>
+        {
+            opt.Endpoint = "https://llama.inference.azure.com/";
+            opt.ApiKey = "llama-key";
+            opt.ModelId = "llama-3";
+        });
+
+        using var provider = services.BuildServiceProvider();
+
+        var phi = provider.GetRequiredKeyedService<IChatCompletionClient>("phi");
+        var llama = provider.GetRequiredKeyedService<IChatCompletionClient>("llama");
+
+        Assert.That(phi, Is.Not.Null);
+        Assert.That(llama, Is.Not.Null);
+        Assert.That(phi, Is.Not.SameAs(llama));
+        Assert.That(phi, Is.InstanceOf<AzureAiInferenceChatCompletionClient>());
+    }
 }

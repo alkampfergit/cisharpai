@@ -49,4 +49,30 @@ public sealed class OpenAiDiRegistrationTests
         Assert.That(client, Is.Not.Null);
         Assert.That(client, Is.InstanceOf<OpenAiChatCompletionClient>());
     }
+
+    [Test]
+    public void KeyedChatClients_ResolveIndependentlyByKey()
+    {
+        var services = new ServiceCollection();
+
+        services.AddOpenAiClient("fast", opt =>
+        {
+            opt.ApiKey = "key";
+        });
+
+        services.AddOpenAiClient("quality", opt =>
+        {
+            opt.ApiKey = "key";
+        });
+
+        using var provider = services.BuildServiceProvider();
+
+        var fast = provider.GetRequiredKeyedService<IChatCompletionClient>("fast");
+        var quality = provider.GetRequiredKeyedService<IChatCompletionClient>("quality");
+
+        Assert.That(fast, Is.Not.Null);
+        Assert.That(quality, Is.Not.Null);
+        Assert.That(fast, Is.Not.SameAs(quality));
+        Assert.That(fast, Is.InstanceOf<OpenAiChatCompletionClient>());
+    }
 }

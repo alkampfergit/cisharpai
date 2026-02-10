@@ -58,4 +58,64 @@ public static class OpenAiServiceCollectionExtensions
 
         return builder;
     }
+
+    public static IHttpClientBuilder AddOpenAiClient(
+        this IServiceCollection services,
+        string key,
+        Action<OpenAiClientOptions> configure)
+    {
+        var options = new OpenAiClientOptions();
+        configure(options);
+
+        var clientName = $"{nameof(OpenAiChatCompletionClient)}_{key}";
+
+        var builder = services.AddHttpClient(clientName, client =>
+            {
+                client.BaseAddress = new Uri(options.BaseUrl);
+                client.Timeout = TimeSpan.FromMinutes(2);
+            })
+            .AddHttpMessageHandler(() => new OpenAiAuthenticationHandler(options));
+
+        builder.AddCisharpaiResilienceHandler();
+
+        services.AddKeyedTransient<OpenAiChatCompletionClient>(key, (sp, _) =>
+            new OpenAiChatCompletionClient(
+                sp.GetRequiredService<IHttpClientFactory>().CreateClient(clientName),
+                options));
+
+        services.AddKeyedSingleton<IChatCompletionClient>(key, (sp, k) =>
+            sp.GetRequiredKeyedService<OpenAiChatCompletionClient>(k));
+
+        return builder;
+    }
+
+    public static IHttpClientBuilder AddOpenAiEmbeddingClient(
+        this IServiceCollection services,
+        string key,
+        Action<OpenAiClientOptions> configure)
+    {
+        var options = new OpenAiClientOptions();
+        configure(options);
+
+        var clientName = $"{nameof(OpenAiEmbeddingClient)}_{key}";
+
+        var builder = services.AddHttpClient(clientName, client =>
+            {
+                client.BaseAddress = new Uri(options.BaseUrl);
+                client.Timeout = TimeSpan.FromMinutes(2);
+            })
+            .AddHttpMessageHandler(() => new OpenAiAuthenticationHandler(options));
+
+        builder.AddCisharpaiResilienceHandler();
+
+        services.AddKeyedTransient<OpenAiEmbeddingClient>(key, (sp, _) =>
+            new OpenAiEmbeddingClient(
+                sp.GetRequiredService<IHttpClientFactory>().CreateClient(clientName),
+                options));
+
+        services.AddKeyedSingleton<IEmbeddingClient>(key, (sp, k) =>
+            sp.GetRequiredKeyedService<OpenAiEmbeddingClient>(k));
+
+        return builder;
+    }
 }
