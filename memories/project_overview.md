@@ -40,7 +40,7 @@ Contains the abstractions and shared logic. This is the only dependency needed f
     *   **`CitationMode.cs`**: Enum defining citation modes for grounded chat: `Accurate`, `Fast`, `Enabled`.
     *   **`DocumentChunk.cs`**: Represents a document chunk for RAG (Id, Data as key-value dict, or Text as plain string). Includes `Validate()` ensuring exactly one of Data/Text is set.
     *   **`CitationSource.cs`**: Represents a source document backing a citation (Id, optional Data dictionary).
-    *   **`Citation.cs`**: Represents a citation in a grounded response (Start/End character offsets, Text, Sources).
+    *   **`Citation.cs`**: Represents a citation in a grounded response (Start/End character offsets, Text, Sources, optional Type for provider-specific citation type e.g. Cohere's "TEXT_CONTENT").
     *   **`GroundedChatOptions.cs`**: Configuration record for grounded chat (Documents, CitationMode). Includes `Validate()`.
     *   **`GroundedChatCompletionResponse.cs`**: Wraps `ChatCompletionResponse` with `Citations`. Convenience `IsSuccess`, `Content`, `ErrorMessage` properties. Static `Error()` factory.
     *   **`LlmMessage.cs`**: Represents a message in the conversation (Role, Content).

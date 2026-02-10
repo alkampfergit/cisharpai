@@ -295,7 +295,8 @@ public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOut
                 Data: s.Document is not null
                     ? new System.Collections.ObjectModel.ReadOnlyDictionary<string, string>(s.Document)
                     : null
-            )).ToList()
+            )).ToList(),
+            Type: c.Type
         )).ToList();
     }
 
