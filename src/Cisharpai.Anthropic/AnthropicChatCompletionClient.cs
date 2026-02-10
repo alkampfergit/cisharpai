@@ -6,7 +6,7 @@ using Cisharpai.Anthropic.Models;
 
 namespace Cisharpai.Anthropic;
 
-public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJsonOutputFeature
+public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature
 {
     private readonly LlmHttpClient _client;
     private readonly AnthropicClientOptions _options;
@@ -20,6 +20,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
 
         var features = new FeatureCollection();
         features.Set<IJsonOutputFeature>(this);
+        features.Set<IToolCallingFeature>(this);
         Features = features;
     }
 
@@ -82,6 +83,48 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         }
     }
 
+    public async Task<ToolCallingResponse> GetChatCompletionWithToolsAsync(
+        ChatCompletionRequest request,
+        ToolCallingOptions toolOptions,
+        CancellationToken cancellationToken = default)
+    {
+        request = request with { Model = ResolveModel(request.Model) };
+
+        try
+        {
+            toolOptions.Validate();
+
+            var providerRequest = BuildRequest(request);
+            providerRequest.Tools = MapToolDefinitions(toolOptions.Tools);
+            providerRequest.ToolChoice = MapToolChoice(toolOptions.ToolChoice);
+
+            string? rawResponseJson = null;
+            string? rawRequestJson = null;
+            AnthropicChatResponse raw;
+
+            if (request.IncludeRawResponse)
+            {
+                (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<AnthropicChatRequest, AnthropicChatResponse>(
+                    "messages", providerRequest, cancellationToken, request.ExtraParameters);
+            }
+            else
+            {
+                raw = await _client.PostAsync<AnthropicChatRequest, AnthropicChatResponse>(
+                    "messages", providerRequest, cancellationToken, request.ExtraParameters);
+            }
+
+            return MapToolCallingResponse(raw, rawResponseJson, rawRequestJson);
+        }
+        catch (LlmHttpRequestException ex)
+        {
+            return ToolCallingResponse.Error(ex.Message, ex.ResponseBody);
+        }
+        catch (Exception ex)
+        {
+            return ToolCallingResponse.Error(ex.Message);
+        }
+    }
+
     private string ResolveModel(string? model)
     {
         return model
@@ -107,14 +150,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
             Temperature = request.Temperature,
             MaxTokens = request.MaxTokens ?? DefaultMaxTokens,
             System = systemMessage,
-            Messages = request.Messages
-                .Where(m => m.Role != LlmRole.System)
-                .Select(m => new AnthropicMessage
-                {
-                    Role = MapRole(m.Role),
-                    Content = m.Content
-                })
-                .ToList()
+            Messages = MapMessages(request.Messages)
         };
     }
 
@@ -158,6 +194,76 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
             Status: raw.StopReason,
             IncompleteReason: incompleteReason,
             Refusal: refusal);
+    }
+
+    private static ToolCallingResponse MapToolCallingResponse(
+        AnthropicChatResponse raw,
+        string? rawResponseJson,
+        string? rawRequestJson)
+    {
+        var content = string.Join("", raw.Content
+            .Where(c => c.Type == "text")
+            .Select(c => c.Text));
+
+        var chatCompletion = new ChatCompletionResponse(
+            Content: content,
+            Model: raw.Model,
+            PromptTokens: raw.Usage.InputTokens,
+            CompletionTokens: raw.Usage.OutputTokens,
+            RawResponseJson: rawResponseJson,
+            RawRequestJson: rawRequestJson,
+            Status: raw.StopReason);
+
+        var toolCalls = MapResponseToolCalls(raw.Content);
+
+        return new ToolCallingResponse(chatCompletion, toolCalls);
+    }
+
+    private static IReadOnlyList<ToolCall>? MapResponseToolCalls(List<AnthropicContentBlock> contentBlocks)
+    {
+        var toolUseBlocks = contentBlocks
+            .Where(c => c.Type == "tool_use" && c.Id is not null && c.Name is not null && c.Input.HasValue)
+            .ToList();
+
+        if (toolUseBlocks.Count == 0)
+            return null;
+
+        return toolUseBlocks.Select(b =>
+            new ToolCall(b.Id!, b.Name!, b.Input!.Value.Clone())
+        ).ToList();
+    }
+
+    private static List<AnthropicToolDefinition> MapToolDefinitions(IReadOnlyList<ToolDefinition> tools)
+    {
+        return tools.Select(t => new AnthropicToolDefinition
+        {
+            Name = t.Name,
+            Description = t.Description,
+            InputSchema = t.Parameters
+        }).ToList();
+    }
+
+    private static AnthropicToolChoice? MapToolChoice(ToolChoice? toolChoice)
+    {
+        if (toolChoice is null)
+            return null;
+
+        if (toolChoice == ToolChoice.Auto)
+            return new AnthropicToolChoice { Type = "auto" };
+
+        if (toolChoice == ToolChoice.None)
+            // Anthropic doesn't have a "none" type for tool_choice.
+            // Omitting tool_choice with no tools would achieve this, but since
+            // we're sending tools, use auto and let the model decide.
+            return null;
+
+        if (toolChoice == ToolChoice.Required)
+            return new AnthropicToolChoice { Type = "any" };
+
+        if (toolChoice.IsSpecific)
+            return new AnthropicToolChoice { Type = "tool", Name = toolChoice.FunctionName };
+
+        return null;
     }
 
     private static AnthropicOutputConfig? BuildOutputConfig(JsonOutputOptions options)
@@ -222,6 +328,76 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
             trimmed = trimmed[..lastFence];
 
         return trimmed.Trim();
+    }
+
+    private static List<AnthropicMessage> MapMessages(IReadOnlyList<LlmMessage> messages)
+    {
+        var result = new List<AnthropicMessage>();
+
+        foreach (var m in messages)
+        {
+            if (m.Role == LlmRole.System)
+                continue; // System messages are handled via the top-level system field
+
+            // Tool result messages: convert to user role with tool_result content blocks
+            if (m.Role == LlmRole.Tool && m.ToolCallId is not null)
+            {
+                result.Add(new AnthropicMessage
+                {
+                    Role = "user",
+                    Content = new List<AnthropicContentBlock>
+                    {
+                        new()
+                        {
+                            Type = "tool_result",
+                            ToolUseId = m.ToolCallId,
+                            Content = m.Content
+                        }
+                    }
+                });
+                continue;
+            }
+
+            // Assistant message with tool calls: serialize as tool_use content blocks
+            if (m.Role == LlmRole.Assistant && m.ToolCalls is not null && m.ToolCalls.Count > 0)
+            {
+                var blocks = new List<AnthropicContentBlock>();
+
+                // If there's text content, add it as a text block
+                if (!string.IsNullOrEmpty(m.Content))
+                {
+                    blocks.Add(new AnthropicContentBlock { Type = "text", Text = m.Content });
+                }
+
+                // Add tool_use blocks
+                foreach (var tc in m.ToolCalls)
+                {
+                    blocks.Add(new AnthropicContentBlock
+                    {
+                        Type = "tool_use",
+                        Id = tc.Id,
+                        Name = tc.FunctionName,
+                        Input = tc.Arguments
+                    });
+                }
+
+                result.Add(new AnthropicMessage
+                {
+                    Role = "assistant",
+                    Content = blocks
+                });
+                continue;
+            }
+
+            // Normal messages
+            result.Add(new AnthropicMessage
+            {
+                Role = MapRole(m.Role),
+                Content = m.Content
+            });
+        }
+
+        return result;
     }
 
     private static string MapRole(LlmRole role) => role switch
