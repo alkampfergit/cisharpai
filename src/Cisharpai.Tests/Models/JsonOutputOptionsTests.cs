@@ -87,4 +87,29 @@ public sealed class JsonOutputOptionsTests
         Assert.That(options.Strict, Is.False);
         Assert.DoesNotThrow(() => options.Validate());
     }
+
+    [Test]
+    public void JsonSchema_WithInvalidJson_ThrowsArgumentException()
+    {
+        var invalidJson = "not valid json {{{";
+        var options = new JsonOutputOptions(
+            Mode: JsonOutputMode.JsonSchema,
+            SchemaName: "test",
+            JsonSchema: invalidJson);
+
+        var ex = Assert.Throws<ArgumentException>(() => options.Validate());
+        Assert.That(ex!.ParamName, Is.EqualTo("JsonSchema"));
+        Assert.That(ex.Message, Does.Contain(invalidJson));
+        Assert.That(ex.Message, Does.Contain("invalid JSON"));
+    }
+
+    [Test]
+    public void JsonMode_WithInvalidJson_DoesNotValidateSchema()
+    {
+        var options = new JsonOutputOptions(
+            Mode: JsonOutputMode.JsonMode,
+            JsonSchema: "not valid json");
+
+        Assert.DoesNotThrow(() => options.Validate());
+    }
 }

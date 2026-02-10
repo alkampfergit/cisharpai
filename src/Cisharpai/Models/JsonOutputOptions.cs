@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace Cisharpai.Models;
 
 /// <summary>
@@ -48,5 +50,16 @@ public sealed record JsonOutputOptions(
         if (string.IsNullOrWhiteSpace(JsonSchema))
             throw new ArgumentException(
                 "JsonSchema is required when Mode is JsonSchema.", nameof(JsonSchema));
+
+        try
+        {
+            using var doc = JsonDocument.Parse(JsonSchema);
+        }
+        catch (JsonException ex)
+        {
+            throw new ArgumentException(
+                $"JsonSchema contains invalid JSON: {JsonSchema}. Parse error: {ex.Message}",
+                nameof(JsonSchema));
+        }
     }
 }
