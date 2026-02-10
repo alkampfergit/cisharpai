@@ -66,7 +66,7 @@ public sealed class AzureAiInferenceChatCompletionClient : IChatCompletionClient
         }
         catch (Exception ex)
         {
-            return ChatCompletionResponse.Error($"Unexpected error: {ex.Message}");
+            return ChatCompletionResponse.Error(ex.Message);
         }
     }
 
@@ -114,7 +114,7 @@ public sealed class AzureAiInferenceChatCompletionClient : IChatCompletionClient
         }
         catch (Exception ex)
         {
-            return ChatCompletionResponse.Error($"Unexpected error: {ex.Message}");
+            return ChatCompletionResponse.Error(ex.Message);
         }
     }
 
