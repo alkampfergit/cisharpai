@@ -4,5 +4,6 @@ public enum LlmRole
 {
     System,
     User,
-    Assistant
+    Assistant,
+    Tool
 }

@@ -6,7 +6,7 @@ using Cisharpai.OpenAi.Models;
 
 namespace Cisharpai.OpenAi;
 
-public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOutputFeature
+public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature
 {
     private const string ChatCompletionsEndpoint = "chat/completions";
     private const string ResponsesEndpoint = "responses";
@@ -23,6 +23,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
 
         var features = new FeatureCollection();
         features.Set<IJsonOutputFeature>(this);
+        features.Set<IToolCallingFeature>(this);
         Features = features;
     }
 
@@ -85,6 +86,36 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         }
     }
 
+    public async Task<ToolCallingResponse> GetChatCompletionWithToolsAsync(
+        ChatCompletionRequest request,
+        ToolCallingOptions toolOptions,
+        CancellationToken cancellationToken = default)
+    {
+        var model = ResolveModel(request.Model);
+        request = request with { Model = model };
+
+        try
+        {
+            toolOptions.Validate();
+
+            var modelType = DetectModelType(model);
+
+            return modelType switch
+            {
+                OpenAiModelType.Reasoning => await SendReasoningChatWithToolsAsync(request, toolOptions, cancellationToken),
+                _ => await SendLegacyChatWithToolsAsync(request, toolOptions, cancellationToken)
+            };
+        }
+        catch (LlmHttpRequestException ex)
+        {
+            return ToolCallingResponse.Error(ex.Message, ex.ResponseBody);
+        }
+        catch (Exception ex)
+        {
+            return ToolCallingResponse.Error(ex.Message);
+        }
+    }
+
     private async Task<ChatCompletionResponse> SendLegacyChatAsync(
         ChatCompletionRequest request,
         CancellationToken cancellationToken)
@@ -137,6 +168,24 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
                 ChatCompletionsEndpoint, providerRequest, cancellationToken, request.ExtraParameters));
     }
 
+    private async Task<ToolCallingResponse> SendLegacyChatWithToolsAsync(
+        ChatCompletionRequest request,
+        ToolCallingOptions toolOptions,
+        CancellationToken cancellationToken)
+    {
+        var providerRequest = new OpenAiChatRequest
+        {
+            Model = request.Model,
+            Temperature = request.Temperature,
+            MaxTokens = request.MaxTokens,
+            Messages = MapMessages(request.Messages),
+            Tools = MapToolDefinitions(toolOptions.Tools),
+            ToolChoice = MapToolChoice(toolOptions.ToolChoice)
+        };
+
+        return await ExecuteToolCallingAsync(providerRequest, request, cancellationToken);
+    }
+
     private async Task<ChatCompletionResponse> SendReasoningChatAsync(
         ChatCompletionRequest request,
         CancellationToken cancellationToken)
@@ -185,6 +234,61 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         return MapChatResponse(
             await _client.PostAsync<OpenAiReasoningRequest, OpenAiChatResponse>(
                 ChatCompletionsEndpoint, providerRequest, cancellationToken, request.ExtraParameters));
+    }
+
+    private async Task<ToolCallingResponse> SendReasoningChatWithToolsAsync(
+        ChatCompletionRequest request,
+        ToolCallingOptions toolOptions,
+        CancellationToken cancellationToken)
+    {
+        var providerRequest = new OpenAiReasoningRequest
+        {
+            Model = request.Model,
+            MaxCompletionTokens = request.MaxTokens,
+            Messages = MapMessages(request.Messages),
+            Tools = MapToolDefinitions(toolOptions.Tools),
+            ToolChoice = MapToolChoice(toolOptions.ToolChoice)
+        };
+
+        string? rawResponseJson = null;
+        string? rawRequestJson = null;
+        OpenAiChatResponse raw;
+
+        if (request.IncludeRawResponse)
+        {
+            (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<OpenAiReasoningRequest, OpenAiChatResponse>(
+                ChatCompletionsEndpoint, providerRequest, cancellationToken, request.ExtraParameters);
+        }
+        else
+        {
+            raw = await _client.PostAsync<OpenAiReasoningRequest, OpenAiChatResponse>(
+                ChatCompletionsEndpoint, providerRequest, cancellationToken, request.ExtraParameters);
+        }
+
+        return MapToolCallingResponse(raw, rawResponseJson, rawRequestJson);
+    }
+
+    private async Task<ToolCallingResponse> ExecuteToolCallingAsync(
+        OpenAiChatRequest providerRequest,
+        ChatCompletionRequest request,
+        CancellationToken cancellationToken)
+    {
+        string? rawResponseJson = null;
+        string? rawRequestJson = null;
+        OpenAiChatResponse raw;
+
+        if (request.IncludeRawResponse)
+        {
+            (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<OpenAiChatRequest, OpenAiChatResponse>(
+                ChatCompletionsEndpoint, providerRequest, cancellationToken, request.ExtraParameters);
+        }
+        else
+        {
+            raw = await _client.PostAsync<OpenAiChatRequest, OpenAiChatResponse>(
+                ChatCompletionsEndpoint, providerRequest, cancellationToken, request.ExtraParameters);
+        }
+
+        return MapToolCallingResponse(raw, rawResponseJson, rawRequestJson);
     }
 
     private async Task<ChatCompletionResponse> SendResponsesApiAsync(
@@ -305,6 +409,90 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
             Refusal: refusal);
     }
 
+    private static ToolCallingResponse MapToolCallingResponse(
+        OpenAiChatResponse raw,
+        string? rawResponseJson = null,
+        string? rawRequestJson = null)
+    {
+        var choice = raw.Choices.FirstOrDefault();
+        var content = choice?.Message.Content ?? string.Empty;
+
+        var chatCompletion = new ChatCompletionResponse(
+            Content: content,
+            Model: raw.Model,
+            PromptTokens: raw.Usage.PromptTokens,
+            CompletionTokens: raw.Usage.CompletionTokens,
+            RawResponseJson: rawResponseJson,
+            RawRequestJson: rawRequestJson);
+
+        var toolCalls = MapResponseToolCalls(choice?.Message.ToolCalls);
+
+        return new ToolCallingResponse(chatCompletion, toolCalls);
+    }
+
+    private static IReadOnlyList<ToolCall>? MapResponseToolCalls(List<OpenAiToolCall>? toolCalls)
+    {
+        if (toolCalls is null || toolCalls.Count == 0)
+            return null;
+
+        return toolCalls.Select(tc =>
+        {
+            JsonElement arguments;
+            try
+            {
+                arguments = JsonDocument.Parse(tc.Function.Arguments).RootElement.Clone();
+            }
+            catch
+            {
+                // If arguments can't be parsed, wrap them as a raw string
+                arguments = JsonDocument.Parse($"\"{tc.Function.Arguments}\"").RootElement.Clone();
+            }
+
+            return new ToolCall(tc.Id, tc.Function.Name, arguments);
+        }).ToList();
+    }
+
+    private static List<OpenAiToolDefinition> MapToolDefinitions(IReadOnlyList<ToolDefinition> tools)
+    {
+        return tools.Select(t => new OpenAiToolDefinition
+        {
+            Type = "function",
+            Function = new OpenAiToolFunction
+            {
+                Name = t.Name,
+                Description = t.Description,
+                Parameters = t.Parameters,
+                Strict = t.Strict
+            }
+        }).ToList();
+    }
+
+    private static object? MapToolChoice(ToolChoice? toolChoice)
+    {
+        if (toolChoice is null)
+            return null;
+
+        if (toolChoice == ToolChoice.Auto)
+            return "auto";
+
+        if (toolChoice == ToolChoice.None)
+            return "none";
+
+        if (toolChoice == ToolChoice.Required)
+            return "required";
+
+        if (toolChoice.IsSpecific)
+        {
+            return new OpenAiToolChoiceObject
+            {
+                Type = "function",
+                Function = new OpenAiToolChoiceFunction { Name = toolChoice.FunctionName! }
+            };
+        }
+
+        return null;
+    }
+
     private static OpenAiResponseFormat BuildChatCompletionsResponseFormat(JsonOutputOptions options)
     {
         if (options.Mode == JsonOutputMode.JsonMode)
@@ -373,10 +561,36 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
     private static List<OpenAiChatMessage> MapMessages(IReadOnlyList<LlmMessage> messages)
     {
         return messages
-            .Select(m => new OpenAiChatMessage
+            .Select(m =>
             {
-                Role = MapRole(m.Role),
-                Content = m.Content
+                var msg = new OpenAiChatMessage
+                {
+                    Role = MapRole(m.Role),
+                    Content = m.Content
+                };
+
+                // Tool result message: set tool_call_id, content is the result
+                if (m.Role == LlmRole.Tool && m.ToolCallId is not null)
+                {
+                    msg.ToolCallId = m.ToolCallId;
+                }
+
+                // Assistant message with tool calls
+                if (m.Role == LlmRole.Assistant && m.ToolCalls is not null && m.ToolCalls.Count > 0)
+                {
+                    msg.ToolCalls = m.ToolCalls.Select(tc => new OpenAiToolCall
+                    {
+                        Id = tc.Id,
+                        Type = "function",
+                        Function = new OpenAiToolCallFunction
+                        {
+                            Name = tc.FunctionName,
+                            Arguments = tc.Arguments.GetRawText()
+                        }
+                    }).ToList();
+                }
+
+                return msg;
             })
             .ToList();
     }
@@ -386,6 +600,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         LlmRole.System => "system",
         LlmRole.User => "user",
         LlmRole.Assistant => "assistant",
+        LlmRole.Tool => "tool",
         _ => throw new ArgumentOutOfRangeException(nameof(role), role, null)
     };
 

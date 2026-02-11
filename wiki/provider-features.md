@@ -12,6 +12,7 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Image Embeddings | `IImageEmbeddingFeature` | Generate vector embeddings from a single image |
 | Multimodal Embeddings | `IMultimodalEmbeddingFeature` | Embed mixed text + image inputs in a single request |
 | Grounded Chat (RAG) | `IGroundedChatFeature` | Chat with document grounding and citations |
+| Tool Calling | `IToolCallingFeature` | Function calling / tool use in chat completions |
 
 ## Support Matrix
 
@@ -26,6 +27,7 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Reasoning Models | Yes | Yes | Yes | -- | -- |
 | Responses API (GPT-5) | Yes | -- | -- | -- | -- |
 | Grounded Chat (RAG) | -- | -- | -- | -- | Yes |
+| Tool Calling | Yes | -- | -- | Yes | Yes |
 
 ## Provider Details
 
@@ -41,6 +43,7 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Structured Outputs | Via `response_format.json_schema`; refusal extraction supported |
 | Reasoning Models | o1, o3, o3-mini, o4-mini — uses `max_completion_tokens` |
 | Responses API | GPT-5 models — status and incomplete-reason tracking |
+| Tool Calling | All models; `ToolChoice` supports Auto, None, Required, Specific (function name) |
 
 ### Azure OpenAI
 
@@ -78,6 +81,7 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Chat Completions | Claude model family (claude-opus-4-5, claude-sonnet-4-5, claude-haiku-4-5) |
 | JSON Mode | Implemented via system-message injection; auto-strips markdown fences |
 | Structured Outputs | Via native `output_config.format` parameter; refusal via `stop_reason: "refusal"` |
+| Tool Calling | All Claude models; `ToolChoice` maps Auto->auto, Required->any, Specific->{type:tool,name}, None is omitted |
 
 ### Cohere
 
@@ -94,6 +98,7 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Supported Formats | PNG, JPEG, WebP, GIF |
 | Grounded Chat (RAG) | Document grounding via `documents` array, `citation_options` mode (ACCURATE/FAST/ENABLED), citation character offsets |
 | Input Types | search_query, search_document, classification, clustering |
+| Tool Calling | Command models; `ToolChoice` maps to uppercase (AUTO/NONE/REQUIRED); Specific degrades to REQUIRED; `strict_tools` flag when all tools are strict |
 
 ## Feature Discovery
 
@@ -127,6 +132,13 @@ if (chatClient.Features.Get<IGroundedChatFeature>() is { } groundedFeature)
 {
     var response = await groundedFeature.GetGroundedChatCompletionAsync(request, options);
     // response.Citations contains source references
+}
+
+// Tool calling (function calling)
+if (chatClient.Features.Get<IToolCallingFeature>() is { } toolFeature)
+{
+    var response = await toolFeature.GetChatCompletionWithToolsAsync(request, toolOptions);
+    // response.ToolCalls contains requested tool invocations
 }
 ```
 

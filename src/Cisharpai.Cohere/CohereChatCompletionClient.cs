@@ -7,7 +7,7 @@ using Cisharpai.Cohere.Models;
 
 namespace Cisharpai.Cohere;
 
-public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IGroundedChatFeature
+public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IGroundedChatFeature, IToolCallingFeature
 {
     private const string ChatEndpoint = "chat";
     private readonly LlmHttpClient _client;
@@ -27,6 +27,7 @@ public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOut
         var features = new FeatureCollection();
         features.Set<IJsonOutputFeature>(this);
         features.Set<IGroundedChatFeature>(this);
+        features.Set<IToolCallingFeature>(this);
         Features = features;
     }
 
@@ -147,6 +148,49 @@ public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOut
         }
     }
 
+    public async Task<ToolCallingResponse> GetChatCompletionWithToolsAsync(
+        ChatCompletionRequest request,
+        ToolCallingOptions toolOptions,
+        CancellationToken cancellationToken = default)
+    {
+        request = request with { Model = ResolveModel(request.Model) };
+
+        try
+        {
+            toolOptions.Validate();
+
+            var providerRequest = BuildRequest(request);
+            providerRequest.Tools = MapToolDefinitions(toolOptions.Tools);
+            providerRequest.ToolChoice = MapToolChoice(toolOptions.ToolChoice);
+            providerRequest.StrictTools = toolOptions.Tools.All(t => t.Strict) ? true : null;
+
+            string? rawResponseJson = null;
+            string? rawRequestJson = null;
+            CohereChatResponse raw;
+
+            if (request.IncludeRawResponse)
+            {
+                (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<CohereChatRequest, CohereChatResponse>(
+                    ChatEndpoint, providerRequest, cancellationToken, request.ExtraParameters);
+            }
+            else
+            {
+                raw = await _client.PostAsync<CohereChatRequest, CohereChatResponse>(
+                    ChatEndpoint, providerRequest, cancellationToken, request.ExtraParameters);
+            }
+
+            return MapToolCallingResponse(raw, request.Model!, rawResponseJson, rawRequestJson);
+        }
+        catch (LlmHttpRequestException ex)
+        {
+            return ToolCallingResponse.Error(ex.Message, ex.ResponseBody);
+        }
+        catch (Exception ex)
+        {
+            return ToolCallingResponse.Error(ex.Message);
+        }
+    }
+
     private string ResolveModel(string? model)
     {
         return model
@@ -162,13 +206,7 @@ public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOut
             Model = request.Model!,
             Temperature = request.Temperature,
             MaxTokens = request.MaxTokens,
-            Messages = request.Messages
-                .Select(m => new CohereChatMessage
-                {
-                    Role = MapRole(m.Role),
-                    Content = m.Content
-                })
-                .ToList()
+            Messages = MapMessages(request.Messages)
         };
     }
 
@@ -203,6 +241,120 @@ public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOut
             CompletionTokens: raw.Usage.Tokens.OutputTokens,
             RawResponseJson: rawResponseJson,
             RawRequestJson: rawRequestJson);
+    }
+
+    private static ToolCallingResponse MapToolCallingResponse(
+        CohereChatResponse raw,
+        string model,
+        string? rawResponseJson,
+        string? rawRequestJson)
+    {
+        var content = string.Join("", raw.Message.Content
+            .Where(c => c.Type == "text")
+            .Select(c => c.Text));
+
+        var chatCompletion = new ChatCompletionResponse(
+            Content: content,
+            Model: model,
+            PromptTokens: raw.Usage.Tokens.InputTokens,
+            CompletionTokens: raw.Usage.Tokens.OutputTokens,
+            RawResponseJson: rawResponseJson,
+            RawRequestJson: rawRequestJson);
+
+        var toolCalls = MapResponseToolCalls(raw.Message.ToolCalls);
+
+        return new ToolCallingResponse(chatCompletion, toolCalls);
+    }
+
+    private static IReadOnlyList<ToolCall>? MapResponseToolCalls(List<CohereToolCall>? toolCalls)
+    {
+        if (toolCalls is null || toolCalls.Count == 0)
+            return null;
+
+        return toolCalls.Select(tc =>
+        {
+            JsonElement arguments;
+            try
+            {
+                arguments = JsonDocument.Parse(tc.Function.Arguments).RootElement.Clone();
+            }
+            catch
+            {
+                arguments = JsonDocument.Parse($"\"{tc.Function.Arguments}\"").RootElement.Clone();
+            }
+
+            return new ToolCall(tc.Id, tc.Function.Name, arguments);
+        }).ToList();
+    }
+
+    private static List<CohereToolDefinition> MapToolDefinitions(IReadOnlyList<ToolDefinition> tools)
+    {
+        return tools.Select(t => new CohereToolDefinition
+        {
+            Type = "function",
+            Function = new CohereToolFunction
+            {
+                Name = t.Name,
+                Description = t.Description,
+                Parameters = t.Parameters
+            }
+        }).ToList();
+    }
+
+    private static string? MapToolChoice(ToolChoice? toolChoice)
+    {
+        if (toolChoice is null)
+            return null;
+
+        if (toolChoice == ToolChoice.Auto)
+            return "AUTO";
+
+        if (toolChoice == ToolChoice.None)
+            return "NONE";
+
+        if (toolChoice == ToolChoice.Required)
+            return "REQUIRED";
+
+        // Cohere doesn't support specific tool choice; degrade to REQUIRED
+        if (toolChoice.IsSpecific)
+            return "REQUIRED";
+
+        return null;
+    }
+
+    private static List<CohereChatMessage> MapMessages(IReadOnlyList<LlmMessage> messages)
+    {
+        return messages.Select(m =>
+        {
+            var msg = new CohereChatMessage
+            {
+                Role = MapRole(m.Role),
+                Content = m.Content
+            };
+
+            // Tool result message: set tool_call_id
+            if (m.Role == LlmRole.Tool && m.ToolCallId is not null)
+            {
+                msg.ToolCallId = m.ToolCallId;
+            }
+
+            // Assistant message with tool calls
+            if (m.Role == LlmRole.Assistant && m.ToolCalls is not null && m.ToolCalls.Count > 0)
+            {
+                msg.ToolCalls = m.ToolCalls.Select(tc => new CohereToolCall
+                {
+                    Id = tc.Id,
+                    Type = "function",
+                    Function = new CohereToolCallFunction
+                    {
+                        Name = tc.FunctionName,
+                        Arguments = tc.Arguments.GetRawText()
+                    }
+                }).ToList();
+            }
+
+            return msg;
+        }).ToList();
     }
 
     private static CohereChatResponseFormat? BuildResponseFormat(JsonOutputOptions options)
@@ -313,6 +465,7 @@ public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOut
         LlmRole.System => "system",
         LlmRole.User => "user",
         LlmRole.Assistant => "assistant",
+        LlmRole.Tool => "tool",
         _ => throw new ArgumentOutOfRangeException(nameof(role), role, null)
     };
 }

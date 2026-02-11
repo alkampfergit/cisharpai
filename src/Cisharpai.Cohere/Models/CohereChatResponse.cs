@@ -11,6 +11,7 @@ public sealed class CohereChatResponseMessage
     public string Role { get; set; } = string.Empty;
     public List<CohereChatContentBlock> Content { get; set; } = [];
     public List<CohereChatCitation>? Citations { get; set; }
+    public List<CohereToolCall>? ToolCalls { get; set; }
 }
 
 public sealed class CohereChatTokens

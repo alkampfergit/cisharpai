@@ -14,6 +14,9 @@ public sealed class OpenAiUsage
 public sealed class OpenAiChatChoice
 {
     public OpenAiChatMessage Message { get; set; } = new();
+
+    [JsonPropertyName("finish_reason")]
+    public string? FinishReason { get; set; }
 }
 
 public sealed class OpenAiChatResponse
