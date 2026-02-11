@@ -10,7 +10,7 @@ namespace Cisharpai.Azure.AzureAiInference;
 /// Azure AI Inference chat completion client using HttpClient.
 /// Supports Azure AI model-as-a-service offerings including Phi-3, Llama-3, Mistral, and others.
 /// </summary>
-public sealed class AzureAiInferenceChatCompletionClient : IChatCompletionClient, IJsonOutputFeature
+public sealed class AzureAiInferenceChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature
 {
     private readonly LlmHttpClient _client;
     private readonly AzureAiInferenceClientOptions _options;
@@ -26,6 +26,7 @@ public sealed class AzureAiInferenceChatCompletionClient : IChatCompletionClient
 
         var features = new FeatureCollection();
         features.Set<IJsonOutputFeature>(this);
+        features.Set<IToolCallingFeature>(this);
         Features = features;
     }
 
@@ -118,6 +119,56 @@ public sealed class AzureAiInferenceChatCompletionClient : IChatCompletionClient
         }
     }
 
+    public async Task<ToolCallingResponse> GetChatCompletionWithToolsAsync(
+        ChatCompletionRequest request,
+        ToolCallingOptions toolOptions,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            toolOptions.Validate();
+
+            var messages = MapMessages(request.Messages);
+
+            var modelId = !string.IsNullOrWhiteSpace(request.Model)
+                ? request.Model
+                : _options.ModelId;
+
+            var isReasoning = IsReasoningModel(modelId);
+            var tools = MapToolDefinitions(toolOptions.Tools);
+            var toolChoice = MapToolChoice(toolOptions.ToolChoice);
+
+            object providerRequest = isReasoning
+                ? new AzureAiInferenceReasoningChatRequest
+                {
+                    Model = modelId,
+                    Messages = messages,
+                    MaxCompletionTokens = request.MaxTokens,
+                    Tools = tools,
+                    ToolChoice = toolChoice
+                }
+                : new AzureAiInferenceChatRequest
+                {
+                    Model = modelId,
+                    Messages = messages,
+                    Temperature = request.Temperature,
+                    MaxTokens = request.MaxTokens,
+                    Tools = tools,
+                    ToolChoice = toolChoice
+                };
+
+            return await ExecuteToolCallingRequestAsync(providerRequest, request, cancellationToken);
+        }
+        catch (LlmHttpRequestException ex)
+        {
+            return ToolCallingResponse.Error(ex.Message, ex.ResponseBody);
+        }
+        catch (Exception ex)
+        {
+            return ToolCallingResponse.Error(ex.Message);
+        }
+    }
+
     private async Task<ChatCompletionResponse> ExecuteRequestAsync(
         object providerRequest,
         ChatCompletionRequest request,
@@ -156,6 +207,119 @@ public sealed class AzureAiInferenceChatCompletionClient : IChatCompletionClient
             Status: choice?.FinishReason,
             IncompleteReason: MapIncompleteReason(choice?.FinishReason),
             Refusal: choice?.Message.Refusal);
+    }
+
+    private async Task<ToolCallingResponse> ExecuteToolCallingRequestAsync(
+        object providerRequest,
+        ChatCompletionRequest request,
+        CancellationToken cancellationToken)
+    {
+        var uri = $"models/chat/completions?api-version={_options.ApiVersion}";
+
+        string? rawResponseJson = null;
+        string? rawRequestJson = null;
+        AzureAiInferenceChatResponse raw;
+
+        if (request.IncludeRawResponse)
+        {
+            (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<
+                object,
+                AzureAiInferenceChatResponse>(
+                uri, providerRequest, cancellationToken, request.ExtraParameters);
+        }
+        else
+        {
+            raw = await _client.PostAsync<
+                object,
+                AzureAiInferenceChatResponse>(
+                uri, providerRequest, cancellationToken, request.ExtraParameters);
+        }
+
+        return MapToolCallingResponse(raw, rawResponseJson, rawRequestJson);
+    }
+
+    private static ToolCallingResponse MapToolCallingResponse(
+        AzureAiInferenceChatResponse raw,
+        string? rawResponseJson = null,
+        string? rawRequestJson = null)
+    {
+        var choice = raw.Choices.FirstOrDefault();
+        var content = choice?.Message.Content ?? string.Empty;
+
+        var chatCompletion = new ChatCompletionResponse(
+            Content: content,
+            Model: raw.Model,
+            PromptTokens: raw.Usage?.PromptTokens ?? 0,
+            CompletionTokens: raw.Usage?.CompletionTokens ?? 0,
+            RawResponseJson: rawResponseJson,
+            RawRequestJson: rawRequestJson);
+
+        var toolCalls = MapResponseToolCalls(choice?.Message.ToolCalls);
+
+        return new ToolCallingResponse(chatCompletion, toolCalls);
+    }
+
+    private static IReadOnlyList<ToolCall>? MapResponseToolCalls(List<AzureAiInferenceToolCall>? toolCalls)
+    {
+        if (toolCalls is null || toolCalls.Count == 0)
+            return null;
+
+        return toolCalls.Select(tc =>
+        {
+            JsonElement arguments;
+            try
+            {
+                arguments = JsonDocument.Parse(tc.Function.Arguments).RootElement.Clone();
+            }
+            catch
+            {
+                // If arguments can't be parsed, wrap them as a raw string
+                arguments = JsonDocument.Parse($"\"{tc.Function.Arguments}\"").RootElement.Clone();
+            }
+
+            return new ToolCall(tc.Id, tc.Function.Name, arguments);
+        }).ToList();
+    }
+
+    private static List<AzureAiInferenceToolDefinition> MapToolDefinitions(IReadOnlyList<ToolDefinition> tools)
+    {
+        return tools.Select(t => new AzureAiInferenceToolDefinition
+        {
+            Type = "function",
+            Function = new AzureAiInferenceToolFunction
+            {
+                Name = t.Name,
+                Description = t.Description,
+                Parameters = t.Parameters,
+                Strict = t.Strict
+            }
+        }).ToList();
+    }
+
+    private static object? MapToolChoice(ToolChoice? toolChoice)
+    {
+        if (toolChoice is null)
+            return null;
+
+        if (toolChoice == ToolChoice.Auto)
+            return "auto";
+
+        if (toolChoice == ToolChoice.None)
+            return "none";
+
+        if (toolChoice == ToolChoice.Required)
+            return "required";
+
+        if (toolChoice.IsSpecific)
+        {
+            return new AzureAiInferenceToolChoiceObject
+            {
+                Type = "function",
+                Function = new AzureAiInferenceToolChoiceFunction { Name = toolChoice.FunctionName! }
+            };
+        }
+
+        return null;
     }
 
     private static AzureAiInferenceResponseFormat BuildResponseFormat(JsonOutputOptions options)
@@ -209,10 +373,36 @@ public sealed class AzureAiInferenceChatCompletionClient : IChatCompletionClient
     private static List<AzureAiInferenceChatMessage> MapMessages(IReadOnlyList<LlmMessage> messages)
     {
         return messages
-            .Select(m => new AzureAiInferenceChatMessage
+            .Select(m =>
             {
-                Role = MapRole(m.Role),
-                Content = m.Content
+                var msg = new AzureAiInferenceChatMessage
+                {
+                    Role = MapRole(m.Role),
+                    Content = m.Content
+                };
+
+                // Tool result message: set tool_call_id, content is the result
+                if (m.Role == LlmRole.Tool && m.ToolCallId is not null)
+                {
+                    msg.ToolCallId = m.ToolCallId;
+                }
+
+                // Assistant message with tool calls
+                if (m.Role == LlmRole.Assistant && m.ToolCalls is not null && m.ToolCalls.Count > 0)
+                {
+                    msg.ToolCalls = m.ToolCalls.Select(tc => new AzureAiInferenceToolCall
+                    {
+                        Id = tc.Id,
+                        Type = "function",
+                        Function = new AzureAiInferenceToolCallFunction
+                        {
+                            Name = tc.FunctionName,
+                            Arguments = tc.Arguments.GetRawText()
+                        }
+                    }).ToList();
+                }
+
+                return msg;
             })
             .ToList();
     }
@@ -222,6 +412,7 @@ public sealed class AzureAiInferenceChatCompletionClient : IChatCompletionClient
         LlmRole.System => "system",
         LlmRole.User => "user",
         LlmRole.Assistant => "assistant",
+        LlmRole.Tool => "tool",
         _ => throw new ArgumentOutOfRangeException(nameof(role), role, null)
     };
 
