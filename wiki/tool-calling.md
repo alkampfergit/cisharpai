@@ -118,15 +118,15 @@ Cohere uses this to set `strict_tools: true` when all tools are strict. Other pr
 
 ## Provider Support
 
-| Feature | OpenAI | Anthropic | Cohere |
-|---------|--------|-----------|--------|
-| Basic Tool Calling | Yes | Yes | Yes |
-| ToolChoice.Auto | Yes | Yes (auto) | Yes (AUTO) |
-| ToolChoice.None | Yes | Omitted | Yes (NONE) |
-| ToolChoice.Required | Yes | Yes (any) | Yes (REQUIRED) |
-| ToolChoice.Specific | Yes | Yes (tool) | Degrades to REQUIRED |
-| Parallel Tool Calls | Yes | Yes | Yes |
-| Strict Mode | Via schema | Via input_schema | Via strict_tools flag |
+| Feature | OpenAI | Azure OpenAI | Azure AI Inference | Anthropic | Cohere |
+|---------|--------|--------------|-------------------|-----------|--------|
+| Basic Tool Calling | Yes | Yes | Yes | Yes | Yes |
+| ToolChoice.Auto | Yes | Yes | Yes | Yes (auto) | Yes (AUTO) |
+| ToolChoice.None | Yes | Yes | Yes | Omitted | Yes (NONE) |
+| ToolChoice.Required | Yes | Yes | Yes | Yes (any) | Yes (REQUIRED) |
+| ToolChoice.Specific | Yes | Yes | Yes | Yes (tool) | Degrades to REQUIRED |
+| Parallel Tool Calls | Yes | Yes | Yes | Yes | Yes |
+| Strict Mode | Via schema | Via schema | Via schema | Via input_schema | Via strict_tools flag |
 
 ## Provider Differences
 
@@ -135,6 +135,21 @@ Cohere uses this to set `strict_tools: true` when all tools are strict. Other pr
 - Standard function calling format with `tools` array and `tool_choice` parameter.
 - Supports all `ToolChoice` variants including `Specific` (mapped to `{type: "function", function: {name: "..."}}"`).
 - Tool call arguments are JSON-encoded strings that are parsed to `JsonElement`.
+
+### Azure OpenAI
+
+- Identical JSON format to OpenAI -- uses `tools` array and `tool_choice` parameter.
+- Deployment-based routing: endpoint is `openai/deployments/{deployment}/chat/completions`.
+- Reasoning model detection (o1/o3/o4/gpt-5) automatically uses `max_completion_tokens`.
+- All `ToolChoice` variants supported including `Specific`.
+
+### Azure AI Inference
+
+- Uses OpenAI-compatible chat completions format at `models/chat/completions` endpoint.
+- Model ID is included in the request body (not the URL).
+- Support depends on the deployed model -- some catalog models may not support tool calling.
+- Reasoning model detection (o1/o3/o4/gpt-5) automatically uses `max_completion_tokens`.
+- All `ToolChoice` variants supported including `Specific`.
 
 ### Anthropic
 
