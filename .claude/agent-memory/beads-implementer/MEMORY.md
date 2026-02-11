@@ -18,13 +18,24 @@
 - OpenAI: tool_choice maps to string/object, arguments are JSON strings needing parse
 - Anthropic: tool_result as user role with content blocks, tool_use as assistant content blocks, Content is `object` (string or List<ContentBlock>), ToolChoice.Required->any, Specific->{type:tool,name}
 - Cohere: uppercase ToolChoice strings (AUTO/NONE/REQUIRED), Specific degrades to REQUIRED, strict_tools flag, snake_case serialization
+- Azure OpenAI: identical JSON shape to OpenAI for tool calling, deployment-based routing, reasoning model detection
+- Azure AI Inference: identical JSON shape to OpenAI for tool calling, model ID in request body, model-dependent tool support
 
 ## Test Patterns
 - MockHttpMessageHandler captures request body for assertion
 - JSON fixtures as const strings in test class
 - Feature discovery tests verify `client.Features.Get<T>()` returns non-null and same instance
+- Integration tests use `[TestCaseSource]` with env-var-driven model/deployment lists
+- Azure AI Inference integration tests use `Assert.Warn` for graceful handling of unsupported models
 
 ## Documentation Files to Update When Adding Features
 1. `wiki/provider-features.md` - Feature matrix + provider details
 2. `memories/project_overview.md` - Full project structure reference
 3. Consider adding `wiki/<feature>.md` for user-facing docs
+4. `src/Cisharpai.Tests/Features/FeatureDiscoveryTests.cs` - Feature discovery tests
+
+## Key Implementation Notes
+- When adding tool calling to providers: Content property on message DTOs must be `string?` (nullable) to support tool call responses where content is null
+- Azure OpenAI/AI Inference tool calling uses the same JSON shape as standard OpenAI (tools array, tool_choice as string or object)
+- Both Azure providers support reasoning model detection for proper request format selection
+- `bd sync` should be run after `bd close` to persist state
