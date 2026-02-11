@@ -6,10 +6,19 @@ public sealed class AzureAiInferenceChatMessage
 {
     public string Role { get; set; } = string.Empty;
 
-    public string Content { get; set; } = string.Empty;
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Content { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Refusal { get; set; }
+
+    [JsonPropertyName("tool_calls")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<AzureAiInferenceToolCall>? ToolCalls { get; set; }
+
+    [JsonPropertyName("tool_call_id")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ToolCallId { get; set; }
 }
 
 public sealed class AzureAiInferenceChatRequest
@@ -37,6 +46,13 @@ public sealed class AzureAiInferenceChatRequest
     [JsonPropertyName("response_format")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AzureAiInferenceResponseFormat? ResponseFormat { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<AzureAiInferenceToolDefinition>? Tools { get; set; }
+
+    [JsonPropertyName("tool_choice")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public object? ToolChoice { get; set; }
 }
 
 public sealed class AzureAiInferenceReasoningChatRequest
@@ -51,4 +67,11 @@ public sealed class AzureAiInferenceReasoningChatRequest
     [JsonPropertyName("response_format")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AzureAiInferenceResponseFormat? ResponseFormat { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<AzureAiInferenceToolDefinition>? Tools { get; set; }
+
+    [JsonPropertyName("tool_choice")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public object? ToolChoice { get; set; }
 }
