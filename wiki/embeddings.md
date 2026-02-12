@@ -1,6 +1,6 @@
 # Embeddings
 
-Cisharpai provides a unified `IEmbeddingClient` interface for generating text embeddings across multiple providers. Currently OpenAI and Cohere are supported.
+Cisharpai provides a unified `IEmbeddingClient` interface for generating text embeddings across multiple providers. Currently **OpenAI**, **Azure OpenAI**, **Azure AI Inference**, and **Cohere** are supported. See the [Provider Feature Matrix](provider-features.md) for a full capability overview.
 
 ## Core concepts
 
@@ -87,6 +87,106 @@ var response = await client.GetEmbeddingsAsync(new EmbeddingRequest(
 
 - `text-embedding-3-small` (1536 dimensions by default)
 - `text-embedding-3-large` (3072 dimensions by default)
+
+## Azure OpenAI embeddings
+
+### Setup
+
+```csharp
+using Cisharpai;
+using Cisharpai.Azure.Extensions;
+using Microsoft.Extensions.DependencyInjection;
+
+var services = new ServiceCollection();
+services.AddLogging();
+services.AddAzureOpenAiEmbeddingClient(options =>
+{
+    options.Endpoint = "https://myresource.openai.azure.com";
+    options.ApiKey = "YOUR_AZURE_OPENAI_KEY";
+    options.DeploymentName = "text-embedding-3-small";
+});
+
+var provider = services.BuildServiceProvider();
+var client = provider.GetRequiredService<IEmbeddingClient>();
+```
+
+### Usage
+
+Azure OpenAI embeddings use deployment-based routing. The model is determined by your deployment, so you do not need to specify `Model` in the request.
+
+```csharp
+var response = await client.GetEmbeddingsAsync(new EmbeddingRequest(
+    Input: ["Hello world"]));
+
+Console.WriteLine($"Dimensions: {response.Dimensions}");
+```
+
+### Custom dimensions
+
+Azure OpenAI `text-embedding-3-*` deployments support dimension reduction, just like the standard OpenAI API:
+
+```csharp
+var response = await client.GetEmbeddingsAsync(new EmbeddingRequest(
+    Input: ["Hello world"],
+    Dimensions: 256));
+```
+
+### Supported deployments
+
+- `text-embedding-ada-002` (1536 dimensions)
+- `text-embedding-3-small` (1536 dimensions by default)
+- `text-embedding-3-large` (3072 dimensions by default)
+
+## Azure AI Inference embeddings
+
+### Setup
+
+```csharp
+using Cisharpai;
+using Cisharpai.Azure.Extensions;
+using Microsoft.Extensions.DependencyInjection;
+
+var services = new ServiceCollection();
+services.AddLogging();
+services.AddAzureAiInferenceEmbeddings(options =>
+{
+    options.Endpoint = "https://mymodel.eastus.models.ai.azure.com";
+    options.ApiKey = "YOUR_AZURE_INFERENCE_KEY";
+    options.ModelId = "your-embedding-model-id";
+});
+
+var provider = services.BuildServiceProvider();
+var client = provider.GetRequiredService<IEmbeddingClient>();
+```
+
+### Text embeddings
+
+```csharp
+var response = await client.GetEmbeddingsAsync(new EmbeddingRequest(
+    Input: ["Hello world"],
+    Model: "your-embedding-model-id"));
+
+Console.WriteLine($"Dimensions: {response.Dimensions}");
+```
+
+### Image embeddings
+
+Azure AI Inference also supports image embeddings via the `IImageEmbeddingFeature` feature:
+
+```csharp
+if (client.Features.Get<IImageEmbeddingFeature>() is { } imageFeature)
+{
+    var response = await imageFeature.GetImageEmbeddingAsync(
+        imagePath: "path/to/image.png",
+        model: "your-embedding-model-id");
+
+    Console.WriteLine($"Dimensions: {response.Dimensions}");
+}
+```
+
+### Supported models
+
+Available models depend on your Azure AI Inference deployment. Common embedding models include those available through the Azure AI model catalog.
 
 ## Cohere embeddings
 
