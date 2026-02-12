@@ -27,6 +27,9 @@ public sealed class EnvironmentConfigurationTests
             (DotEnv.AzureAiInferenceTestEndpoint, "Azure AI Inference", "https://your-model-endpoint.region.inference.ai.azure.com/"),
             (DotEnv.AzureAiInferenceTestApiKey, "Azure AI Inference", "your-azure-inference-api-key-here"),
             (DotEnv.AzureAiInferenceTestModels, "Azure AI Inference", "Phi-3-mini-4k-instruct,Mistral-large"),
+            (DotEnv.AzureAiInferenceTestEmbeddingEndpoint, "Azure AI Inference", "https://your-embedding-endpoint.region.inference.ai.azure.com"),
+            (DotEnv.AzureAiInferenceTestEmbeddingKey, "Azure AI Inference", "your-azure-inference-embedding-key-here"),
+            (DotEnv.AzureAiInferenceTestEmbeddingModel, "Azure AI Inference", "Cohere-embed-v3-english"),
             (DotEnv.CohereTestApiKey, "Cohere", "your-cohere-api-key-here"),
         };
 
