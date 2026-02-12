@@ -23,7 +23,7 @@ public sealed class AzureOpenAiClientOptions : AzureClientOptionsBase
     /// </summary>
     public AzureOpenAiClientOptions()
     {
-        ApiVersion = "2024-02-01";
+        ApiVersion = "2024-10-21";
     }
 
     /// <summary>

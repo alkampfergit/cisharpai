@@ -9,7 +9,7 @@ namespace Cisharpai.Tests.Azure.AzureOpenAi;
 public sealed class AzureOpenAiToolCallingTests
 {
     private const string DeploymentName = "gpt-4";
-    private const string ApiVersion = "2024-02-01";
+    private const string ApiVersion = "2024-10-21";
 
     private static readonly JsonElement WeatherParameters = JsonDocument.Parse(
         """{"type":"object","properties":{"city":{"type":"string"},"unit":{"type":"string","enum":["celsius","fahrenheit"]}},"required":["city"]}""")

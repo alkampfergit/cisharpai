@@ -20,7 +20,7 @@ public sealed class AzureOpenAiChatCompletionClientTests
         {
             Endpoint = "https://myresource.openai.azure.com/",
             DeploymentName = "gpt-4",
-            ApiVersion = "2024-02-01",
+            ApiVersion = "2024-10-21",
             ApiKey = "test-key"
         };
         var client = new AzureOpenAiChatCompletionClient(httpClient, options);
@@ -52,7 +52,7 @@ public sealed class AzureOpenAiChatCompletionClientTests
         {
             Endpoint = "https://myresource.openai.azure.com/",
             DeploymentName = "gpt-4",
-            ApiVersion = "2024-02-01",
+            ApiVersion = "2024-10-21",
             ApiKey = "test-key"
         };
         var client = new AzureOpenAiChatCompletionClient(httpClient, options);

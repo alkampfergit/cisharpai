@@ -104,6 +104,6 @@ public sealed class AzureOpenAiClientOptionsTests
     {
         var options = new AzureOpenAiClientOptions();
 
-        Assert.That(options.ApiVersion, Is.EqualTo("2024-02-01"));
+        Assert.That(options.ApiVersion, Is.EqualTo("2024-10-21"));
     }
 }
