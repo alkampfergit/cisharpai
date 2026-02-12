@@ -111,7 +111,7 @@ Integration tests require environment variables to be set. Create a `.env` file 
 | `AZURE_OPENAI_TEST_EMBEDDING_DEPLOYMENT` | Single embedding deployment name | `text-embedding-ada-002` |
 | `AZURE_INFERENCE_TEST_ENDPOINT` | Azure AI Inference endpoint URL | `https://mymodel.eastus.models.ai.azure.com` |
 | `AZURE_INFERENCE_TEST_API_KEY` | Azure AI Inference API key | `abc123...` |
-| `AZURE_INFERENCE_TEST_MODEL` | Model ID for Azure AI Inference | `Phi-3-mini-4k-instruct` |
+| `AZURE_INFERENCE_TEST_MODELS` | Comma-separated model IDs for Azure AI Inference | `Phi-3-mini-4k-instruct` |
 | `COHERE_TEST_API_KEY` | Cohere API key | `...` |
 
 ### Example `.env` file
@@ -129,7 +129,7 @@ AZURE_OPENAI_TEST_EMBEDDING_DEPLOYMENT=text-embedding-ada-002
 # Azure AI Inference
 AZURE_INFERENCE_TEST_ENDPOINT=https://mymodel.eastus.models.ai.azure.com
 AZURE_INFERENCE_TEST_API_KEY=your-azure-inference-key
-AZURE_INFERENCE_TEST_MODEL=Phi-3-mini-4k-instruct
+AZURE_INFERENCE_TEST_MODELS=Phi-3-mini-4k-instruct
 
 # Anthropic
 ANTHROPIC_TEST_API_KEY=sk-ant-your-key-here
