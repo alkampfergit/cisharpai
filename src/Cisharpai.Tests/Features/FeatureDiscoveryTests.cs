@@ -403,4 +403,101 @@ public sealed class FeatureDiscoveryTests
 
         Assert.That(jsonFeature, Is.Not.Null);
     }
+
+    // --- Tool Calling Feature discovery ---
+
+    [Test]
+    public void OpenAiChatCompletionClient_ExposesToolCallingFeature()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.openai.com/v1/") };
+        var client = new OpenAiChatCompletionClient(httpClient, new OpenAiClientOptions());
+
+        var feature = client.Features.Get<IToolCallingFeature>();
+
+        Assert.That(feature, Is.Not.Null);
+        Assert.That(feature, Is.SameAs(client));
+    }
+
+    [Test]
+    public void AnthropicChatCompletionClient_ExposesToolCallingFeature()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
+
+        var feature = client.Features.Get<IToolCallingFeature>();
+
+        Assert.That(feature, Is.Not.Null);
+        Assert.That(feature, Is.SameAs(client));
+    }
+
+    [Test]
+    public void CohereChatCompletionClient_ExposesToolCallingFeature()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.cohere.com/v2/") };
+        var client = new CohereChatCompletionClient(httpClient, new CohereClientOptions());
+
+        var feature = client.Features.Get<IToolCallingFeature>();
+
+        Assert.That(feature, Is.Not.Null);
+        Assert.That(feature, Is.SameAs(client));
+    }
+
+    [Test]
+    public void AzureOpenAiChatCompletionClient_ExposesToolCallingFeature()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://test.openai.azure.com/") };
+        var options = new AzureOpenAiClientOptions { DeploymentName = "test", ApiKey = "key" };
+        var client = new AzureOpenAiChatCompletionClient(httpClient, options);
+
+        var feature = client.Features.Get<IToolCallingFeature>();
+
+        Assert.That(feature, Is.Not.Null);
+        Assert.That(feature, Is.SameAs(client));
+    }
+
+    [Test]
+    public void AzureAiInferenceChatCompletionClient_ExposesToolCallingFeature()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://test.inference.azure.com/") };
+        var options = new AzureAiInferenceClientOptions { ModelId = "test-model", ApiKey = "key" };
+        var client = new AzureAiInferenceChatCompletionClient(httpClient, options);
+
+        var feature = client.Features.Get<IToolCallingFeature>();
+
+        Assert.That(feature, Is.Not.Null);
+        Assert.That(feature, Is.SameAs(client));
+    }
+
+    [Test]
+    public void OpenAiEmbeddingClient_DoesNotExposeToolCallingFeature()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.openai.com/v1/") };
+        var client = new OpenAiEmbeddingClient(httpClient, new OpenAiClientOptions());
+
+        Assert.That(client.Features.Get<IToolCallingFeature>(), Is.Null);
+    }
+
+    [Test]
+    public void FeatureDiscovery_ViaInterface_WorksForAzureOpenAiToolCalling()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://test.openai.azure.com/") };
+        var options = new AzureOpenAiClientOptions { DeploymentName = "test", ApiKey = "key" };
+        IChatCompletionClient client = new AzureOpenAiChatCompletionClient(httpClient, options);
+
+        var toolFeature = client.Features.Get<IToolCallingFeature>();
+
+        Assert.That(toolFeature, Is.Not.Null);
+    }
+
+    [Test]
+    public void FeatureDiscovery_ViaInterface_WorksForAzureAiInferenceToolCalling()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://test.inference.azure.com/") };
+        var options = new AzureAiInferenceClientOptions { ModelId = "test-model", ApiKey = "key" };
+        IChatCompletionClient client = new AzureAiInferenceChatCompletionClient(httpClient, options);
+
+        var toolFeature = client.Features.Get<IToolCallingFeature>();
+
+        Assert.That(toolFeature, Is.Not.Null);
+    }
 }

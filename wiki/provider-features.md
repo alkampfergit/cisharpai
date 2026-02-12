@@ -27,7 +27,7 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Reasoning Models | Yes | Yes | Yes | -- | -- |
 | Responses API (GPT-5) | Yes | -- | -- | -- | -- |
 | Grounded Chat (RAG) | -- | -- | -- | -- | Yes |
-| Tool Calling | Yes | -- | -- | Yes | Yes |
+| Tool Calling | Yes | Yes | Yes | Yes | Yes |
 
 ## Provider Details
 
@@ -56,6 +56,7 @@ This page lists every feature supported by each provider integration in Cisharpa
 | JSON Mode | Via `response_format` (requires api-version 2024-08-01-preview+ for json_schema) |
 | Structured Outputs | Via `response_format.json_schema`; refusal extraction supported |
 | Reasoning Models | Detected automatically; uses `max_completion_tokens` instead of `max_tokens` |
+| Tool Calling | All deployments; identical JSON shape to OpenAI (`tools` array, `tool_choice` parameter); all `ToolChoice` variants supported |
 | Authentication | API key (`api-key` header) or Azure AD (Bearer token) |
 
 ### Azure AI Inference
@@ -70,6 +71,7 @@ This page lists every feature supported by each provider integration in Cisharpa
 | JSON Mode | Via `response_format`; availability varies by deployed model |
 | Structured Outputs | Via `response_format.json_schema`; availability varies by deployed model |
 | Reasoning Models | o1/o3/o4/gpt-5 detected automatically |
+| Tool Calling | Model-dependent; uses OpenAI-compatible `tools` array and `tool_choice`; all `ToolChoice` variants supported |
 | Authentication | API key (`api-key` header) or Azure AD (Bearer token) |
 
 ### Anthropic
