@@ -14,7 +14,7 @@ Cisharpai is a unified .NET client library for chat completions across multiple 
 1) Add references to the core library and a provider package:
 
 - Cisharpai
-- Cisharpai.OpenAi or Cisharpai.AzureOpenAi or Cisharpai.Anthropic
+- Cisharpai.OpenAi or Cisharpai.Azure or Cisharpai.Anthropic or Cisharpai.Cohere
 
 2) Register and call the client:
 

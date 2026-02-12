@@ -7,7 +7,7 @@ This guide shows the basic workflow for using Cisharpai with any provider implem
 Add references to the core library and the provider of your choice:
 
 - Cisharpai (core abstractions)
-- Cisharpai.OpenAi, Cisharpai.AzureOpenAi, or Cisharpai.Anthropic (provider implementation)
+- Cisharpai.OpenAi, Cisharpai.Azure, Cisharpai.Anthropic, or Cisharpai.Cohere (provider implementation)
 
 ## 2) Register a provider client
 
