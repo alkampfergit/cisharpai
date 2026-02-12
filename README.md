@@ -1,13 +1,16 @@
 # Cisharpai
 
-Cisharpai is a unified .NET client library for chat completions across multiple LLM providers. It exposes a single interface so you can switch providers (OpenAI, Azure OpenAI, Anthropic) with minimal code changes.
+Cisharpai is a unified .NET client library for interacting with multiple LLM providers. It exposes shared interfaces so you can switch providers (OpenAI, Azure OpenAI, Azure AI Inference, Anthropic, Cohere) with minimal code changes.
 
 ## Why Cisharpai?
 
-- One shared `IChatCompletionClient` interface
-- Unified request/response models
-- Provider-specific packages for OpenAI, Azure OpenAI, and Anthropic
+- One shared `IChatCompletionClient` and `IEmbeddingClient` interface
+- Unified request/response models across all providers
+- Provider-specific packages: `Cisharpai.OpenAi`, `Cisharpai.Azure`, `Cisharpai.Anthropic`, `Cisharpai.Cohere`
 - Built-in HTTP resilience for retries and timeouts
+- Feature Collection pattern for optional capabilities: JSON output, tool calling, grounded chat (RAG), image embeddings, multimodal embeddings
+- No exceptions for API errors -- consistent `IsSuccess`/`ErrorMessage` error handling
+- Full debug support with `RawRequestJson`/`RawResponseJson`
 
 ## Quick start
 
@@ -47,13 +50,18 @@ Console.WriteLine(response.Content);
 
 Start here:
 
-- [wiki/index.md](wiki/index.md)
-- [wiki/getting-started.md](wiki/getting-started.md)
-- [wiki/openai.md](wiki/openai.md)
+- [Getting Started](wiki/getting-started.md)
+- [Provider Feature Matrix](wiki/provider-features.md) -- see what each provider supports
+- [OpenAI Quickstart](wiki/openai.md)
+- [Embeddings](wiki/embeddings.md) -- text, image, and multimodal embeddings across providers
+- [JSON Output](wiki/json-output.md) -- JSON Mode and Structured Outputs
+- [Tool Calling](wiki/tool-calling.md) -- function calling across providers
+- [Grounded Chat (RAG)](wiki/grounded-chat.md) -- document grounding with citations
+- [Feature Extensions](wiki/feature-extensions.md) -- Feature Collection pattern
 
 ## Samples
 
-- OpenAI console scenario: [src/Cisharp.Console/Scenarios/OpenAiChatScenario.cs](src/Cisharp.Console/Scenarios/OpenAiChatScenario.cs)
+- Interactive console demo: [src/Cisharp.Console/](src/Cisharp.Console/) -- covers all providers and features
 
 ## Building Locally
 
