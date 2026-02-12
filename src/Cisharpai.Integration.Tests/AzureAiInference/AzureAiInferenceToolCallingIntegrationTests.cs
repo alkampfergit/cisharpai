@@ -13,10 +13,31 @@ public sealed class AzureAiInferenceToolCallingIntegrationTests
         """{"type":"object","properties":{"city":{"type":"string","description":"The city name"}},"required":["city"],"additionalProperties":false}""")
         .RootElement.Clone();
 
+    /// <summary>
+    /// Tracks how many models passed strict tool-calling assertions.
+    /// If zero models pass, the OneTimeTearDown will fail the suite.
+    /// </summary>
+    private static int _modelsWithToolCallingSupport;
+
     [OneTimeSetUp]
     public void LoadEnvironment()
     {
         DotEnv.Load();
+        _modelsWithToolCallingSupport = 0;
+    }
+
+    [OneTimeTearDown]
+    public void VerifyAtLeastOneModelSupportsToolCalling()
+    {
+        if (_modelsWithToolCallingSupport == 0)
+        {
+            Assert.Fail(
+                "No configured Azure AI Inference model successfully completed tool-calling assertions. " +
+                "Ensure at least one model in AZURE_INFERENCE_TEST_MODELS supports tool calling.");
+        }
+
+        TestContext.WriteLine(
+            $"{_modelsWithToolCallingSupport} model(s) passed strict tool-calling assertions.");
     }
 
     private static IEnumerable<string> Models()
@@ -89,10 +110,11 @@ public sealed class AzureAiInferenceToolCallingIntegrationTests
 
         var response = await toolFeature.GetChatCompletionWithToolsAsync(request, toolOptions);
 
-        // Some Azure AI models may not support tool calling - handle gracefully
+        // Some Azure AI models may not support tool calling - mark as inconclusive
         if (!response.IsSuccess)
         {
-            Assert.Warn($"Model {modelId} returned error for tool calling: {response.ErrorMessage}");
+            Assert.Inconclusive(
+                $"Model {modelId} does not support tool calling: {response.ErrorMessage}");
             return;
         }
 
@@ -103,6 +125,8 @@ public sealed class AzureAiInferenceToolCallingIntegrationTests
         Assert.That(toolCall.FunctionName, Is.EqualTo("get_weather"));
         Assert.That(toolCall.Id, Is.Not.Null.And.Not.Empty);
         Assert.That(toolCall.Arguments.GetProperty("city").GetString(), Is.Not.Null.And.Not.Empty);
+
+        Interlocked.Increment(ref _modelsWithToolCallingSupport);
     }
 
     // --- ToolChoice.Required Forces Tool Call ---
@@ -128,10 +152,11 @@ public sealed class AzureAiInferenceToolCallingIntegrationTests
 
         var response = await toolFeature.GetChatCompletionWithToolsAsync(request, toolOptions);
 
-        // Some Azure AI models may not support tool calling - handle gracefully
+        // Some Azure AI models may not support tool calling - mark as inconclusive
         if (!response.IsSuccess)
         {
-            Assert.Warn($"Model {modelId} returned error for tool calling: {response.ErrorMessage}");
+            Assert.Inconclusive(
+                $"Model {modelId} does not support tool calling: {response.ErrorMessage}");
             return;
         }
 
@@ -162,16 +187,18 @@ public sealed class AzureAiInferenceToolCallingIntegrationTests
 
         var response = await toolFeature.GetChatCompletionWithToolsAsync(request, toolOptions);
 
-        // Some Azure AI models may not support tool calling - handle gracefully
+        // Some Azure AI models may not support tool calling - mark as inconclusive
         if (!response.IsSuccess)
         {
-            Assert.Warn($"Model {modelId} returned error for tool calling: {response.ErrorMessage}");
+            Assert.Inconclusive(
+                $"Model {modelId} does not support tool calling: {response.ErrorMessage}");
             return;
         }
 
         if (response.ToolCalls is null || response.ToolCalls.Count == 0)
         {
-            Assert.Warn($"Model {modelId} did not return tool calls in step 1");
+            Assert.Inconclusive(
+                $"Model {modelId} did not return tool calls in step 1 (may not support tool calling).");
             return;
         }
 
