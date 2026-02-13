@@ -11,6 +11,9 @@ public sealed class AzureOpenAiChatCompletionIntegrationTests
     public void LoadEnvironment()
     {
         DotEnv.Load();
+        var raw = Environment.GetEnvironmentVariable(DotEnv.AzureOpenAiTestDeployments);
+        Assert.That(raw, Is.Not.Null.And.Not.Empty,
+            $"Environment variable {DotEnv.AzureOpenAiTestDeployments} must be set with comma-separated deployment names.");
     }
 
     private static IEnumerable<string> Deployments()
@@ -19,7 +22,6 @@ public sealed class AzureOpenAiChatCompletionIntegrationTests
         var raw = Environment.GetEnvironmentVariable(DotEnv.AzureOpenAiTestDeployments);
         if (string.IsNullOrWhiteSpace(raw))
         {
-            // Return a placeholder so the test runs and fails with a clear message
             yield return "__MISSING_DEPLOYMENTS__";
             yield break;
         }
@@ -31,9 +33,6 @@ public sealed class AzureOpenAiChatCompletionIntegrationTests
     [TestCaseSource(nameof(Deployments))]
     public async Task GetChatCompletionAsync_ReturnsValidResponse(string deployment)
     {
-        Assert.That(deployment, Is.Not.EqualTo("__MISSING_DEPLOYMENTS__"),
-            $"Environment variable {DotEnv.AzureOpenAiTestDeployments} must be set.");
-
         var endpoint = Environment.GetEnvironmentVariable(DotEnv.AzureOpenAiTestEndpoint);
         var apiKey = Environment.GetEnvironmentVariable(DotEnv.AzureOpenAiTestApiKey);
 
@@ -76,9 +75,6 @@ public sealed class AzureOpenAiChatCompletionIntegrationTests
     [TestCaseSource(nameof(Deployments))]
     public async Task GetChatCompletionAsync_VeryLowMaxTokens_ReturnsTruncatedResponse(string deployment)
     {
-        Assert.That(deployment, Is.Not.EqualTo("__MISSING_DEPLOYMENTS__"),
-            $"Environment variable {DotEnv.AzureOpenAiTestDeployments} must be set.");
-
         var endpoint = Environment.GetEnvironmentVariable(DotEnv.AzureOpenAiTestEndpoint);
         var apiKey = Environment.GetEnvironmentVariable(DotEnv.AzureOpenAiTestApiKey);
 

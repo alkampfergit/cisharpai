@@ -13,6 +13,9 @@ public sealed class AzureOpenAiJsonOutputIntegrationTests
     public void LoadEnvironment()
     {
         DotEnv.Load();
+        var raw = Environment.GetEnvironmentVariable(DotEnv.AzureOpenAiTestDeployments);
+        Assert.That(raw, Is.Not.Null.And.Not.Empty,
+            $"Environment variable {DotEnv.AzureOpenAiTestDeployments} must be set with comma-separated deployment names.");
     }
 
     private static IEnumerable<string> Deployments()
@@ -57,9 +60,6 @@ public sealed class AzureOpenAiJsonOutputIntegrationTests
     [TestCaseSource(nameof(Deployments))]
     public void FeatureDiscovery_JsonOutputFeature_Available(string deployment)
     {
-        Assert.That(deployment, Is.Not.EqualTo("__MISSING_DEPLOYMENTS__"),
-            $"Environment variable {DotEnv.AzureOpenAiTestDeployments} must be set.");
-
         var client = CreateClient(deployment);
         var feature = client.Features.Get<IJsonOutputFeature>();
 
@@ -71,9 +71,6 @@ public sealed class AzureOpenAiJsonOutputIntegrationTests
     [TestCaseSource(nameof(Deployments))]
     public async Task JsonMode_ReturnsValidJson(string deployment)
     {
-        Assert.That(deployment, Is.Not.EqualTo("__MISSING_DEPLOYMENTS__"),
-            $"Environment variable {DotEnv.AzureOpenAiTestDeployments} must be set.");
-
         var client = CreateClient(deployment);
         var jsonFeature = client.Features.Get<IJsonOutputFeature>()!;
 
@@ -101,9 +98,6 @@ public sealed class AzureOpenAiJsonOutputIntegrationTests
     [TestCaseSource(nameof(Deployments))]
     public async Task StructuredOutputs_SimpleSchema_MatchesSchema(string deployment)
     {
-        Assert.That(deployment, Is.Not.EqualTo("__MISSING_DEPLOYMENTS__"),
-            $"Environment variable {DotEnv.AzureOpenAiTestDeployments} must be set.");
-
         var client = CreateClient(deployment);
         var jsonFeature = client.Features.Get<IJsonOutputFeature>()!;
 

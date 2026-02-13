@@ -24,6 +24,9 @@ public sealed class AzureAiInferenceToolCallingIntegrationTests
     {
         DotEnv.Load();
         _modelsWithToolCallingSupport = 0;
+        var raw = Environment.GetEnvironmentVariable(DotEnv.AzureAiInferenceTestModels);
+        Assert.That(raw, Is.Not.Null.And.Not.Empty,
+            $"Environment variable {DotEnv.AzureAiInferenceTestModels} must be set with comma-separated model IDs.");
     }
 
     [OneTimeTearDown]
@@ -78,9 +81,6 @@ public sealed class AzureAiInferenceToolCallingIntegrationTests
     public void FeatureDiscovery_ToolCallingFeature_Available()
     {
         var models = Models().ToList();
-        Assert.That(models.First(), Is.Not.EqualTo("__MISSING_MODELS__"),
-            $"Environment variable {DotEnv.AzureAiInferenceTestModels} must be set.");
-
         var client = CreateClient(models.First());
 
         var feature = client.Features.Get<IToolCallingFeature>();
@@ -93,9 +93,6 @@ public sealed class AzureAiInferenceToolCallingIntegrationTests
     [TestCaseSource(nameof(Models))]
     public async Task ToolCalling_SingleToolCall_ReturnsToolCall(string modelId)
     {
-        Assert.That(modelId, Is.Not.EqualTo("__MISSING_MODELS__"),
-            $"Environment variable {DotEnv.AzureAiInferenceTestModels} must be set.");
-
         var client = CreateClient(modelId);
         var toolFeature = client.Features.Get<IToolCallingFeature>()!;
 
@@ -134,9 +131,6 @@ public sealed class AzureAiInferenceToolCallingIntegrationTests
     [TestCaseSource(nameof(Models))]
     public async Task ToolCalling_ToolChoiceRequired_ForcesToolCall(string modelId)
     {
-        Assert.That(modelId, Is.Not.EqualTo("__MISSING_MODELS__"),
-            $"Environment variable {DotEnv.AzureAiInferenceTestModels} must be set.");
-
         var client = CreateClient(modelId);
         var toolFeature = client.Features.Get<IToolCallingFeature>()!;
 
@@ -169,9 +163,6 @@ public sealed class AzureAiInferenceToolCallingIntegrationTests
     [TestCaseSource(nameof(Models))]
     public async Task ToolCalling_MultiTurnLoop_ReturnsTextResponseAfterToolResult(string modelId)
     {
-        Assert.That(modelId, Is.Not.EqualTo("__MISSING_MODELS__"),
-            $"Environment variable {DotEnv.AzureAiInferenceTestModels} must be set.");
-
         var client = CreateClient(modelId);
         var toolFeature = client.Features.Get<IToolCallingFeature>()!;
 
