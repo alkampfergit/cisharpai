@@ -13,6 +13,9 @@ public sealed class AzureAiInferenceJsonOutputIntegrationTests
     public void LoadEnvironment()
     {
         DotEnv.Load();
+        var raw = Environment.GetEnvironmentVariable(DotEnv.AzureAiInferenceTestModels);
+        Assert.That(raw, Is.Not.Null.And.Not.Empty,
+            $"Environment variable {DotEnv.AzureAiInferenceTestModels} must be set with comma-separated model IDs.");
     }
 
     private static IEnumerable<string> Models()
@@ -57,9 +60,6 @@ public sealed class AzureAiInferenceJsonOutputIntegrationTests
     [TestCaseSource(nameof(Models))]
     public void FeatureDiscovery_JsonOutputFeature_Available(string modelId)
     {
-        Assert.That(modelId, Is.Not.EqualTo("__MISSING_MODELS__"),
-            $"Environment variable {DotEnv.AzureAiInferenceTestModels} must be set.");
-
         var client = CreateClient(modelId);
         var feature = client.Features.Get<IJsonOutputFeature>();
 
@@ -71,9 +71,6 @@ public sealed class AzureAiInferenceJsonOutputIntegrationTests
     [TestCaseSource(nameof(Models))]
     public async Task JsonMode_ReturnsValidJson(string modelId)
     {
-        Assert.That(modelId, Is.Not.EqualTo("__MISSING_MODELS__"),
-            $"Environment variable {DotEnv.AzureAiInferenceTestModels} must be set.");
-
         var client = CreateClient(modelId);
         var jsonFeature = client.Features.Get<IJsonOutputFeature>()!;
 
@@ -101,9 +98,6 @@ public sealed class AzureAiInferenceJsonOutputIntegrationTests
     [TestCaseSource(nameof(Models))]
     public async Task StructuredOutputs_SimpleSchema_MatchesSchema(string modelId)
     {
-        Assert.That(modelId, Is.Not.EqualTo("__MISSING_MODELS__"),
-            $"Environment variable {DotEnv.AzureAiInferenceTestModels} must be set.");
-
         var client = CreateClient(modelId);
         var jsonFeature = client.Features.Get<IJsonOutputFeature>()!;
 

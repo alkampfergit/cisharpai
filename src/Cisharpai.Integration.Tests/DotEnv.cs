@@ -19,6 +19,9 @@ public static class DotEnv
     public const string AzureAiInferenceTestEndpoint = TestEnvironmentVariables.AzureAiInferenceTestEndpoint;
     public const string AzureAiInferenceTestApiKey = TestEnvironmentVariables.AzureAiInferenceTestApiKey;
     public const string AzureAiInferenceTestModels = TestEnvironmentVariables.AzureAiInferenceTestModels;
+    public const string AzureAiInferenceTestEmbeddingEndpoint = TestEnvironmentVariables.AzureAiInferenceTestEmbeddingEndpoint;
+    public const string AzureAiInferenceTestEmbeddingKey = TestEnvironmentVariables.AzureAiInferenceTestEmbeddingKey;
+    public const string AzureAiInferenceTestEmbeddingModel = TestEnvironmentVariables.AzureAiInferenceTestEmbeddingModel;
 
     /// <summary>
     /// Loads environment variables from a .env file found in the current

@@ -34,7 +34,7 @@ Follow this precise workflow:
 
 ### Phase 2: Sequential Implementation
 
-For EACH story in dependency order, repeat this cycle:
+For EACH story in dependency order, repeat this cycle using a sub agent to avoid increading master context.
 
 #### Step 2a: Claim the Story
 - Run `bd update <id> --status in_progress` to claim the work.

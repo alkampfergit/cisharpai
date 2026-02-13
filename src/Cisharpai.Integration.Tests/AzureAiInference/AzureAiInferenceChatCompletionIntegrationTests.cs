@@ -11,6 +11,9 @@ public sealed class AzureAiInferenceChatCompletionIntegrationTests
     public void LoadEnvironment()
     {
         DotEnv.Load();
+        var raw = Environment.GetEnvironmentVariable(DotEnv.AzureAiInferenceTestModels);
+        Assert.That(raw, Is.Not.Null.And.Not.Empty,
+            $"Environment variable {DotEnv.AzureAiInferenceTestModels} must be set with comma-separated model IDs.");
     }
 
     private static IEnumerable<string> Models()
@@ -30,9 +33,6 @@ public sealed class AzureAiInferenceChatCompletionIntegrationTests
     [TestCaseSource(nameof(Models))]
     public async Task GetChatCompletionAsync_ReturnsValidResponse(string modelId)
     {
-        Assert.That(modelId, Is.Not.EqualTo("__MISSING_MODELS__"),
-            $"Environment variable {DotEnv.AzureAiInferenceTestModels} must be set.");
-
         var endpoint = Environment.GetEnvironmentVariable(DotEnv.AzureAiInferenceTestEndpoint);
         var apiKey = Environment.GetEnvironmentVariable(DotEnv.AzureAiInferenceTestApiKey);
 
@@ -74,9 +74,6 @@ public sealed class AzureAiInferenceChatCompletionIntegrationTests
     [TestCaseSource(nameof(Models))]
     public async Task GetChatCompletionAsync_WithSystemMessage_ReturnsValidResponse(string modelId)
     {
-        Assert.That(modelId, Is.Not.EqualTo("__MISSING_MODELS__"),
-            $"Environment variable {DotEnv.AzureAiInferenceTestModels} must be set.");
-
         var endpoint = Environment.GetEnvironmentVariable(DotEnv.AzureAiInferenceTestEndpoint);
         var apiKey = Environment.GetEnvironmentVariable(DotEnv.AzureAiInferenceTestApiKey);
 
@@ -118,9 +115,6 @@ public sealed class AzureAiInferenceChatCompletionIntegrationTests
     [TestCaseSource(nameof(Models))]
     public async Task GetChatCompletionAsync_MultiTurnConversation_ReturnsValidResponse(string modelId)
     {
-        Assert.That(modelId, Is.Not.EqualTo("__MISSING_MODELS__"),
-            $"Environment variable {DotEnv.AzureAiInferenceTestModels} must be set.");
-
         var endpoint = Environment.GetEnvironmentVariable(DotEnv.AzureAiInferenceTestEndpoint);
         var apiKey = Environment.GetEnvironmentVariable(DotEnv.AzureAiInferenceTestApiKey);
 
@@ -164,9 +158,6 @@ public sealed class AzureAiInferenceChatCompletionIntegrationTests
     [TestCaseSource(nameof(Models))]
     public async Task GetChatCompletionAsync_InvalidApiKey_ReturnsErrorResponse(string modelId)
     {
-        Assert.That(modelId, Is.Not.EqualTo("__MISSING_MODELS__"),
-            $"Environment variable {DotEnv.AzureAiInferenceTestModels} must be set.");
-
         var endpoint = Environment.GetEnvironmentVariable(DotEnv.AzureAiInferenceTestEndpoint);
 
         Assert.That(endpoint, Is.Not.Null.And.Not.Empty,

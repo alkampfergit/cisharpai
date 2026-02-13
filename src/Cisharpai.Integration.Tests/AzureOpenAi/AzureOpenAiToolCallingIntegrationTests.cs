@@ -17,6 +17,9 @@ public sealed class AzureOpenAiToolCallingIntegrationTests
     public void LoadEnvironment()
     {
         DotEnv.Load();
+        var raw = Environment.GetEnvironmentVariable(DotEnv.AzureOpenAiTestDeployments);
+        Assert.That(raw, Is.Not.Null.And.Not.Empty,
+            $"Environment variable {DotEnv.AzureOpenAiTestDeployments} must be set with comma-separated deployment names.");
     }
 
     private static IEnumerable<string> Deployments()
@@ -57,9 +60,6 @@ public sealed class AzureOpenAiToolCallingIntegrationTests
     public void FeatureDiscovery_ToolCallingFeature_Available()
     {
         var deployments = Deployments().ToList();
-        Assert.That(deployments.First(), Is.Not.EqualTo("__MISSING_DEPLOYMENTS__"),
-            $"Environment variable {DotEnv.AzureOpenAiTestDeployments} must be set.");
-
         var client = CreateClient(deployments.First());
 
         var feature = client.Features.Get<IToolCallingFeature>();
@@ -72,9 +72,6 @@ public sealed class AzureOpenAiToolCallingIntegrationTests
     [TestCaseSource(nameof(Deployments))]
     public async Task ToolCalling_SingleToolCall_ReturnsToolCall(string deployment)
     {
-        Assert.That(deployment, Is.Not.EqualTo("__MISSING_DEPLOYMENTS__"),
-            $"Environment variable {DotEnv.AzureOpenAiTestDeployments} must be set.");
-
         var client = CreateClient(deployment);
         var toolFeature = client.Features.Get<IToolCallingFeature>()!;
 
@@ -104,9 +101,6 @@ public sealed class AzureOpenAiToolCallingIntegrationTests
     [TestCaseSource(nameof(Deployments))]
     public async Task ToolCalling_ToolChoiceRequired_ForcesToolCall(string deployment)
     {
-        Assert.That(deployment, Is.Not.EqualTo("__MISSING_DEPLOYMENTS__"),
-            $"Environment variable {DotEnv.AzureOpenAiTestDeployments} must be set.");
-
         var client = CreateClient(deployment);
         var toolFeature = client.Features.Get<IToolCallingFeature>()!;
 
@@ -132,9 +126,6 @@ public sealed class AzureOpenAiToolCallingIntegrationTests
     [TestCaseSource(nameof(Deployments))]
     public async Task ToolCalling_MultiTurnLoop_ReturnsTextResponseAfterToolResult(string deployment)
     {
-        Assert.That(deployment, Is.Not.EqualTo("__MISSING_DEPLOYMENTS__"),
-            $"Environment variable {DotEnv.AzureOpenAiTestDeployments} must be set.");
-
         var client = CreateClient(deployment);
         var toolFeature = client.Features.Get<IToolCallingFeature>()!;
 

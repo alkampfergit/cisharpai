@@ -1,20 +1,23 @@
 # Cisharpai
 
-Cisharpai is a unified .NET client library for chat completions across multiple LLM providers. It exposes a single interface so you can switch providers (OpenAI, Azure OpenAI, Anthropic) with minimal code changes.
+Cisharpai is a unified .NET client library for interacting with multiple LLM providers. It exposes shared interfaces so you can switch providers (OpenAI, Azure OpenAI, Azure AI Inference, Anthropic, Cohere) with minimal code changes.
 
 ## Why Cisharpai?
 
-- One shared `IChatCompletionClient` interface
-- Unified request/response models
-- Provider-specific packages for OpenAI, Azure OpenAI, and Anthropic
+- One shared `IChatCompletionClient` and `IEmbeddingClient` interface
+- Unified request/response models across all providers
+- Provider-specific packages: `Cisharpai.OpenAi`, `Cisharpai.Azure`, `Cisharpai.Anthropic`, `Cisharpai.Cohere`
 - Built-in HTTP resilience for retries and timeouts
+- Feature Collection pattern for optional capabilities: JSON output, tool calling, grounded chat (RAG), image embeddings, multimodal embeddings
+- No exceptions for API errors -- consistent `IsSuccess`/`ErrorMessage` error handling
+- Full debug support with `RawRequestJson`/`RawResponseJson`
 
 ## Quick start
 
 1) Add references to the core library and a provider package:
 
 - Cisharpai
-- Cisharpai.OpenAi or Cisharpai.AzureOpenAi or Cisharpai.Anthropic
+- Cisharpai.OpenAi or Cisharpai.Azure or Cisharpai.Anthropic or Cisharpai.Cohere
 
 2) Register and call the client:
 
@@ -47,13 +50,18 @@ Console.WriteLine(response.Content);
 
 Start here:
 
-- [wiki/index.md](wiki/index.md)
-- [wiki/getting-started.md](wiki/getting-started.md)
-- [wiki/openai.md](wiki/openai.md)
+- [Getting Started](wiki/getting-started.md)
+- [Provider Feature Matrix](wiki/provider-features.md) -- see what each provider supports
+- [OpenAI Quickstart](wiki/openai.md)
+- [Embeddings](wiki/embeddings.md) -- text, image, and multimodal embeddings across providers
+- [JSON Output](wiki/json-output.md) -- JSON Mode and Structured Outputs
+- [Tool Calling](wiki/tool-calling.md) -- function calling across providers
+- [Grounded Chat (RAG)](wiki/grounded-chat.md) -- document grounding with citations
+- [Feature Extensions](wiki/feature-extensions.md) -- Feature Collection pattern
 
 ## Samples
 
-- OpenAI console scenario: [src/Cisharp.Console/Scenarios/OpenAiChatScenario.cs](src/Cisharp.Console/Scenarios/OpenAiChatScenario.cs)
+- Interactive console demo: [src/Cisharp.Console/](src/Cisharp.Console/) -- covers all providers and features
 
 ## Building Locally
 
@@ -111,7 +119,10 @@ Integration tests require environment variables to be set. Create a `.env` file 
 | `AZURE_OPENAI_TEST_EMBEDDING_DEPLOYMENT` | Single embedding deployment name | `text-embedding-ada-002` |
 | `AZURE_INFERENCE_TEST_ENDPOINT` | Azure AI Inference endpoint URL | `https://mymodel.eastus.models.ai.azure.com` |
 | `AZURE_INFERENCE_TEST_API_KEY` | Azure AI Inference API key | `abc123...` |
-| `AZURE_INFERENCE_TEST_MODEL` | Model ID for Azure AI Inference | `Phi-3-mini-4k-instruct` |
+| `AZURE_INFERENCE_TEST_MODELS` | Comma-separated model IDs for Azure AI Inference | `Phi-3-mini-4k-instruct` |
+| `AZURE_INFERENCE_TEST_EMBEDDING_ENDPOINT` | Azure AI Inference embedding endpoint URL | `https://myembedding.eastus.models.ai.azure.com` |
+| `AZURE_INFERENCE_TEST_EMBEDDING_KEY` | Azure AI Inference embedding API key | `abc123...` |
+| `AZURE_INFERENCE_TEST_EMBEDDING_MODEL` | Model ID for Azure AI Inference embedding | `Cohere-embed-v3-english` |
 | `COHERE_TEST_API_KEY` | Cohere API key | `...` |
 
 ### Example `.env` file
@@ -129,7 +140,10 @@ AZURE_OPENAI_TEST_EMBEDDING_DEPLOYMENT=text-embedding-ada-002
 # Azure AI Inference
 AZURE_INFERENCE_TEST_ENDPOINT=https://mymodel.eastus.models.ai.azure.com
 AZURE_INFERENCE_TEST_API_KEY=your-azure-inference-key
-AZURE_INFERENCE_TEST_MODEL=Phi-3-mini-4k-instruct
+AZURE_INFERENCE_TEST_MODELS=Phi-3-mini-4k-instruct
+AZURE_INFERENCE_TEST_EMBEDDING_ENDPOINT=https://myembedding.eastus.models.ai.azure.com
+AZURE_INFERENCE_TEST_EMBEDDING_KEY=your-azure-inference-embedding-key
+AZURE_INFERENCE_TEST_EMBEDDING_MODEL=Cohere-embed-v3-english
 
 # Anthropic
 ANTHROPIC_TEST_API_KEY=sk-ant-your-key-here

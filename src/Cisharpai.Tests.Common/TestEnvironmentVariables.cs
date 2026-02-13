@@ -21,6 +21,9 @@ public static class TestEnvironmentVariables
     public const string AzureAiInferenceTestEndpoint = "AZURE_INFERENCE_TEST_ENDPOINT";
     public const string AzureAiInferenceTestApiKey = "AZURE_INFERENCE_TEST_API_KEY";
     public const string AzureAiInferenceTestModels = "AZURE_INFERENCE_TEST_MODELS";
+    public const string AzureAiInferenceTestEmbeddingEndpoint = "AZURE_INFERENCE_TEST_EMBEDDING_ENDPOINT";
+    public const string AzureAiInferenceTestEmbeddingKey = "AZURE_INFERENCE_TEST_EMBEDDING_KEY";
+    public const string AzureAiInferenceTestEmbeddingModel = "AZURE_INFERENCE_TEST_EMBEDDING_MODEL";
 
     // Cohere
     public const string CohereTestApiKey = "COHERE_TEST_API_KEY";
