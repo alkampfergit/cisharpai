@@ -10,11 +10,11 @@ Cisharpai is a unified .NET client library that provides shared interfaces for i
 
 | Provider | Package | Capabilities |
 |----------|---------|-------------|
-| OpenAI | `Cisharpai.OpenAi` | Chat, embeddings, JSON output, tool calling, reasoning models, Responses API (GPT-5) |
-| Azure OpenAI | `Cisharpai.Azure` | Chat, embeddings, JSON output, tool calling, reasoning models |
-| Azure AI Inference | `Cisharpai.Azure` | Chat, embeddings, image embeddings, JSON output, tool calling |
-| Anthropic | `Cisharpai.Anthropic` | Chat, JSON output, tool calling |
-| Cohere | `Cisharpai.Cohere` | Chat, embeddings, image embeddings, multimodal embeddings, JSON output, tool calling, grounded chat (RAG) |
+| OpenAI | `Cisharpai.OpenAi` | Chat, embeddings, JSON output, tool calling, vision, streaming, reasoning models, Responses API (GPT-5) |
+| Azure OpenAI | `Cisharpai.Azure` | Chat, embeddings, JSON output, tool calling, vision, streaming, reasoning models |
+| Azure AI Inference | `Cisharpai.Azure` | Chat, embeddings, image embeddings, JSON output, tool calling, vision, streaming |
+| Anthropic | `Cisharpai.Anthropic` | Chat, JSON output, tool calling, vision, streaming |
+| Cohere | `Cisharpai.Cohere` | Chat, embeddings, image embeddings, multimodal embeddings, JSON output, tool calling, grounded chat (RAG), streaming |
 
 ### Key Features
 
@@ -22,6 +22,8 @@ Cisharpai is a unified .NET client library that provides shared interfaces for i
 - **Text Embeddings** -- unified `IEmbeddingClient` interface (OpenAI, Azure OpenAI, Azure AI Inference, Cohere)
 - **JSON Output** -- JSON Mode and Structured Outputs via `IJsonOutputFeature`
 - **Tool Calling** -- function calling via `IToolCallingFeature` across all providers
+- **Vision** -- send images in messages via `LlmMessage.WithImage()` / `LlmMessage.WithBase64Image()`
+- **Streaming** -- token-by-token streaming via `IStreamingChatFeature` across all providers
 - **Grounded Chat (RAG)** -- document grounding with citations via `IGroundedChatFeature` (Cohere)
 - **Image Embeddings** -- via `IImageEmbeddingFeature` (Azure AI Inference, Cohere)
 - **Multimodal Embeddings** -- mixed text + image inputs via `IMultimodalEmbeddingFeature` (Cohere)
@@ -40,6 +42,8 @@ Cisharpai is a unified .NET client library that provides shared interfaces for i
 - [JSON Output](json-output.md) -- JSON Mode and Structured Outputs
 - [Tool Calling](tool-calling.md) -- function calling across providers
 - [Grounded Chat (RAG)](grounded-chat.md) -- document grounding with citations
+- [Vision](vision.md) -- sending images in chat messages
+- [Streaming](streaming.md) -- streaming chat completions token-by-token
 
 ### Reference
 
