@@ -35,6 +35,10 @@ public sealed class AnthropicContentBlock
     [JsonPropertyName("is_error")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public bool? IsError { get; set; }
+
+    /// <summary>For image content blocks: the image source (base64 data and media type).</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AnthropicImageSource? Source { get; set; }
 }
 
 public sealed class AnthropicUsage

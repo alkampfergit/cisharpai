@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Cisharpai.Features;
 using Cisharpai.Features.Chat;
@@ -6,8 +7,13 @@ using Cisharpai.Anthropic.Models;
 
 namespace Cisharpai.Anthropic;
 
-public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature
+public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature, IStreamingChatFeature
 {
+    private static readonly JsonSerializerOptions StreamJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     private readonly LlmHttpClient _client;
     private readonly AnthropicClientOptions _options;
 
@@ -21,6 +27,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         var features = new FeatureCollection();
         features.Set<IJsonOutputFeature>(this);
         features.Set<IToolCallingFeature>(this);
+        features.Set<IStreamingChatFeature>(this);
         Features = features;
     }
 
@@ -32,7 +39,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
 
         try
         {
-            var providerRequest = BuildRequest(request);
+            var providerRequest = await BuildRequestAsync(request, cancellationToken);
 
             return await ExecuteAsync(providerRequest, request, cancellationToken);
         }
@@ -60,7 +67,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
             var messages = EnsureJsonKeywordInSystemMessage(request.Messages, jsonOutputOptions);
             var updatedRequest = request with { Messages = messages };
 
-            var providerRequest = BuildRequest(updatedRequest);
+            var providerRequest = await BuildRequestAsync(updatedRequest, cancellationToken);
             providerRequest.OutputConfig = BuildOutputConfig(jsonOutputOptions);
 
             var response = await ExecuteAsync(providerRequest, request, cancellationToken);
@@ -94,7 +101,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         {
             toolOptions.Validate();
 
-            var providerRequest = BuildRequest(request);
+            var providerRequest = await BuildRequestAsync(request, cancellationToken);
             providerRequest.Tools = MapToolDefinitions(toolOptions.Tools);
             providerRequest.ToolChoice = MapToolChoice(toolOptions.ToolChoice);
 
@@ -125,6 +132,63 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         }
     }
 
+    public async IAsyncEnumerable<ChatCompletionChunk> GetChatCompletionStreamAsync(
+        ChatCompletionRequest request,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        request = request with { Model = ResolveModel(request.Model) };
+
+        var providerRequest = await BuildRequestAsync(request, cancellationToken);
+        providerRequest.Stream = true;
+
+        string? model = null;
+        int? inputTokens = null;
+
+        await foreach (var json in _client.PostStreamAsync("messages", providerRequest, cancellationToken, request.ExtraParameters))
+        {
+            AnthropicStreamEvent? evt;
+            try
+            {
+                evt = JsonSerializer.Deserialize<AnthropicStreamEvent>(json, StreamJsonOptions);
+            }
+            catch
+            {
+                continue;
+            }
+
+            if (evt is null) continue;
+
+            switch (evt.Type)
+            {
+                case "message_start":
+                    model = evt.Message?.Model;
+                    inputTokens = evt.Message?.Usage?.InputTokens;
+                    break;
+
+                case "content_block_delta":
+                    if (evt.Delta?.Type == "text_delta")
+                    {
+                        yield return new ChatCompletionChunk(
+                            Content: evt.Delta.Text ?? string.Empty,
+                            Model: model);
+                    }
+                    break;
+
+                case "message_delta":
+                    // Contains stop_reason and output_tokens
+                    yield return new ChatCompletionChunk(
+                        Content: string.Empty,
+                        FinishReason: evt.Delta?.StopReason,
+                        Model: model,
+                        PromptTokens: inputTokens,
+                        CompletionTokens: evt.Usage?.OutputTokens);
+                    break;
+
+                // Ignore: ping, content_block_start, content_block_stop, message_stop
+            }
+        }
+    }
+
     private string ResolveModel(string? model)
     {
         return model
@@ -139,7 +203,9 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
     /// </summary>
     public const int DefaultMaxTokens = 8192;
 
-    private AnthropicChatRequest BuildRequest(ChatCompletionRequest request)
+    private async Task<AnthropicChatRequest> BuildRequestAsync(
+        ChatCompletionRequest request,
+        CancellationToken cancellationToken)
     {
         var systemMessage = request.Messages
             .FirstOrDefault(m => m.Role == LlmRole.System)?.Content;
@@ -150,7 +216,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
             Temperature = request.Temperature,
             MaxTokens = request.MaxTokens ?? DefaultMaxTokens,
             System = systemMessage,
-            Messages = MapMessages(request.Messages)
+            Messages = await MapMessagesAsync(request.Messages, cancellationToken)
         };
     }
 
@@ -330,7 +396,9 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         return trimmed.Trim();
     }
 
-    private static List<AnthropicMessage> MapMessages(IReadOnlyList<LlmMessage> messages)
+    private static async Task<List<AnthropicMessage>> MapMessagesAsync(
+        IReadOnlyList<LlmMessage> messages,
+        CancellationToken ct)
     {
         var result = new List<AnthropicMessage>();
 
@@ -384,6 +452,51 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
                 result.Add(new AnthropicMessage
                 {
                     Role = "assistant",
+                    Content = blocks
+                });
+                continue;
+            }
+
+            // Messages with vision content parts
+            if (m.ContentParts is { Count: > 0 })
+            {
+                var blocks = new List<AnthropicContentBlock>();
+                foreach (var part in m.ContentParts)
+                {
+                    switch (part)
+                    {
+                        case TextContentPart text:
+                            blocks.Add(new AnthropicContentBlock { Type = "text", Text = text.Text });
+                            break;
+                        case ImageFileContentPart file:
+                            // Anthropic uses raw base64, NOT data URIs
+                            var bytes = await File.ReadAllBytesAsync(file.FilePath, ct);
+                            blocks.Add(new AnthropicContentBlock
+                            {
+                                Type = "image",
+                                Source = new AnthropicImageSource
+                                {
+                                    MediaType = ImageDataUriHelper.GetMimeType(file.FilePath),
+                                    Data = Convert.ToBase64String(bytes)
+                                }
+                            });
+                            break;
+                        case ImageBase64ContentPart base64:
+                            blocks.Add(new AnthropicContentBlock
+                            {
+                                Type = "image",
+                                Source = new AnthropicImageSource
+                                {
+                                    MediaType = base64.MediaType,
+                                    Data = base64.Base64Data
+                                }
+                            });
+                            break;
+                    }
+                }
+                result.Add(new AnthropicMessage
+                {
+                    Role = MapRole(m.Role),
                     Content = blocks
                 });
                 continue;

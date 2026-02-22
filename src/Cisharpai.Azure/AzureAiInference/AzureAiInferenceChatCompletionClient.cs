@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Cisharpai.Features;
 using Cisharpai.Features.Chat;
@@ -10,8 +11,13 @@ namespace Cisharpai.Azure.AzureAiInference;
 /// Azure AI Inference chat completion client using HttpClient.
 /// Supports Azure AI model-as-a-service offerings including Phi-3, Llama-3, Mistral, and others.
 /// </summary>
-public sealed class AzureAiInferenceChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature
+public sealed class AzureAiInferenceChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature, IStreamingChatFeature
 {
+    private static readonly JsonSerializerOptions StreamJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     private readonly LlmHttpClient _client;
     private readonly AzureAiInferenceClientOptions _options;
 
@@ -27,6 +33,7 @@ public sealed class AzureAiInferenceChatCompletionClient : IChatCompletionClient
         var features = new FeatureCollection();
         features.Set<IJsonOutputFeature>(this);
         features.Set<IToolCallingFeature>(this);
+        features.Set<IStreamingChatFeature>(this);
         Features = features;
     }
 
@@ -36,7 +43,7 @@ public sealed class AzureAiInferenceChatCompletionClient : IChatCompletionClient
     {
         try
         {
-            var messages = MapMessages(request.Messages);
+            var messages = await MapMessagesAsync(request.Messages, cancellationToken);
 
             var modelId = !string.IsNullOrWhiteSpace(request.Model)
                 ? request.Model
@@ -81,7 +88,7 @@ public sealed class AzureAiInferenceChatCompletionClient : IChatCompletionClient
             jsonOutputOptions.Validate();
 
             var adjustedMessages = EnsureJsonKeywordInSystemMessage(request.Messages, jsonOutputOptions);
-            var messages = MapMessages(adjustedMessages);
+            var messages = await MapMessagesAsync(adjustedMessages, cancellationToken);
 
             var modelId = !string.IsNullOrWhiteSpace(request.Model)
                 ? request.Model
@@ -128,7 +135,7 @@ public sealed class AzureAiInferenceChatCompletionClient : IChatCompletionClient
         {
             toolOptions.Validate();
 
-            var messages = MapMessages(request.Messages);
+            var messages = await MapMessagesAsync(request.Messages, cancellationToken);
 
             var modelId = !string.IsNullOrWhiteSpace(request.Model)
                 ? request.Model
@@ -169,6 +176,74 @@ public sealed class AzureAiInferenceChatCompletionClient : IChatCompletionClient
         }
     }
 
+    public async IAsyncEnumerable<ChatCompletionChunk> GetChatCompletionStreamAsync(
+        ChatCompletionRequest request,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var messages = await MapMessagesAsync(request.Messages, cancellationToken);
+        var uri = $"models/chat/completions?api-version={_options.ApiVersion}";
+
+        var modelId = !string.IsNullOrWhiteSpace(request.Model)
+            ? request.Model
+            : _options.ModelId;
+
+        var isReasoning = IsReasoningModel(modelId);
+
+        object providerRequest = isReasoning
+            ? new AzureAiInferenceReasoningChatRequest
+            {
+                Model = modelId,
+                Messages = messages,
+                MaxCompletionTokens = request.MaxTokens,
+                Stream = true,
+                StreamOptions = new AzureAiInferenceStreamOptions { IncludeUsage = true }
+            }
+            : new AzureAiInferenceChatRequest
+            {
+                Model = modelId,
+                Messages = messages,
+                Temperature = request.Temperature,
+                MaxTokens = request.MaxTokens,
+                Stream = true,
+                StreamOptions = new AzureAiInferenceStreamOptions { IncludeUsage = true }
+            };
+
+        await foreach (var json in _client.PostStreamAsync<object>(uri, providerRequest, cancellationToken, request.ExtraParameters))
+        {
+            AzureAiInferenceStreamChunk? chunk;
+            try
+            {
+                chunk = JsonSerializer.Deserialize<AzureAiInferenceStreamChunk>(json, StreamJsonOptions);
+            }
+            catch
+            {
+                continue;
+            }
+
+            if (chunk is null) continue;
+
+            if (chunk.Choices is { Count: > 0 })
+            {
+                var choice = chunk.Choices[0];
+                var toolDelta = MapStreamToolCallDelta(choice.Delta?.ToolCalls);
+                yield return new ChatCompletionChunk(
+                    Content: choice.Delta?.Content ?? string.Empty,
+                    FinishReason: choice.FinishReason,
+                    Model: chunk.Model,
+                    PromptTokens: chunk.Usage?.PromptTokens,
+                    CompletionTokens: chunk.Usage?.CompletionTokens,
+                    ToolCallDelta: toolDelta);
+            }
+            else if (chunk.Usage is not null)
+            {
+                yield return new ChatCompletionChunk(
+                    Content: string.Empty,
+                    PromptTokens: chunk.Usage.PromptTokens,
+                    CompletionTokens: chunk.Usage.CompletionTokens);
+            }
+        }
+    }
+
     private async Task<ChatCompletionResponse> ExecuteRequestAsync(
         object providerRequest,
         ChatCompletionRequest request,
@@ -198,7 +273,7 @@ public sealed class AzureAiInferenceChatCompletionClient : IChatCompletionClient
         var choice = raw.Choices.FirstOrDefault();
 
         return new ChatCompletionResponse(
-            Content: choice?.Message.Content ?? string.Empty,
+            Content: ExtractStringContent(choice?.Message.Content),
             Model: raw.Model,
             PromptTokens: raw.Usage?.PromptTokens ?? 0,
             CompletionTokens: raw.Usage?.CompletionTokens ?? 0,
@@ -244,7 +319,7 @@ public sealed class AzureAiInferenceChatCompletionClient : IChatCompletionClient
         string? rawRequestJson = null)
     {
         var choice = raw.Choices.FirstOrDefault();
-        var content = choice?.Message.Content ?? string.Empty;
+        var content = ExtractStringContent(choice?.Message.Content);
 
         var chatCompletion = new ChatCompletionResponse(
             Content: content,
@@ -257,6 +332,16 @@ public sealed class AzureAiInferenceChatCompletionClient : IChatCompletionClient
         var toolCalls = MapResponseToolCalls(choice?.Message.ToolCalls);
 
         return new ToolCallingResponse(chatCompletion, toolCalls);
+    }
+
+    private static string ExtractStringContent(object? content)
+    {
+        return content switch
+        {
+            string s => s,
+            JsonElement je when je.ValueKind == JsonValueKind.String => je.GetString() ?? string.Empty,
+            _ => string.Empty
+        };
     }
 
     private static IReadOnlyList<ToolCall>? MapResponseToolCalls(List<AzureAiInferenceToolCall>? toolCalls)
@@ -370,41 +455,91 @@ public sealed class AzureAiInferenceChatCompletionClient : IChatCompletionClient
         return result;
     }
 
-    private static List<AzureAiInferenceChatMessage> MapMessages(IReadOnlyList<LlmMessage> messages)
+    private static async Task<List<AzureAiInferenceChatMessage>> MapMessagesAsync(
+        IReadOnlyList<LlmMessage> messages,
+        CancellationToken ct)
     {
-        return messages
-            .Select(m =>
+        var result = new List<AzureAiInferenceChatMessage>();
+
+        foreach (var m in messages)
+        {
+            var msg = new AzureAiInferenceChatMessage { Role = MapRole(m.Role) };
+
+            if (m.ContentParts is { Count: > 0 })
             {
-                var msg = new AzureAiInferenceChatMessage
+                var parts = new List<AzureAiInferenceContentPart>();
+                foreach (var part in m.ContentParts)
                 {
-                    Role = MapRole(m.Role),
-                    Content = m.Content
-                };
-
-                // Tool result message: set tool_call_id, content is the result
-                if (m.Role == LlmRole.Tool && m.ToolCallId is not null)
-                {
-                    msg.ToolCallId = m.ToolCallId;
-                }
-
-                // Assistant message with tool calls
-                if (m.Role == LlmRole.Assistant && m.ToolCalls is not null && m.ToolCalls.Count > 0)
-                {
-                    msg.ToolCalls = m.ToolCalls.Select(tc => new AzureAiInferenceToolCall
+                    switch (part)
                     {
-                        Id = tc.Id,
-                        Type = "function",
-                        Function = new AzureAiInferenceToolCallFunction
-                        {
-                            Name = tc.FunctionName,
-                            Arguments = tc.Arguments.GetRawText()
-                        }
-                    }).ToList();
+                        case TextContentPart text:
+                            parts.Add(new AzureAiInferenceContentPart { Type = "text", Text = text.Text });
+                            break;
+                        case ImageFileContentPart file:
+                            var dataUri = await ImageDataUriHelper.ToDataUriAsync(file.FilePath, ct);
+                            parts.Add(new AzureAiInferenceContentPart
+                            {
+                                Type = "image_url",
+                                ImageUrl = new AzureAiInferenceImageUrl { Url = dataUri }
+                            });
+                            break;
+                        case ImageBase64ContentPart base64:
+                            parts.Add(new AzureAiInferenceContentPart
+                            {
+                                Type = "image_url",
+                                ImageUrl = new AzureAiInferenceImageUrl
+                                {
+                                    Url = $"data:{base64.MediaType};base64,{base64.Base64Data}"
+                                }
+                            });
+                            break;
+                    }
                 }
+                msg.Content = parts;
+            }
+            else
+            {
+                msg.Content = m.Content;
+            }
 
-                return msg;
-            })
-            .ToList();
+            // Tool result message: set tool_call_id, content is the result
+            if (m.Role == LlmRole.Tool && m.ToolCallId is not null)
+            {
+                msg.ToolCallId = m.ToolCallId;
+            }
+
+            // Assistant message with tool calls
+            if (m.Role == LlmRole.Assistant && m.ToolCalls is not null && m.ToolCalls.Count > 0)
+            {
+                msg.ToolCalls = m.ToolCalls.Select(tc => new AzureAiInferenceToolCall
+                {
+                    Id = tc.Id,
+                    Type = "function",
+                    Function = new AzureAiInferenceToolCallFunction
+                    {
+                        Name = tc.FunctionName,
+                        Arguments = tc.Arguments.GetRawText()
+                    }
+                }).ToList();
+            }
+
+            result.Add(msg);
+        }
+
+        return result;
+    }
+
+    private static ToolCallDelta? MapStreamToolCallDelta(List<AzureAiInferenceStreamToolCallDelta>? toolCalls)
+    {
+        if (toolCalls is null || toolCalls.Count == 0)
+            return null;
+
+        var first = toolCalls[0];
+        return new ToolCallDelta(
+            Index: first.Index,
+            Id: first.Id,
+            FunctionName: first.Function?.Name,
+            ArgumentsDelta: first.Function?.Arguments);
     }
 
     private static string MapRole(LlmRole role) => role switch

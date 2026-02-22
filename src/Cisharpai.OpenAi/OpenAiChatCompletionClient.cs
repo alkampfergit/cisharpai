@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Cisharpai.Features;
 using Cisharpai.Features.Chat;
@@ -6,10 +7,15 @@ using Cisharpai.OpenAi.Models;
 
 namespace Cisharpai.OpenAi;
 
-public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature
+public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature, IStreamingChatFeature
 {
     private const string ChatCompletionsEndpoint = "chat/completions";
     private const string ResponsesEndpoint = "responses";
+
+    private static readonly JsonSerializerOptions StreamJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
 
     private readonly LlmHttpClient _client;
     private readonly OpenAiClientOptions _options;
@@ -24,6 +30,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         var features = new FeatureCollection();
         features.Set<IJsonOutputFeature>(this);
         features.Set<IToolCallingFeature>(this);
+        features.Set<IStreamingChatFeature>(this);
         Features = features;
     }
 
@@ -116,6 +123,141 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         }
     }
 
+    public async IAsyncEnumerable<ChatCompletionChunk> GetChatCompletionStreamAsync(
+        ChatCompletionRequest request,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var model = ResolveModel(request.Model);
+        request = request with { Model = model };
+
+        var modelType = DetectModelType(model);
+
+        if (modelType == OpenAiModelType.Gpt5)
+        {
+            await foreach (var chunk in StreamResponsesApiAsync(request, cancellationToken))
+                yield return chunk;
+        }
+        else
+        {
+            await foreach (var chunk in StreamLegacyChatAsync(request, cancellationToken))
+                yield return chunk;
+        }
+    }
+
+    private async IAsyncEnumerable<ChatCompletionChunk> StreamLegacyChatAsync(
+        ChatCompletionRequest request,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        var providerRequest = new OpenAiChatRequest
+        {
+            Model = request.Model,
+            Temperature = request.Temperature,
+            MaxTokens = request.MaxTokens,
+            Messages = await MapMessagesAsync(request.Messages, cancellationToken),
+            Stream = true,
+            StreamOptions = new OpenAiStreamOptions { IncludeUsage = true }
+        };
+
+        await foreach (var json in _client.PostStreamAsync(ChatCompletionsEndpoint, providerRequest, cancellationToken, request.ExtraParameters))
+        {
+            OpenAiStreamChunk? chunk;
+            try
+            {
+                chunk = JsonSerializer.Deserialize<OpenAiStreamChunk>(json, StreamJsonOptions);
+            }
+            catch
+            {
+                continue;
+            }
+
+            if (chunk is null) continue;
+
+            if (chunk.Choices is { Count: > 0 })
+            {
+                var choice = chunk.Choices[0];
+                var toolDelta = MapStreamToolCallDelta(choice.Delta?.ToolCalls);
+                yield return new ChatCompletionChunk(
+                    Content: choice.Delta?.Content ?? string.Empty,
+                    FinishReason: choice.FinishReason,
+                    Model: chunk.Model,
+                    PromptTokens: chunk.Usage?.PromptTokens,
+                    CompletionTokens: chunk.Usage?.CompletionTokens,
+                    ToolCallDelta: toolDelta);
+            }
+            else if (chunk.Usage is not null)
+            {
+                // Usage-only final chunk (when stream_options.include_usage is true)
+                yield return new ChatCompletionChunk(
+                    Content: string.Empty,
+                    PromptTokens: chunk.Usage.PromptTokens,
+                    CompletionTokens: chunk.Usage.CompletionTokens);
+            }
+        }
+    }
+
+    private async IAsyncEnumerable<ChatCompletionChunk> StreamResponsesApiAsync(
+        ChatCompletionRequest request,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        var providerRequest = new OpenAiResponsesApiRequest
+        {
+            Model = request.Model,
+            MaxOutputTokens = request.MaxTokens,
+            Input = await MapMessagesAsync(request.Messages, cancellationToken),
+            Stream = true,
+            Reasoning = _options.ReasoningEffort is not null
+                ? new OpenAiReasoningOption { Effort = _options.ReasoningEffort }
+                : null,
+            Text = _options.TextVerbosity is not null
+                ? new OpenAiTextOption { Verbosity = _options.TextVerbosity }
+                : null
+        };
+
+        string? model = null;
+        int? promptTokens = null;
+        int? completionTokens = null;
+
+        await foreach (var json in _client.PostStreamAsync(ResponsesEndpoint, providerRequest, cancellationToken, request.ExtraParameters))
+        {
+            OpenAiResponsesStreamEvent? evt;
+            try
+            {
+                evt = JsonSerializer.Deserialize<OpenAiResponsesStreamEvent>(json, StreamJsonOptions);
+            }
+            catch
+            {
+                continue;
+            }
+
+            if (evt is null) continue;
+
+            switch (evt.Type)
+            {
+                case "response.output_text.delta":
+                    yield return new ChatCompletionChunk(
+                        Content: evt.Delta ?? string.Empty,
+                        Model: model);
+                    break;
+
+                case "response.completed":
+                    if (evt.Response is not null)
+                    {
+                        model = evt.Response.Model;
+                        promptTokens = evt.Response.Usage?.InputTokens;
+                        completionTokens = evt.Response.Usage?.OutputTokens;
+
+                        yield return new ChatCompletionChunk(
+                            Content: string.Empty,
+                            FinishReason: evt.Response.Status,
+                            Model: model,
+                            PromptTokens: promptTokens,
+                            CompletionTokens: completionTokens);
+                    }
+                    break;
+            }
+        }
+    }
+
     private async Task<ChatCompletionResponse> SendLegacyChatAsync(
         ChatCompletionRequest request,
         CancellationToken cancellationToken)
@@ -125,7 +267,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
             Model = request.Model,
             Temperature = request.Temperature,
             MaxTokens = request.MaxTokens,
-            Messages = MapMessages(request.Messages)
+            Messages = await MapMessagesAsync(request.Messages, cancellationToken)
         };
 
         if (request.IncludeRawResponse)
@@ -152,7 +294,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
             Model = request.Model,
             Temperature = request.Temperature,
             MaxTokens = request.MaxTokens,
-            Messages = MapMessages(messages),
+            Messages = await MapMessagesAsync(messages, cancellationToken),
             ResponseFormat = BuildChatCompletionsResponseFormat(jsonOptions)
         };
 
@@ -178,7 +320,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
             Model = request.Model,
             Temperature = request.Temperature,
             MaxTokens = request.MaxTokens,
-            Messages = MapMessages(request.Messages),
+            Messages = await MapMessagesAsync(request.Messages, cancellationToken),
             Tools = MapToolDefinitions(toolOptions.Tools),
             ToolChoice = MapToolChoice(toolOptions.ToolChoice)
         };
@@ -194,7 +336,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         {
             Model = request.Model,
             MaxCompletionTokens = request.MaxTokens,
-            Messages = MapMessages(request.Messages)
+            Messages = await MapMessagesAsync(request.Messages, cancellationToken)
         };
 
         if (request.IncludeRawResponse)
@@ -220,7 +362,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         {
             Model = request.Model,
             MaxCompletionTokens = request.MaxTokens,
-            Messages = MapMessages(messages),
+            Messages = await MapMessagesAsync(messages, cancellationToken),
             ResponseFormat = BuildChatCompletionsResponseFormat(jsonOptions)
         };
 
@@ -245,7 +387,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         {
             Model = request.Model,
             MaxCompletionTokens = request.MaxTokens,
-            Messages = MapMessages(request.Messages),
+            Messages = await MapMessagesAsync(request.Messages, cancellationToken),
             Tools = MapToolDefinitions(toolOptions.Tools),
             ToolChoice = MapToolChoice(toolOptions.ToolChoice)
         };
@@ -299,7 +441,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         {
             Model = request.Model,
             MaxOutputTokens = request.MaxTokens,
-            Input = MapMessages(request.Messages),
+            Input = await MapMessagesAsync(request.Messages, cancellationToken),
             Reasoning = _options.ReasoningEffort is not null
                 ? new OpenAiReasoningOption { Effort = _options.ReasoningEffort }
                 : null,
@@ -328,7 +470,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         {
             Model = request.Model,
             MaxOutputTokens = request.MaxTokens,
-            Input = MapMessages(messages),
+            Input = await MapMessagesAsync(messages, cancellationToken),
             Reasoning = _options.ReasoningEffort is not null
                 ? new OpenAiReasoningOption { Effort = _options.ReasoningEffort }
                 : null,
@@ -400,7 +542,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         var refusal = choice?.Message.Refusal;
 
         return new ChatCompletionResponse(
-            Content: choice?.Message.Content ?? string.Empty,
+            Content: ExtractStringContent(choice?.Message.Content),
             Model: raw.Model,
             PromptTokens: raw.Usage.PromptTokens,
             CompletionTokens: raw.Usage.CompletionTokens,
@@ -415,7 +557,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         string? rawRequestJson = null)
     {
         var choice = raw.Choices.FirstOrDefault();
-        var content = choice?.Message.Content ?? string.Empty;
+        var content = ExtractStringContent(choice?.Message.Content);
 
         var chatCompletion = new ChatCompletionResponse(
             Content: content,
@@ -558,41 +700,101 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         return result;
     }
 
-    private static List<OpenAiChatMessage> MapMessages(IReadOnlyList<LlmMessage> messages)
+    private static async Task<List<OpenAiChatMessage>> MapMessagesAsync(
+        IReadOnlyList<LlmMessage> messages,
+        CancellationToken ct)
     {
-        return messages
-            .Select(m =>
+        var result = new List<OpenAiChatMessage>();
+
+        foreach (var m in messages)
+        {
+            var msg = new OpenAiChatMessage { Role = MapRole(m.Role) };
+
+            if (m.ContentParts is { Count: > 0 })
             {
-                var msg = new OpenAiChatMessage
+                var parts = new List<OpenAiContentPart>();
+                foreach (var part in m.ContentParts)
                 {
-                    Role = MapRole(m.Role),
-                    Content = m.Content
-                };
-
-                // Tool result message: set tool_call_id, content is the result
-                if (m.Role == LlmRole.Tool && m.ToolCallId is not null)
-                {
-                    msg.ToolCallId = m.ToolCallId;
-                }
-
-                // Assistant message with tool calls
-                if (m.Role == LlmRole.Assistant && m.ToolCalls is not null && m.ToolCalls.Count > 0)
-                {
-                    msg.ToolCalls = m.ToolCalls.Select(tc => new OpenAiToolCall
+                    switch (part)
                     {
-                        Id = tc.Id,
-                        Type = "function",
-                        Function = new OpenAiToolCallFunction
-                        {
-                            Name = tc.FunctionName,
-                            Arguments = tc.Arguments.GetRawText()
-                        }
-                    }).ToList();
+                        case TextContentPart text:
+                            parts.Add(new OpenAiContentPart { Type = "text", Text = text.Text });
+                            break;
+                        case ImageFileContentPart file:
+                            var dataUri = await ImageDataUriHelper.ToDataUriAsync(file.FilePath, ct);
+                            parts.Add(new OpenAiContentPart
+                            {
+                                Type = "image_url",
+                                ImageUrl = new OpenAiImageUrl { Url = dataUri }
+                            });
+                            break;
+                        case ImageBase64ContentPart base64:
+                            parts.Add(new OpenAiContentPart
+                            {
+                                Type = "image_url",
+                                ImageUrl = new OpenAiImageUrl
+                                {
+                                    Url = $"data:{base64.MediaType};base64,{base64.Base64Data}"
+                                }
+                            });
+                            break;
+                    }
                 }
+                msg.Content = parts;
+            }
+            else
+            {
+                msg.Content = m.Content;
+            }
 
-                return msg;
-            })
-            .ToList();
+            // Tool result message: set tool_call_id, content is the result
+            if (m.Role == LlmRole.Tool && m.ToolCallId is not null)
+            {
+                msg.ToolCallId = m.ToolCallId;
+            }
+
+            // Assistant message with tool calls
+            if (m.Role == LlmRole.Assistant && m.ToolCalls is not null && m.ToolCalls.Count > 0)
+            {
+                msg.ToolCalls = m.ToolCalls.Select(tc => new OpenAiToolCall
+                {
+                    Id = tc.Id,
+                    Type = "function",
+                    Function = new OpenAiToolCallFunction
+                    {
+                        Name = tc.FunctionName,
+                        Arguments = tc.Arguments.GetRawText()
+                    }
+                }).ToList();
+            }
+
+            result.Add(msg);
+        }
+
+        return result;
+    }
+
+    private static ToolCallDelta? MapStreamToolCallDelta(List<OpenAiStreamToolCallDelta>? toolCalls)
+    {
+        if (toolCalls is null || toolCalls.Count == 0)
+            return null;
+
+        var first = toolCalls[0];
+        return new ToolCallDelta(
+            Index: first.Index,
+            Id: first.Id,
+            FunctionName: first.Function?.Name,
+            ArgumentsDelta: first.Function?.Arguments);
+    }
+
+    private static string ExtractStringContent(object? content)
+    {
+        return content switch
+        {
+            string s => s,
+            System.Text.Json.JsonElement je when je.ValueKind == System.Text.Json.JsonValueKind.String => je.GetString() ?? string.Empty,
+            _ => string.Empty
+        };
     }
 
     private static string MapRole(LlmRole role) => role switch

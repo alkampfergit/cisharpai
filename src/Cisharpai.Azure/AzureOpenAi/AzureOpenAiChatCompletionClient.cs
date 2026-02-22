@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Cisharpai.Features;
 using Cisharpai.Features.Chat;
@@ -10,8 +11,13 @@ namespace Cisharpai.Azure.AzureOpenAi;
 /// Azure OpenAI chat completion client using HttpClient.
 /// Supports both legacy models (GPT-4) and reasoning models (o1/o3/o4/GPT-5).
 /// </summary>
-public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature
+public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature, IStreamingChatFeature
 {
+    private static readonly JsonSerializerOptions StreamJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     private readonly LlmHttpClient _client;
     private readonly AzureOpenAiClientOptions _options;
 
@@ -27,6 +33,7 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         var features = new FeatureCollection();
         features.Set<IJsonOutputFeature>(this);
         features.Set<IToolCallingFeature>(this);
+        features.Set<IStreamingChatFeature>(this);
         Features = features;
     }
 
@@ -37,7 +44,7 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         try
         {
             var model = ResolveModel(request.Model);
-            var messages = MapMessages(request.Messages);
+            var messages = await MapMessagesAsync(request.Messages, cancellationToken);
             var isReasoning = IsReasoningModel(model);
 
             object providerRequest = isReasoning
@@ -76,7 +83,7 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
 
             var model = ResolveModel(request.Model);
             var adjustedMessages = EnsureJsonKeywordInSystemMessage(request.Messages, jsonOutputOptions);
-            var messages = MapMessages(adjustedMessages);
+            var messages = await MapMessagesAsync(adjustedMessages, cancellationToken);
             var isReasoning = IsReasoningModel(model);
             var responseFormat = BuildResponseFormat(jsonOutputOptions);
 
@@ -117,7 +124,7 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
             toolOptions.Validate();
 
             var model = ResolveModel(request.Model);
-            var messages = MapMessages(request.Messages);
+            var messages = await MapMessagesAsync(request.Messages, cancellationToken);
             var isReasoning = IsReasoningModel(model);
             var tools = MapToolDefinitions(toolOptions.Tools);
             var toolChoice = MapToolChoice(toolOptions.ToolChoice);
@@ -151,6 +158,68 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         }
     }
 
+    public async IAsyncEnumerable<ChatCompletionChunk> GetChatCompletionStreamAsync(
+        ChatCompletionRequest request,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var model = ResolveModel(request.Model);
+        var messages = await MapMessagesAsync(request.Messages, cancellationToken);
+        var isReasoning = IsReasoningModel(model);
+        var uri = $"openai/deployments/{_options.DeploymentName}/chat/completions?api-version={_options.ApiVersion}";
+
+        object providerRequest = isReasoning
+            ? new AzureOpenAiReasoningChatRequest
+            {
+                Messages = messages,
+                MaxCompletionTokens = request.MaxTokens,
+                Stream = true,
+                StreamOptions = new AzureOpenAiStreamOptions { IncludeUsage = true }
+            }
+            : new AzureOpenAiChatRequest
+            {
+                Temperature = request.Temperature,
+                MaxTokens = request.MaxTokens,
+                Messages = messages,
+                Stream = true,
+                StreamOptions = new AzureOpenAiStreamOptions { IncludeUsage = true }
+            };
+
+        await foreach (var json in _client.PostStreamAsync<object>(uri, providerRequest, cancellationToken, request.ExtraParameters))
+        {
+            AzureOpenAiStreamChunk? chunk;
+            try
+            {
+                chunk = JsonSerializer.Deserialize<AzureOpenAiStreamChunk>(json, StreamJsonOptions);
+            }
+            catch
+            {
+                continue;
+            }
+
+            if (chunk is null) continue;
+
+            if (chunk.Choices is { Count: > 0 })
+            {
+                var choice = chunk.Choices[0];
+                var toolDelta = MapStreamToolCallDelta(choice.Delta?.ToolCalls);
+                yield return new ChatCompletionChunk(
+                    Content: choice.Delta?.Content ?? string.Empty,
+                    FinishReason: choice.FinishReason,
+                    Model: chunk.Model,
+                    PromptTokens: chunk.Usage?.PromptTokens,
+                    CompletionTokens: chunk.Usage?.CompletionTokens,
+                    ToolCallDelta: toolDelta);
+            }
+            else if (chunk.Usage is not null)
+            {
+                yield return new ChatCompletionChunk(
+                    Content: string.Empty,
+                    PromptTokens: chunk.Usage.PromptTokens,
+                    CompletionTokens: chunk.Usage.CompletionTokens);
+            }
+        }
+    }
+
     private async Task<ChatCompletionResponse> ExecuteRequestAsync(
         object providerRequest,
         ChatCompletionRequest request,
@@ -176,7 +245,7 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         var choice = raw.Choices.FirstOrDefault();
 
         return new ChatCompletionResponse(
-            Content: choice?.Message.Content ?? string.Empty,
+            Content: ExtractStringContent(choice?.Message.Content),
             Model: raw.Model,
             PromptTokens: raw.Usage.PromptTokens,
             CompletionTokens: raw.Usage.CompletionTokens,
@@ -216,7 +285,7 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         string? rawRequestJson = null)
     {
         var choice = raw.Choices.FirstOrDefault();
-        var content = choice?.Message.Content ?? string.Empty;
+        var content = ExtractStringContent(choice?.Message.Content);
 
         var chatCompletion = new ChatCompletionResponse(
             Content: content,
@@ -229,6 +298,16 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         var toolCalls = MapResponseToolCalls(choice?.Message.ToolCalls);
 
         return new ToolCallingResponse(chatCompletion, toolCalls);
+    }
+
+    private static string ExtractStringContent(object? content)
+    {
+        return content switch
+        {
+            string s => s,
+            System.Text.Json.JsonElement je when je.ValueKind == System.Text.Json.JsonValueKind.String => je.GetString() ?? string.Empty,
+            _ => string.Empty
+        };
     }
 
     private static IReadOnlyList<ToolCall>? MapResponseToolCalls(List<AzureOpenAiToolCall>? toolCalls)
@@ -342,41 +421,91 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         return result;
     }
 
-    private static List<AzureOpenAiChatMessage> MapMessages(IReadOnlyList<LlmMessage> messages)
+    private static async Task<List<AzureOpenAiChatMessage>> MapMessagesAsync(
+        IReadOnlyList<LlmMessage> messages,
+        CancellationToken ct)
     {
-        return messages
-            .Select(m =>
+        var result = new List<AzureOpenAiChatMessage>();
+
+        foreach (var m in messages)
+        {
+            var msg = new AzureOpenAiChatMessage { Role = MapRole(m.Role) };
+
+            if (m.ContentParts is { Count: > 0 })
             {
-                var msg = new AzureOpenAiChatMessage
+                var parts = new List<AzureOpenAiContentPart>();
+                foreach (var part in m.ContentParts)
                 {
-                    Role = MapRole(m.Role),
-                    Content = m.Content
-                };
-
-                // Tool result message: set tool_call_id, content is the result
-                if (m.Role == LlmRole.Tool && m.ToolCallId is not null)
-                {
-                    msg.ToolCallId = m.ToolCallId;
-                }
-
-                // Assistant message with tool calls
-                if (m.Role == LlmRole.Assistant && m.ToolCalls is not null && m.ToolCalls.Count > 0)
-                {
-                    msg.ToolCalls = m.ToolCalls.Select(tc => new AzureOpenAiToolCall
+                    switch (part)
                     {
-                        Id = tc.Id,
-                        Type = "function",
-                        Function = new AzureOpenAiToolCallFunction
-                        {
-                            Name = tc.FunctionName,
-                            Arguments = tc.Arguments.GetRawText()
-                        }
-                    }).ToList();
+                        case TextContentPart text:
+                            parts.Add(new AzureOpenAiContentPart { Type = "text", Text = text.Text });
+                            break;
+                        case ImageFileContentPart file:
+                            var dataUri = await ImageDataUriHelper.ToDataUriAsync(file.FilePath, ct);
+                            parts.Add(new AzureOpenAiContentPart
+                            {
+                                Type = "image_url",
+                                ImageUrl = new AzureOpenAiImageUrl { Url = dataUri }
+                            });
+                            break;
+                        case ImageBase64ContentPart base64:
+                            parts.Add(new AzureOpenAiContentPart
+                            {
+                                Type = "image_url",
+                                ImageUrl = new AzureOpenAiImageUrl
+                                {
+                                    Url = $"data:{base64.MediaType};base64,{base64.Base64Data}"
+                                }
+                            });
+                            break;
+                    }
                 }
+                msg.Content = parts;
+            }
+            else
+            {
+                msg.Content = m.Content;
+            }
 
-                return msg;
-            })
-            .ToList();
+            // Tool result message: set tool_call_id, content is the result
+            if (m.Role == LlmRole.Tool && m.ToolCallId is not null)
+            {
+                msg.ToolCallId = m.ToolCallId;
+            }
+
+            // Assistant message with tool calls
+            if (m.Role == LlmRole.Assistant && m.ToolCalls is not null && m.ToolCalls.Count > 0)
+            {
+                msg.ToolCalls = m.ToolCalls.Select(tc => new AzureOpenAiToolCall
+                {
+                    Id = tc.Id,
+                    Type = "function",
+                    Function = new AzureOpenAiToolCallFunction
+                    {
+                        Name = tc.FunctionName,
+                        Arguments = tc.Arguments.GetRawText()
+                    }
+                }).ToList();
+            }
+
+            result.Add(msg);
+        }
+
+        return result;
+    }
+
+    private static ToolCallDelta? MapStreamToolCallDelta(List<AzureOpenAiStreamToolCallDelta>? toolCalls)
+    {
+        if (toolCalls is null || toolCalls.Count == 0)
+            return null;
+
+        var first = toolCalls[0];
+        return new ToolCallDelta(
+            Index: first.Index,
+            Id: first.Id,
+            FunctionName: first.Function?.Name,
+            ArgumentsDelta: first.Function?.Arguments);
     }
 
     private static string MapRole(LlmRole role) => role switch

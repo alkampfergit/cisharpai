@@ -7,7 +7,7 @@ public sealed class OpenAiChatMessage
     public string Role { get; set; } = string.Empty;
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public string? Content { get; set; }
+    public object? Content { get; set; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Refusal { get; set; }
