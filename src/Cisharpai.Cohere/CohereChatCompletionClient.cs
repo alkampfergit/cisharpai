@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Cisharpai.Features;
@@ -7,11 +8,16 @@ using Cisharpai.Cohere.Models;
 
 namespace Cisharpai.Cohere;
 
-public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IGroundedChatFeature, IToolCallingFeature
+public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IGroundedChatFeature, IToolCallingFeature, IStreamingChatFeature
 {
     private const string ChatEndpoint = "chat";
     private readonly LlmHttpClient _client;
     private readonly CohereClientOptions _options;
+
+    private static readonly JsonSerializerOptions StreamJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
 
     public IFeatureCollection Features { get; }
 
@@ -28,6 +34,7 @@ public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOut
         features.Set<IJsonOutputFeature>(this);
         features.Set<IGroundedChatFeature>(this);
         features.Set<IToolCallingFeature>(this);
+        features.Set<IStreamingChatFeature>(this);
         Features = features;
     }
 
@@ -191,6 +198,65 @@ public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOut
         }
     }
 
+    public async IAsyncEnumerable<ChatCompletionChunk> GetChatCompletionStreamAsync(
+        ChatCompletionRequest request,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        request = request with { Model = ResolveModel(request.Model) };
+
+        var providerRequest = BuildRequest(request);
+        providerRequest.Stream = true;
+
+        string? model = null;
+        int? inputTokens = null;
+
+        await foreach (var json in _client.PostStreamAsync(ChatEndpoint, providerRequest, cancellationToken, request.ExtraParameters))
+        {
+            CohereStreamEvent? evt;
+            try
+            {
+                evt = JsonSerializer.Deserialize<CohereStreamEvent>(json, StreamJsonOptions);
+            }
+            catch
+            {
+                continue;
+            }
+
+            if (evt is null) continue;
+
+            switch (evt.Type)
+            {
+                case "stream-start":
+                    // No useful metadata in Cohere stream-start
+                    model = request.Model;
+                    break;
+
+                case "content-delta":
+                    var text = evt.Delta?.Message?.Content?.Text;
+                    if (text is not null)
+                    {
+                        yield return new ChatCompletionChunk(
+                            Content: text,
+                            Model: model);
+                    }
+                    break;
+
+                case "message-end":
+                    var finishReason = evt.Delta?.FinishReason;
+                    var outputTokens = evt.Delta?.Usage?.BilledUnits?.OutputTokens;
+                    inputTokens = evt.Delta?.Usage?.BilledUnits?.InputTokens;
+
+                    yield return new ChatCompletionChunk(
+                        Content: string.Empty,
+                        FinishReason: finishReason,
+                        Model: model,
+                        PromptTokens: inputTokens,
+                        CompletionTokens: outputTokens);
+                    break;
+            }
+        }
+    }
+
     private string ResolveModel(string? model)
     {
         return model
@@ -329,7 +395,7 @@ public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOut
             var msg = new CohereChatMessage
             {
                 Role = MapRole(m.Role),
-                Content = m.Content
+                Content = ExtractTextContent(m)
             };
 
             // Tool result message: set tool_call_id
@@ -355,6 +421,25 @@ public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOut
 
             return msg;
         }).ToList();
+    }
+
+    /// <summary>
+    /// Extracts text content from an LlmMessage. For messages with ContentParts,
+    /// only text parts are used (image parts are silently skipped as Cohere chat
+    /// does not support vision). If ContentParts contains only images with no text,
+    /// returns an empty string rather than throwing.
+    /// </summary>
+    private static string? ExtractTextContent(LlmMessage message)
+    {
+        if (message.ContentParts is { Count: > 0 })
+        {
+            var textParts = message.ContentParts.OfType<TextContentPart>().ToList();
+            if (textParts.Count == 0)
+                return string.Empty;
+            return string.Join("", textParts.Select(t => t.Text));
+        }
+
+        return message.Content;
     }
 
     private static CohereChatResponseFormat? BuildResponseFormat(JsonOutputOptions options)
