@@ -1,8 +1,14 @@
-namespace Cisharpai.Cohere;
+namespace Cisharpai;
 
-internal static class ImageDataUriHelper
+/// <summary>
+/// Utility for converting image file paths to data URIs and detecting MIME types.
+/// </summary>
+public static class ImageDataUriHelper
 {
-    internal static async Task<string> ToDataUriAsync(
+    /// <summary>
+    /// Reads an image file and returns it as a data URI string (data:{mime};base64,{base64data}).
+    /// </summary>
+    public static async Task<string> ToDataUriAsync(
         string imagePath,
         CancellationToken cancellationToken = default)
     {
@@ -12,7 +18,10 @@ internal static class ImageDataUriHelper
         return $"data:{mime};base64,{base64}";
     }
 
-    internal static string GetMimeType(string path)
+    /// <summary>
+    /// Returns the MIME type for a given image file path based on its extension.
+    /// </summary>
+    public static string GetMimeType(string path)
     {
         var ext = Path.GetExtension(path).ToLowerInvariant();
         return ext switch

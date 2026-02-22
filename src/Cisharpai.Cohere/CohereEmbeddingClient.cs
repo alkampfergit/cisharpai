@@ -4,6 +4,7 @@ using Cisharpai.Features;
 using Cisharpai.Features.Embeddings;
 using Cisharpai.Models;
 using Cisharpai.Cohere.Models;
+using Cisharpai;
 
 namespace Cisharpai.Cohere;
 

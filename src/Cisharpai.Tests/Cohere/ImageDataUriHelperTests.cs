@@ -1,5 +1,3 @@
-using Cisharpai.Cohere;
-
 namespace Cisharpai.Tests.Cohere;
 
 public sealed class ImageDataUriHelperTests
