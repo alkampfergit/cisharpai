@@ -31,7 +31,8 @@
       "Bash(/home/vscode/.local/bin/bd migrate:*)",
       "Bash(/home/vscode/.local/bin/bd list:*)",
       "Bash(/home/vscode/.local/bin/bd:*)",
-      "Bash(dotnet restore:*)"
+      "Bash(dotnet restore:*)",
+      "Bash(code:*)"
     ]
   }
 }
