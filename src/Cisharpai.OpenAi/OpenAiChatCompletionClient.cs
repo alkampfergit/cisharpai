@@ -150,7 +150,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
     {
         var providerRequest = new OpenAiChatRequest
         {
-            Model = request.Model,
+            Model = request.Model!,
             Temperature = request.Temperature,
             MaxTokens = request.MaxTokens,
             Messages = await MapMessagesAsync(request.Messages, cancellationToken),
@@ -201,7 +201,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
     {
         var providerRequest = new OpenAiResponsesApiRequest
         {
-            Model = request.Model,
+            Model = request.Model!,
             MaxOutputTokens = request.MaxTokens,
             Input = await MapMessagesAsync(request.Messages, cancellationToken),
             Stream = true,
@@ -264,7 +264,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
     {
         var providerRequest = new OpenAiChatRequest
         {
-            Model = request.Model,
+            Model = request.Model!,
             Temperature = request.Temperature,
             MaxTokens = request.MaxTokens,
             Messages = await MapMessagesAsync(request.Messages, cancellationToken)
@@ -291,7 +291,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
 
         var providerRequest = new OpenAiChatRequest
         {
-            Model = request.Model,
+            Model = request.Model!,
             Temperature = request.Temperature,
             MaxTokens = request.MaxTokens,
             Messages = await MapMessagesAsync(messages, cancellationToken),
@@ -317,7 +317,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
     {
         var providerRequest = new OpenAiChatRequest
         {
-            Model = request.Model,
+            Model = request.Model!,
             Temperature = request.Temperature,
             MaxTokens = request.MaxTokens,
             Messages = await MapMessagesAsync(request.Messages, cancellationToken),
@@ -334,7 +334,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
     {
         var providerRequest = new OpenAiReasoningRequest
         {
-            Model = request.Model,
+            Model = request.Model!,
             MaxCompletionTokens = request.MaxTokens,
             Messages = await MapMessagesAsync(request.Messages, cancellationToken)
         };
@@ -360,7 +360,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
 
         var providerRequest = new OpenAiReasoningRequest
         {
-            Model = request.Model,
+            Model = request.Model!,
             MaxCompletionTokens = request.MaxTokens,
             Messages = await MapMessagesAsync(messages, cancellationToken),
             ResponseFormat = BuildChatCompletionsResponseFormat(jsonOptions)
@@ -385,7 +385,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
     {
         var providerRequest = new OpenAiReasoningRequest
         {
-            Model = request.Model,
+            Model = request.Model!,
             MaxCompletionTokens = request.MaxTokens,
             Messages = await MapMessagesAsync(request.Messages, cancellationToken),
             Tools = MapToolDefinitions(toolOptions.Tools),
@@ -439,7 +439,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
     {
         var providerRequest = new OpenAiResponsesApiRequest
         {
-            Model = request.Model,
+            Model = request.Model!,
             MaxOutputTokens = request.MaxTokens,
             Input = await MapMessagesAsync(request.Messages, cancellationToken),
             Reasoning = _options.ReasoningEffort is not null
@@ -468,7 +468,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
 
         var providerRequest = new OpenAiResponsesApiRequest
         {
-            Model = request.Model,
+            Model = request.Model!,
             MaxOutputTokens = request.MaxTokens,
             Input = await MapMessagesAsync(messages, cancellationToken),
             Reasoning = _options.ReasoningEffort is not null
@@ -711,67 +711,69 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
             var msg = new OpenAiChatMessage { Role = MapRole(m.Role) };
 
             if (m.ContentParts is { Count: > 0 })
-            {
-                var parts = new List<OpenAiContentPart>();
-                foreach (var part in m.ContentParts)
-                {
-                    switch (part)
-                    {
-                        case TextContentPart text:
-                            parts.Add(new OpenAiContentPart { Type = "text", Text = text.Text });
-                            break;
-                        case ImageFileContentPart file:
-                            var dataUri = await ImageDataUriHelper.ToDataUriAsync(file.FilePath, ct);
-                            parts.Add(new OpenAiContentPart
-                            {
-                                Type = "image_url",
-                                ImageUrl = new OpenAiImageUrl { Url = dataUri }
-                            });
-                            break;
-                        case ImageBase64ContentPart base64:
-                            parts.Add(new OpenAiContentPart
-                            {
-                                Type = "image_url",
-                                ImageUrl = new OpenAiImageUrl
-                                {
-                                    Url = $"data:{base64.MediaType};base64,{base64.Base64Data}"
-                                }
-                            });
-                            break;
-                    }
-                }
-                msg.Content = parts;
-            }
+                msg.Content = await MapContentPartsAsync(m.ContentParts, ct);
             else
-            {
                 msg.Content = m.Content;
-            }
 
-            // Tool result message: set tool_call_id, content is the result
             if (m.Role == LlmRole.Tool && m.ToolCallId is not null)
-            {
                 msg.ToolCallId = m.ToolCallId;
-            }
 
-            // Assistant message with tool calls
-            if (m.Role == LlmRole.Assistant && m.ToolCalls is not null && m.ToolCalls.Count > 0)
-            {
-                msg.ToolCalls = m.ToolCalls.Select(tc => new OpenAiToolCall
-                {
-                    Id = tc.Id,
-                    Type = "function",
-                    Function = new OpenAiToolCallFunction
-                    {
-                        Name = tc.FunctionName,
-                        Arguments = tc.Arguments.GetRawText()
-                    }
-                }).ToList();
-            }
+            if (m.Role == LlmRole.Assistant && m.ToolCalls is { Count: > 0 })
+                msg.ToolCalls = MapToolCalls(m.ToolCalls);
 
             result.Add(msg);
         }
 
         return result;
+    }
+
+    private static async Task<List<OpenAiContentPart>> MapContentPartsAsync(
+        IReadOnlyList<MessageContentPart> contentParts,
+        CancellationToken ct)
+    {
+        var parts = new List<OpenAiContentPart>();
+        foreach (var part in contentParts)
+        {
+            switch (part)
+            {
+                case TextContentPart text:
+                    parts.Add(new OpenAiContentPart { Type = "text", Text = text.Text });
+                    break;
+                case ImageFileContentPart file:
+                    var dataUri = await ImageDataUriHelper.ToDataUriAsync(file.FilePath, ct);
+                    parts.Add(new OpenAiContentPart
+                    {
+                        Type = "image_url",
+                        ImageUrl = new OpenAiImageUrl { Url = dataUri }
+                    });
+                    break;
+                case ImageBase64ContentPart base64:
+                    parts.Add(new OpenAiContentPart
+                    {
+                        Type = "image_url",
+                        ImageUrl = new OpenAiImageUrl
+                        {
+                            Url = $"data:{base64.MediaType};base64,{base64.Base64Data}"
+                        }
+                    });
+                    break;
+            }
+        }
+        return parts;
+    }
+
+    private static List<OpenAiToolCall> MapToolCalls(IReadOnlyList<ToolCall> toolCalls)
+    {
+        return toolCalls.Select(tc => new OpenAiToolCall
+        {
+            Id = tc.Id,
+            Type = "function",
+            Function = new OpenAiToolCallFunction
+            {
+                Name = tc.FunctionName,
+                Arguments = tc.Arguments.GetRawText()
+            }
+        }).ToList();
     }
 
     private static ToolCallDelta? MapStreamToolCallDelta(List<OpenAiStreamToolCallDelta>? toolCalls)

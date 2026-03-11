@@ -18,8 +18,8 @@ public sealed class OpenAiStreamingScenario : IScenario
         var apiKey = ScenarioHelpers.RequireEnv(DotEnv.OpenAiApiKey);
         var baseUrl = ScenarioHelpers.GetEnv(DotEnv.OpenAiBaseUrl);
 
-        var model = AnsiConsole.Ask("Model?", "gpt-4.1-nano");
-        var prompt = AnsiConsole.Ask("User prompt?", "Write a short poem about the ocean.");
+        var model = await AnsiConsole.AskAsync("Model?", "gpt-4.1-nano", cancellationToken);
+        var prompt = await AnsiConsole.AskAsync("User prompt?", "Write a short poem about the ocean.", cancellationToken);
 
         var services = ScenarioHelpers.CreateServiceCollection();
         services.AddOpenAiClient(options =>

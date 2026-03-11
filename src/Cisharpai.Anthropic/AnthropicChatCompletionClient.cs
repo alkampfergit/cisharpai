@@ -407,102 +407,28 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
             if (m.Role == LlmRole.System)
                 continue; // System messages are handled via the top-level system field
 
-            // Tool result messages: convert to user role with tool_result content blocks
             if (m.Role == LlmRole.Tool && m.ToolCallId is not null)
             {
-                result.Add(new AnthropicMessage
-                {
-                    Role = "user",
-                    Content = new List<AnthropicContentBlock>
-                    {
-                        new()
-                        {
-                            Type = "tool_result",
-                            ToolUseId = m.ToolCallId,
-                            Content = m.Content
-                        }
-                    }
-                });
+                result.Add(MapToolResultMessage(m));
                 continue;
             }
 
-            // Assistant message with tool calls: serialize as tool_use content blocks
-            if (m.Role == LlmRole.Assistant && m.ToolCalls is not null && m.ToolCalls.Count > 0)
+            if (m.Role == LlmRole.Assistant && m.ToolCalls is { Count: > 0 })
             {
-                var blocks = new List<AnthropicContentBlock>();
-
-                // If there's text content, add it as a text block
-                if (!string.IsNullOrEmpty(m.Content))
-                {
-                    blocks.Add(new AnthropicContentBlock { Type = "text", Text = m.Content });
-                }
-
-                // Add tool_use blocks
-                foreach (var tc in m.ToolCalls)
-                {
-                    blocks.Add(new AnthropicContentBlock
-                    {
-                        Type = "tool_use",
-                        Id = tc.Id,
-                        Name = tc.FunctionName,
-                        Input = tc.Arguments
-                    });
-                }
-
-                result.Add(new AnthropicMessage
-                {
-                    Role = "assistant",
-                    Content = blocks
-                });
+                result.Add(MapAssistantToolCallMessage(m));
                 continue;
             }
 
-            // Messages with vision content parts
             if (m.ContentParts is { Count: > 0 })
             {
-                var blocks = new List<AnthropicContentBlock>();
-                foreach (var part in m.ContentParts)
-                {
-                    switch (part)
-                    {
-                        case TextContentPart text:
-                            blocks.Add(new AnthropicContentBlock { Type = "text", Text = text.Text });
-                            break;
-                        case ImageFileContentPart file:
-                            // Anthropic uses raw base64, NOT data URIs
-                            var bytes = await File.ReadAllBytesAsync(file.FilePath, ct);
-                            blocks.Add(new AnthropicContentBlock
-                            {
-                                Type = "image",
-                                Source = new AnthropicImageSource
-                                {
-                                    MediaType = ImageDataUriHelper.GetMimeType(file.FilePath),
-                                    Data = Convert.ToBase64String(bytes)
-                                }
-                            });
-                            break;
-                        case ImageBase64ContentPart base64:
-                            blocks.Add(new AnthropicContentBlock
-                            {
-                                Type = "image",
-                                Source = new AnthropicImageSource
-                                {
-                                    MediaType = base64.MediaType,
-                                    Data = base64.Base64Data
-                                }
-                            });
-                            break;
-                    }
-                }
                 result.Add(new AnthropicMessage
                 {
                     Role = MapRole(m.Role),
-                    Content = blocks
+                    Content = await MapContentPartsAsync(m.ContentParts, ct)
                 });
                 continue;
             }
 
-            // Normal messages
             result.Add(new AnthropicMessage
             {
                 Role = MapRole(m.Role),
@@ -511,6 +437,88 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         }
 
         return result;
+    }
+
+    private static AnthropicMessage MapToolResultMessage(LlmMessage m)
+    {
+        return new AnthropicMessage
+        {
+            Role = "user",
+            Content = new List<AnthropicContentBlock>
+            {
+                new()
+                {
+                    Type = "tool_result",
+                    ToolUseId = m.ToolCallId,
+                    Content = m.Content
+                }
+            }
+        };
+    }
+
+    private static AnthropicMessage MapAssistantToolCallMessage(LlmMessage m)
+    {
+        var blocks = new List<AnthropicContentBlock>();
+
+        if (!string.IsNullOrEmpty(m.Content))
+            blocks.Add(new AnthropicContentBlock { Type = "text", Text = m.Content });
+
+        foreach (var tc in m.ToolCalls!)
+        {
+            blocks.Add(new AnthropicContentBlock
+            {
+                Type = "tool_use",
+                Id = tc.Id,
+                Name = tc.FunctionName,
+                Input = tc.Arguments
+            });
+        }
+
+        return new AnthropicMessage
+        {
+            Role = "assistant",
+            Content = blocks
+        };
+    }
+
+    private static async Task<List<AnthropicContentBlock>> MapContentPartsAsync(
+        IReadOnlyList<MessageContentPart> contentParts,
+        CancellationToken ct)
+    {
+        var blocks = new List<AnthropicContentBlock>();
+        foreach (var part in contentParts)
+        {
+            switch (part)
+            {
+                case TextContentPart text:
+                    blocks.Add(new AnthropicContentBlock { Type = "text", Text = text.Text });
+                    break;
+                case ImageFileContentPart file:
+                    var bytes = await File.ReadAllBytesAsync(file.FilePath, ct);
+                    blocks.Add(new AnthropicContentBlock
+                    {
+                        Type = "image",
+                        Source = new AnthropicImageSource
+                        {
+                            MediaType = ImageDataUriHelper.GetMimeType(file.FilePath),
+                            Data = Convert.ToBase64String(bytes)
+                        }
+                    });
+                    break;
+                case ImageBase64ContentPart base64:
+                    blocks.Add(new AnthropicContentBlock
+                    {
+                        Type = "image",
+                        Source = new AnthropicImageSource
+                        {
+                            MediaType = base64.MediaType,
+                            Data = base64.Base64Data
+                        }
+                    });
+                    break;
+            }
+        }
+        return blocks;
     }
 
     private static string MapRole(LlmRole role) => role switch

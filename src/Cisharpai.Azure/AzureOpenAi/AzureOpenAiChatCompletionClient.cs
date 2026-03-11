@@ -432,67 +432,69 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
             var msg = new AzureOpenAiChatMessage { Role = MapRole(m.Role) };
 
             if (m.ContentParts is { Count: > 0 })
-            {
-                var parts = new List<AzureOpenAiContentPart>();
-                foreach (var part in m.ContentParts)
-                {
-                    switch (part)
-                    {
-                        case TextContentPart text:
-                            parts.Add(new AzureOpenAiContentPart { Type = "text", Text = text.Text });
-                            break;
-                        case ImageFileContentPart file:
-                            var dataUri = await ImageDataUriHelper.ToDataUriAsync(file.FilePath, ct);
-                            parts.Add(new AzureOpenAiContentPart
-                            {
-                                Type = "image_url",
-                                ImageUrl = new AzureOpenAiImageUrl { Url = dataUri }
-                            });
-                            break;
-                        case ImageBase64ContentPart base64:
-                            parts.Add(new AzureOpenAiContentPart
-                            {
-                                Type = "image_url",
-                                ImageUrl = new AzureOpenAiImageUrl
-                                {
-                                    Url = $"data:{base64.MediaType};base64,{base64.Base64Data}"
-                                }
-                            });
-                            break;
-                    }
-                }
-                msg.Content = parts;
-            }
+                msg.Content = await MapContentPartsAsync(m.ContentParts, ct);
             else
-            {
                 msg.Content = m.Content;
-            }
 
-            // Tool result message: set tool_call_id, content is the result
             if (m.Role == LlmRole.Tool && m.ToolCallId is not null)
-            {
                 msg.ToolCallId = m.ToolCallId;
-            }
 
-            // Assistant message with tool calls
-            if (m.Role == LlmRole.Assistant && m.ToolCalls is not null && m.ToolCalls.Count > 0)
-            {
-                msg.ToolCalls = m.ToolCalls.Select(tc => new AzureOpenAiToolCall
-                {
-                    Id = tc.Id,
-                    Type = "function",
-                    Function = new AzureOpenAiToolCallFunction
-                    {
-                        Name = tc.FunctionName,
-                        Arguments = tc.Arguments.GetRawText()
-                    }
-                }).ToList();
-            }
+            if (m.Role == LlmRole.Assistant && m.ToolCalls is { Count: > 0 })
+                msg.ToolCalls = MapToolCalls(m.ToolCalls);
 
             result.Add(msg);
         }
 
         return result;
+    }
+
+    private static async Task<List<AzureOpenAiContentPart>> MapContentPartsAsync(
+        IReadOnlyList<MessageContentPart> contentParts,
+        CancellationToken ct)
+    {
+        var parts = new List<AzureOpenAiContentPart>();
+        foreach (var part in contentParts)
+        {
+            switch (part)
+            {
+                case TextContentPart text:
+                    parts.Add(new AzureOpenAiContentPart { Type = "text", Text = text.Text });
+                    break;
+                case ImageFileContentPart file:
+                    var dataUri = await ImageDataUriHelper.ToDataUriAsync(file.FilePath, ct);
+                    parts.Add(new AzureOpenAiContentPart
+                    {
+                        Type = "image_url",
+                        ImageUrl = new AzureOpenAiImageUrl { Url = dataUri }
+                    });
+                    break;
+                case ImageBase64ContentPart base64:
+                    parts.Add(new AzureOpenAiContentPart
+                    {
+                        Type = "image_url",
+                        ImageUrl = new AzureOpenAiImageUrl
+                        {
+                            Url = $"data:{base64.MediaType};base64,{base64.Base64Data}"
+                        }
+                    });
+                    break;
+            }
+        }
+        return parts;
+    }
+
+    private static List<AzureOpenAiToolCall> MapToolCalls(IReadOnlyList<ToolCall> toolCalls)
+    {
+        return toolCalls.Select(tc => new AzureOpenAiToolCall
+        {
+            Id = tc.Id,
+            Type = "function",
+            Function = new AzureOpenAiToolCallFunction
+            {
+                Name = tc.FunctionName,
+                Arguments = tc.Arguments.GetRawText()
+            }
+        }).ToList();
     }
 
     private static ToolCallDelta? MapStreamToolCallDelta(List<AzureOpenAiStreamToolCallDelta>? toolCalls)

@@ -8,12 +8,13 @@ namespace Cisharpai.Testing;
 /// </summary>
 public static class FakeResponses
 {
+    private const string DefaultModel = "fake-model";
     /// <summary>
     /// Creates a successful chat completion response.
     /// </summary>
     public static ChatCompletionResponse Chat(
         string content,
-        string model = "fake-model",
+        string model = DefaultModel,
         int promptTokens = 10,
         int completionTokens = 5) =>
         new(Content: content, Model: model, PromptTokens: promptTokens, CompletionTokens: completionTokens);
@@ -31,7 +32,7 @@ public static class FakeResponses
         string functionName,
         string argumentsJson,
         string? id = null,
-        string model = "fake-model") =>
+        string model = DefaultModel) =>
         new(
             ChatCompletion: new ChatCompletionResponse(
                 Content: string.Empty,
@@ -51,7 +52,7 @@ public static class FakeResponses
         new(
             ChatCompletion: new ChatCompletionResponse(
                 Content: string.Empty,
-                Model: "fake-model",
+                Model: DefaultModel,
                 PromptTokens: 10,
                 CompletionTokens: 5),
             ToolCalls: calls.Select(c => new Models.ToolCall(
@@ -65,7 +66,7 @@ public static class FakeResponses
     public static GroundedChatCompletionResponse GroundedChat(
         string content,
         IReadOnlyList<Citation>? citations = null,
-        string model = "fake-model") =>
+        string model = DefaultModel) =>
         new(
             ChatCompletion: new ChatCompletionResponse(
                 Content: content,
@@ -87,7 +88,7 @@ public static class FakeResponses
             chunks.Add(new ChatCompletionChunk(
                 Content: textSegments[i],
                 FinishReason: isLast ? "stop" : null,
-                Model: "fake-model"));
+                Model: DefaultModel));
         }
 
         return chunks;
@@ -98,7 +99,7 @@ public static class FakeResponses
     /// </summary>
     public static EmbeddingResponse Embedding(
         float[]? vector = null,
-        string model = "fake-model",
+        string model = DefaultModel,
         int totalTokens = 8) =>
         new(
             Embeddings: [vector ?? [0.1f, 0.2f, 0.3f]],
@@ -111,7 +112,7 @@ public static class FakeResponses
     /// </summary>
     public static EmbeddingResponse Embeddings(
         IReadOnlyList<float[]> vectors,
-        string model = "fake-model",
+        string model = DefaultModel,
         int totalTokens = 16) =>
         new(
             Embeddings: vectors,

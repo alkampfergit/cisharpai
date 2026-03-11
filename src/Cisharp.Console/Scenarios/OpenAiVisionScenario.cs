@@ -16,9 +16,9 @@ public sealed class OpenAiVisionScenario : IScenario
     {
         var apiKey = ScenarioHelpers.RequireEnv(DotEnv.OpenAiApiKey);
 
-        var model = AnsiConsole.Ask("Model?", "gpt-4o");
-        var imagePath = AnsiConsole.Ask<string>("Image file path (local file)?");
-        var prompt = AnsiConsole.Ask("Prompt?", "Describe this image in detail.");
+        var model = await AnsiConsole.AskAsync("Model?", "gpt-4o", cancellationToken);
+        var imagePath = await AnsiConsole.AskAsync<string>("Image file path (local file)?", cancellationToken);
+        var prompt = await AnsiConsole.AskAsync("Prompt?", "Describe this image in detail.", cancellationToken);
 
         if (!File.Exists(imagePath))
         {

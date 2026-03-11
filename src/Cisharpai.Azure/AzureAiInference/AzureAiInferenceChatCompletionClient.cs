@@ -466,67 +466,69 @@ public sealed class AzureAiInferenceChatCompletionClient : IChatCompletionClient
             var msg = new AzureAiInferenceChatMessage { Role = MapRole(m.Role) };
 
             if (m.ContentParts is { Count: > 0 })
-            {
-                var parts = new List<AzureAiInferenceContentPart>();
-                foreach (var part in m.ContentParts)
-                {
-                    switch (part)
-                    {
-                        case TextContentPart text:
-                            parts.Add(new AzureAiInferenceContentPart { Type = "text", Text = text.Text });
-                            break;
-                        case ImageFileContentPart file:
-                            var dataUri = await ImageDataUriHelper.ToDataUriAsync(file.FilePath, ct);
-                            parts.Add(new AzureAiInferenceContentPart
-                            {
-                                Type = "image_url",
-                                ImageUrl = new AzureAiInferenceImageUrl { Url = dataUri }
-                            });
-                            break;
-                        case ImageBase64ContentPart base64:
-                            parts.Add(new AzureAiInferenceContentPart
-                            {
-                                Type = "image_url",
-                                ImageUrl = new AzureAiInferenceImageUrl
-                                {
-                                    Url = $"data:{base64.MediaType};base64,{base64.Base64Data}"
-                                }
-                            });
-                            break;
-                    }
-                }
-                msg.Content = parts;
-            }
+                msg.Content = await MapContentPartsAsync(m.ContentParts, ct);
             else
-            {
                 msg.Content = m.Content;
-            }
 
-            // Tool result message: set tool_call_id, content is the result
             if (m.Role == LlmRole.Tool && m.ToolCallId is not null)
-            {
                 msg.ToolCallId = m.ToolCallId;
-            }
 
-            // Assistant message with tool calls
-            if (m.Role == LlmRole.Assistant && m.ToolCalls is not null && m.ToolCalls.Count > 0)
-            {
-                msg.ToolCalls = m.ToolCalls.Select(tc => new AzureAiInferenceToolCall
-                {
-                    Id = tc.Id,
-                    Type = "function",
-                    Function = new AzureAiInferenceToolCallFunction
-                    {
-                        Name = tc.FunctionName,
-                        Arguments = tc.Arguments.GetRawText()
-                    }
-                }).ToList();
-            }
+            if (m.Role == LlmRole.Assistant && m.ToolCalls is { Count: > 0 })
+                msg.ToolCalls = MapToolCalls(m.ToolCalls);
 
             result.Add(msg);
         }
 
         return result;
+    }
+
+    private static async Task<List<AzureAiInferenceContentPart>> MapContentPartsAsync(
+        IReadOnlyList<MessageContentPart> contentParts,
+        CancellationToken ct)
+    {
+        var parts = new List<AzureAiInferenceContentPart>();
+        foreach (var part in contentParts)
+        {
+            switch (part)
+            {
+                case TextContentPart text:
+                    parts.Add(new AzureAiInferenceContentPart { Type = "text", Text = text.Text });
+                    break;
+                case ImageFileContentPart file:
+                    var dataUri = await ImageDataUriHelper.ToDataUriAsync(file.FilePath, ct);
+                    parts.Add(new AzureAiInferenceContentPart
+                    {
+                        Type = "image_url",
+                        ImageUrl = new AzureAiInferenceImageUrl { Url = dataUri }
+                    });
+                    break;
+                case ImageBase64ContentPart base64:
+                    parts.Add(new AzureAiInferenceContentPart
+                    {
+                        Type = "image_url",
+                        ImageUrl = new AzureAiInferenceImageUrl
+                        {
+                            Url = $"data:{base64.MediaType};base64,{base64.Base64Data}"
+                        }
+                    });
+                    break;
+            }
+        }
+        return parts;
+    }
+
+    private static List<AzureAiInferenceToolCall> MapToolCalls(IReadOnlyList<ToolCall> toolCalls)
+    {
+        return toolCalls.Select(tc => new AzureAiInferenceToolCall
+        {
+            Id = tc.Id,
+            Type = "function",
+            Function = new AzureAiInferenceToolCallFunction
+            {
+                Name = tc.FunctionName,
+                Arguments = tc.Arguments.GetRawText()
+            }
+        }).ToList();
     }
 
     private static ToolCallDelta? MapStreamToolCallDelta(List<AzureAiInferenceStreamToolCallDelta>? toolCalls)
