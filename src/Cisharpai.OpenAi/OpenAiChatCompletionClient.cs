@@ -560,7 +560,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         string? rawRequestJson = null)
     {
         var choice = raw.Choices.FirstOrDefault();
-        var content = ExtractStringContent(choice?.Message.Content);
+        var content = ContentPartHelper.ExtractStringContent(choice?.Message.Content);
 
         var chatCompletion = new ChatCompletionResponse(
             Content: content,
