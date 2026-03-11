@@ -100,11 +100,14 @@ public sealed class AzureAiInferenceJsonOutputTests
 
         var doc = JsonDocument.Parse(capturedBody!);
         var responseFormat = doc.RootElement.GetProperty("response_format");
-        Assert.That(responseFormat.GetProperty("type").GetString(), Is.EqualTo("json_object"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(responseFormat.GetProperty("type").GetString(), Is.EqualTo("json_object"));
 
-        // Reasoning model should use max_completion_tokens, not max_tokens
-        Assert.That(doc.RootElement.TryGetProperty("temperature", out _), Is.False,
-            "Reasoning model request should not contain temperature");
+            // Reasoning model should use max_completion_tokens, not max_tokens
+            Assert.That(doc.RootElement.TryGetProperty("temperature", out _), Is.False,
+                "Reasoning model request should not contain temperature");
+        });
     }
 
     [Test]
@@ -185,10 +188,13 @@ public sealed class AzureAiInferenceJsonOutputTests
         Assert.That(responseFormat.GetProperty("type").GetString(), Is.EqualTo("json_schema"));
 
         var jsonSchema = responseFormat.GetProperty("json_schema");
-        Assert.That(jsonSchema.GetProperty("name").GetString(), Is.EqualTo("person"));
-        Assert.That(jsonSchema.GetProperty("strict").GetBoolean(), Is.True);
-        Assert.That(jsonSchema.TryGetProperty("schema", out _), Is.True,
-            "response_format.json_schema should contain schema property");
+        Assert.Multiple(() =>
+        {
+            Assert.That(jsonSchema.GetProperty("name").GetString(), Is.EqualTo("person"));
+            Assert.That(jsonSchema.GetProperty("strict").GetBoolean(), Is.True);
+            Assert.That(jsonSchema.TryGetProperty("schema", out _), Is.True,
+                "response_format.json_schema should contain schema property");
+        });
     }
 
     [Test]
@@ -230,12 +236,18 @@ public sealed class AzureAiInferenceJsonOutputTests
         // Verify the schema string was parsed into a proper JSON element (not a string)
         Assert.That(schema.ValueKind, Is.EqualTo(JsonValueKind.Object),
             "Schema should be a JSON object, not a string");
-        Assert.That(schema.GetProperty("type").GetString(), Is.EqualTo("object"));
-        Assert.That(schema.GetProperty("properties").GetProperty("name").GetProperty("type").GetString(),
-            Is.EqualTo("string"));
-        Assert.That(schema.GetProperty("properties").GetProperty("age").GetProperty("type").GetString(),
-            Is.EqualTo("integer"));
-        Assert.That(schema.GetProperty("additionalProperties").GetBoolean(), Is.False);
+        Assert.Multiple(() =>
+        {
+            Assert.That(schema.GetProperty("type").GetString(), Is.EqualTo("object"));
+            Assert.That(schema.GetProperty("properties").GetProperty("name").GetProperty("type").GetString(),
+                Is.EqualTo("string"));
+        });
+        Assert.Multiple(() =>
+        {
+            Assert.That(schema.GetProperty("properties").GetProperty("age").GetProperty("type").GetString(),
+                Is.EqualTo("integer"));
+            Assert.That(schema.GetProperty("additionalProperties").GetBoolean(), Is.False);
+        });
     }
 
     #endregion
@@ -257,8 +269,11 @@ public sealed class AzureAiInferenceJsonOutputTests
 
         var feature = client.Features.Get<IJsonOutputFeature>();
 
-        Assert.That(feature, Is.Not.Null);
-        Assert.That(feature, Is.SameAs(client));
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
     }
 
     #endregion
@@ -292,9 +307,12 @@ public sealed class AzureAiInferenceJsonOutputTests
                 Model: "Phi-3-mini"),
             new JsonOutputOptions(Mode: JsonOutputMode.JsonMode));
 
-        Assert.That(capturedUri, Is.Not.Null);
-        Assert.That(capturedUri!.PathAndQuery, Does.StartWith("/models/chat/completions"));
-        Assert.That(capturedUri.Query, Does.Contain("api-version="));
+        Assert.Multiple(() =>
+        {
+            Assert.That(capturedUri, Is.Not.Null);
+            Assert.That(capturedUri!.PathAndQuery, Does.StartWith("/models/chat/completions"));
+            Assert.That(capturedUri.Query, Does.Contain("api-version="));
+        });
     }
 
     [Test]

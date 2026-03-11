@@ -18,8 +18,11 @@ public class FakeChatCompletionClientTests
         var result = await fake.GetChatCompletionAsync(
             new ChatCompletionRequest([new LlmMessage(LlmRole.User, "Hi")]));
 
-        Assert.That(result.Content, Is.EqualTo("Hello!"));
-        Assert.That(result.IsSuccess, Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Content, Is.EqualTo("Hello!"));
+            Assert.That(result.IsSuccess, Is.True);
+        });
     }
 
     [Test]
@@ -36,8 +39,11 @@ public class FakeChatCompletionClientTests
         var second = await fake.GetChatCompletionAsync(
             new ChatCompletionRequest([new LlmMessage(LlmRole.User, "Hi")]));
 
-        Assert.That(first.Content, Is.EqualTo("queued"));
-        Assert.That(second.Content, Is.EqualTo("default"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(first.Content, Is.EqualTo("queued"));
+            Assert.That(second.Content, Is.EqualTo("default"));
+        });
     }
 
     [Test]
@@ -61,8 +67,11 @@ public class FakeChatCompletionClientTests
         var request = new ChatCompletionRequest([new LlmMessage(LlmRole.User, "test")]);
         await fake.GetChatCompletionAsync(request);
 
-        Assert.That(fake.ReceivedRequests, Has.Count.EqualTo(1));
-        Assert.That(fake.ReceivedRequests[0].Messages[0].Content, Is.EqualTo("test"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(fake.ReceivedRequests, Has.Count.EqualTo(1));
+            Assert.That(fake.ReceivedRequests[0].Messages[0].Content, Is.EqualTo("test"));
+        });
     }
 
     [Test]
@@ -99,10 +108,13 @@ public class FakeChatCompletionClientTests
 
         var result = await fake.GetChatCompletionWithToolsAsync(request, options);
 
-        Assert.That(result.ToolCalls, Has.Count.EqualTo(1));
-        Assert.That(result.ToolCalls![0].FunctionName, Is.EqualTo("get_weather"));
-        Assert.That(fake.ReceivedToolCallingRequests, Has.Count.EqualTo(1));
-        Assert.That(fake.ReceivedToolCallingRequests[0].Options.Tools, Has.Count.EqualTo(1));
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.ToolCalls, Has.Count.EqualTo(1));
+            Assert.That(result.ToolCalls![0].FunctionName, Is.EqualTo("get_weather"));
+            Assert.That(fake.ReceivedToolCallingRequests, Has.Count.EqualTo(1));
+            Assert.That(fake.ReceivedToolCallingRequests[0].Options.Tools, Has.Count.EqualTo(1));
+        });
     }
 
     [Test]
@@ -118,8 +130,11 @@ public class FakeChatCompletionClientTests
 
         var result = await fake.GetChatCompletionWithJsonOutputAsync(request, options);
 
-        Assert.That(result.Content, Is.EqualTo("""{"answer":"Paris"}"""));
-        Assert.That(fake.ReceivedJsonOutputRequests, Has.Count.EqualTo(1));
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Content, Is.EqualTo("""{"answer":"Paris"}"""));
+            Assert.That(fake.ReceivedJsonOutputRequests, Has.Count.EqualTo(1));
+        });
     }
 
     [Test]
@@ -150,8 +165,11 @@ public class FakeChatCompletionClientTests
 
         var result = await fake.GetGroundedChatCompletionAsync(request, options);
 
-        Assert.That(result.Content, Is.EqualTo("grounded answer"));
-        Assert.That(fake.ReceivedGroundedChatRequests, Has.Count.EqualTo(1));
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Content, Is.EqualTo("grounded answer"));
+            Assert.That(fake.ReceivedGroundedChatRequests, Has.Count.EqualTo(1));
+        });
     }
 
     [Test]
@@ -169,10 +187,13 @@ public class FakeChatCompletionClientTests
             chunks.Add(chunk);
         }
 
-        Assert.That(chunks, Has.Count.EqualTo(2));
-        Assert.That(string.Concat(chunks.Select(c => c.Content)), Is.EqualTo("Hello world"));
-        Assert.That(chunks[0].FinishReason, Is.Null);
-        Assert.That(chunks[1].FinishReason, Is.EqualTo("stop"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(chunks, Has.Count.EqualTo(2));
+            Assert.That(string.Concat(chunks.Select(c => c.Content)), Is.EqualTo("Hello world"));
+            Assert.That(chunks[0].FinishReason, Is.Null);
+            Assert.That(chunks[1].FinishReason, Is.EqualTo("stop"));
+        });
     }
 
     [Test]
@@ -192,8 +213,11 @@ public class FakeChatCompletionClientTests
         await foreach (var c in fake.GetChatCompletionStreamAsync(request))
             second.Add(c.Content);
 
-        Assert.That(string.Join("", first), Is.EqualTo("first"));
-        Assert.That(string.Join("", second), Is.EqualTo("second"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(string.Join("", first), Is.EqualTo("first"));
+            Assert.That(string.Join("", second), Is.EqualTo("second"));
+        });
     }
 
     [Test]
@@ -201,10 +225,13 @@ public class FakeChatCompletionClientTests
     {
         var fake = new FakeChatCompletionClient();
 
-        Assert.That(fake.Features.Get<IStreamingChatFeature>(), Is.Not.Null);
-        Assert.That(fake.Features.Get<IToolCallingFeature>(), Is.Not.Null);
-        Assert.That(fake.Features.Get<IJsonOutputFeature>(), Is.Not.Null);
-        Assert.That(fake.Features.Get<IGroundedChatFeature>(), Is.Not.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(fake.Features.Get<IStreamingChatFeature>(), Is.Not.Null);
+            Assert.That(fake.Features.Get<IToolCallingFeature>(), Is.Not.Null);
+            Assert.That(fake.Features.Get<IJsonOutputFeature>(), Is.Not.Null);
+            Assert.That(fake.Features.Get<IGroundedChatFeature>(), Is.Not.Null);
+        });
     }
 
     [Test]
@@ -212,10 +239,13 @@ public class FakeChatCompletionClientTests
     {
         var fake = new FakeChatCompletionClient(FakeChatFeatures.Streaming | FakeChatFeatures.ToolCalling);
 
-        Assert.That(fake.Features.Get<IStreamingChatFeature>(), Is.Not.Null);
-        Assert.That(fake.Features.Get<IToolCallingFeature>(), Is.Not.Null);
-        Assert.That(fake.Features.Get<IJsonOutputFeature>(), Is.Null);
-        Assert.That(fake.Features.Get<IGroundedChatFeature>(), Is.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(fake.Features.Get<IStreamingChatFeature>(), Is.Not.Null);
+            Assert.That(fake.Features.Get<IToolCallingFeature>(), Is.Not.Null);
+            Assert.That(fake.Features.Get<IJsonOutputFeature>(), Is.Null);
+            Assert.That(fake.Features.Get<IGroundedChatFeature>(), Is.Null);
+        });
     }
 
     [Test]
@@ -223,10 +253,13 @@ public class FakeChatCompletionClientTests
     {
         var fake = new FakeChatCompletionClient(FakeChatFeatures.None);
 
-        Assert.That(fake.Features.Get<IStreamingChatFeature>(), Is.Null);
-        Assert.That(fake.Features.Get<IToolCallingFeature>(), Is.Null);
-        Assert.That(fake.Features.Get<IJsonOutputFeature>(), Is.Null);
-        Assert.That(fake.Features.Get<IGroundedChatFeature>(), Is.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(fake.Features.Get<IStreamingChatFeature>(), Is.Null);
+            Assert.That(fake.Features.Get<IToolCallingFeature>(), Is.Null);
+            Assert.That(fake.Features.Get<IJsonOutputFeature>(), Is.Null);
+            Assert.That(fake.Features.Get<IGroundedChatFeature>(), Is.Null);
+        });
     }
 
     [Test]
@@ -242,8 +275,11 @@ public class FakeChatCompletionClientTests
 
         fake.Reset();
 
-        Assert.That(fake.ReceivedRequests, Is.Empty);
-        Assert.That(fake.CallCount, Is.EqualTo(0));
+        Assert.Multiple(() =>
+        {
+            Assert.That(fake.ReceivedRequests, Is.Empty);
+            Assert.That(fake.CallCount, Is.EqualTo(0));
+        });
         // Queue was cleared, so default should be used
         var result = await fake.GetChatCompletionAsync(
             new ChatCompletionRequest([new LlmMessage(LlmRole.User, "test")]));
@@ -263,8 +299,11 @@ public class FakeChatCompletionClientTests
         var r2 = await fake.GetChatCompletionAsync(request);
         var r3 = await fake.GetChatCompletionAsync(request);
 
-        Assert.That(r1.Content, Is.EqualTo("first"));
-        Assert.That(r2.Content, Is.EqualTo("second"));
-        Assert.That(r3.Content, Is.EqualTo("third"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(r1.Content, Is.EqualTo("first"));
+            Assert.That(r2.Content, Is.EqualTo("second"));
+            Assert.That(r3.Content, Is.EqualTo("third"));
+        });
     }
 }

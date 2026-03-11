@@ -32,9 +32,12 @@ public sealed class OpenAiEmbeddingClientTests
 
         Assert.That(capturedBody, Is.Not.Null);
         var doc = JsonDocument.Parse(capturedBody!);
-        Assert.That(doc.RootElement.GetProperty("model").GetString(), Is.EqualTo("text-embedding-3-small"));
-        Assert.That(doc.RootElement.GetProperty("input").GetString(), Is.EqualTo("Hello world"));
-        Assert.That(doc.RootElement.GetProperty("dimensions").GetInt32(), Is.EqualTo(256));
+        Assert.Multiple(() =>
+        {
+            Assert.That(doc.RootElement.GetProperty("model").GetString(), Is.EqualTo("text-embedding-3-small"));
+            Assert.That(doc.RootElement.GetProperty("input").GetString(), Is.EqualTo("Hello world"));
+            Assert.That(doc.RootElement.GetProperty("dimensions").GetInt32(), Is.EqualTo(256));
+        });
     }
 
     [Test]
@@ -55,14 +58,17 @@ public sealed class OpenAiEmbeddingClientTests
 
         var response = await client.GetEmbeddingsAsync(request);
 
-        Assert.That(response.IsSuccess, Is.True);
-        Assert.That(response.ErrorMessage, Is.Null);
-        Assert.That(response.Model, Is.EqualTo("text-embedding-3-small"));
-        Assert.That(response.TotalTokens, Is.EqualTo(2));
-        Assert.That(response.Embeddings, Has.Count.EqualTo(1));
-        Assert.That(response.Embeddings[0], Has.Length.EqualTo(3));
-        Assert.That(response.Embeddings[0][0], Is.EqualTo(0.1f).Within(0.001f));
-        Assert.That(response.Dimensions, Is.EqualTo(3));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.True);
+            Assert.That(response.ErrorMessage, Is.Null);
+            Assert.That(response.Model, Is.EqualTo("text-embedding-3-small"));
+            Assert.That(response.TotalTokens, Is.EqualTo(2));
+            Assert.That(response.Embeddings, Has.Count.EqualTo(1));
+            Assert.That(response.Embeddings[0], Has.Length.EqualTo(3));
+            Assert.That(response.Embeddings[0][0], Is.EqualTo(0.1f).Within(0.001f));
+            Assert.That(response.Dimensions, Is.EqualTo(3));
+        });
     }
 
     [Test]
@@ -129,8 +135,11 @@ public sealed class OpenAiEmbeddingClientTests
             Model: "text-embedding-3-small"));
 
         var doc = JsonDocument.Parse(capturedBody!);
-        Assert.That(doc.RootElement.GetProperty("input").ValueKind, Is.EqualTo(JsonValueKind.Array));
-        Assert.That(doc.RootElement.GetProperty("input").GetArrayLength(), Is.EqualTo(2));
+        Assert.Multiple(() =>
+        {
+            Assert.That(doc.RootElement.GetProperty("input").ValueKind, Is.EqualTo(JsonValueKind.Array));
+            Assert.That(doc.RootElement.GetProperty("input").GetArrayLength(), Is.EqualTo(2));
+        });
     }
 
     [Test]
@@ -149,9 +158,12 @@ public sealed class OpenAiEmbeddingClientTests
             Input: ["First", "Second"],
             Model: "text-embedding-3-small"));
 
-        Assert.That(response.Embeddings, Has.Count.EqualTo(2));
-        Assert.That(response.Embeddings[0][0], Is.EqualTo(0.1f).Within(0.001f));
-        Assert.That(response.Embeddings[1][0], Is.EqualTo(0.4f).Within(0.001f));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Embeddings, Has.Count.EqualTo(2));
+            Assert.That(response.Embeddings[0][0], Is.EqualTo(0.1f).Within(0.001f));
+            Assert.That(response.Embeddings[1][0], Is.EqualTo(0.4f).Within(0.001f));
+        });
     }
 
     [Test]
@@ -220,9 +232,12 @@ public sealed class OpenAiEmbeddingClientTests
             Model: "text-embedding-3-small",
             IncludeRawResponse: true));
 
-        Assert.That(response.RawResponseJson, Is.Not.Null);
-        Assert.That(response.RawResponseJson, Does.Contain("text-embedding-3-small"));
-        Assert.That(response.RawRequestJson, Is.Not.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.RawResponseJson, Is.Not.Null);
+            Assert.That(response.RawResponseJson, Does.Contain("text-embedding-3-small"));
+            Assert.That(response.RawRequestJson, Is.Not.Null);
+        });
     }
 
     [Test]
@@ -241,8 +256,11 @@ public sealed class OpenAiEmbeddingClientTests
             Input: ["Hi"],
             Model: "text-embedding-3-small"));
 
-        Assert.That(response.RawResponseJson, Is.Null);
-        Assert.That(response.RawRequestJson, Is.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.RawResponseJson, Is.Null);
+            Assert.That(response.RawRequestJson, Is.Null);
+        });
     }
 
     [Test]
@@ -262,10 +280,13 @@ public sealed class OpenAiEmbeddingClientTests
             Input: ["Hi"],
             Model: "text-embedding-3-small"));
 
-        Assert.That(response.IsSuccess, Is.False);
-        Assert.That(response.ErrorMessage, Does.Contain("500"));
-        Assert.That(response.Embeddings, Is.Empty);
-        Assert.That(response.Model, Is.EqualTo(string.Empty));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.False);
+            Assert.That(response.ErrorMessage, Does.Contain("500"));
+            Assert.That(response.Embeddings, Is.Empty);
+            Assert.That(response.Model, Is.EqualTo(string.Empty));
+        });
     }
 
     [Test]
@@ -285,8 +306,11 @@ public sealed class OpenAiEmbeddingClientTests
             Input: ["Hi"],
             Model: "text-embedding-3-small"));
 
-        Assert.That(response.IsSuccess, Is.False);
-        Assert.That(response.RawResponseJson, Is.EqualTo(errorBody));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.False);
+            Assert.That(response.RawResponseJson, Is.EqualTo(errorBody));
+        });
     }
 
     [Test]

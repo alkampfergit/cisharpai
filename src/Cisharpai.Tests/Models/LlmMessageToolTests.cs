@@ -16,10 +16,13 @@ public sealed class LlmMessageToolTests
     {
         var msg = new LlmMessage(LlmRole.User, "Hello");
 
-        Assert.That(msg.Role, Is.EqualTo(LlmRole.User));
-        Assert.That(msg.Content, Is.EqualTo("Hello"));
-        Assert.That(msg.ToolCallId, Is.Null);
-        Assert.That(msg.ToolCalls, Is.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(msg.Role, Is.EqualTo(LlmRole.User));
+            Assert.That(msg.Content, Is.EqualTo("Hello"));
+            Assert.That(msg.ToolCallId, Is.Null);
+            Assert.That(msg.ToolCalls, Is.Null);
+        });
     }
 
     [Test]
@@ -27,9 +30,12 @@ public sealed class LlmMessageToolTests
     {
         var msg = new LlmMessage(LlmRole.Tool, "Weather is sunny", ToolCallId: "call-1");
 
-        Assert.That(msg.Role, Is.EqualTo(LlmRole.Tool));
-        Assert.That(msg.Content, Is.EqualTo("Weather is sunny"));
-        Assert.That(msg.ToolCallId, Is.EqualTo("call-1"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(msg.Role, Is.EqualTo(LlmRole.Tool));
+            Assert.That(msg.Content, Is.EqualTo("Weather is sunny"));
+            Assert.That(msg.ToolCallId, Is.EqualTo("call-1"));
+        });
     }
 
     [Test]
@@ -43,10 +49,13 @@ public sealed class LlmMessageToolTests
 
         var msg = new LlmMessage(LlmRole.Assistant, "", ToolCalls: toolCalls);
 
-        Assert.That(msg.Role, Is.EqualTo(LlmRole.Assistant));
-        Assert.That(msg.ToolCalls, Is.Not.Null);
-        Assert.That(msg.ToolCalls!.Count, Is.EqualTo(1));
-        Assert.That(msg.ToolCalls[0].FunctionName, Is.EqualTo("get_weather"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(msg.Role, Is.EqualTo(LlmRole.Assistant));
+            Assert.That(msg.ToolCalls, Is.Not.Null);
+            Assert.That(msg.ToolCalls!, Has.Count.EqualTo(1));
+            Assert.That(msg.ToolCalls[0].FunctionName, Is.EqualTo("get_weather"));
+        });
     }
 
     [Test]
@@ -77,8 +86,11 @@ public sealed class LlmMessageToolTests
         var msg = new LlmMessage(LlmRole.Assistant, "", ToolCalls: toolCalls);
         var modified = msg with { Content = "Modified" };
 
-        Assert.That(modified.Content, Is.EqualTo("Modified"));
-        Assert.That(modified.ToolCalls, Is.Not.Null);
-        Assert.That(msg.Content, Is.EqualTo(""));
+        Assert.Multiple(() =>
+        {
+            Assert.That(modified.Content, Is.EqualTo("Modified"));
+            Assert.That(modified.ToolCalls, Is.Not.Null);
+            Assert.That(msg.Content, Is.EqualTo(""));
+        });
     }
 }

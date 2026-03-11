@@ -83,12 +83,15 @@ public sealed class CohereVisionTests
         await client.GetChatCompletionAsync(request);
 
         var body = getBody();
-        Assert.That(body, Is.Not.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(body, Is.Not.Null);
 
-        // Should only contain the text part, not any image data
-        Assert.That(body, Does.Contain("Describe this image:"));
-        Assert.That(body, Does.Not.Contain("image_url"));
-        Assert.That(body, Does.Not.Contain("base64"));
+            // Should only contain the text part, not any image data
+            Assert.That(body, Does.Contain("Describe this image:"));
+            Assert.That(body, Does.Not.Contain("image_url"));
+            Assert.That(body, Does.Not.Contain("base64"));
+        });
     }
 
     [Test]
@@ -111,9 +114,12 @@ public sealed class CohereVisionTests
         Assert.That(response.IsSuccess, Is.True);
 
         var body = getBody();
-        Assert.That(body, Is.Not.Null);
-        // Content should be empty (no text parts)
-        Assert.That(body, Does.Not.Contain("image_url"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(body, Is.Not.Null);
+            // Content should be empty (no text parts)
+            Assert.That(body, Does.Not.Contain("image_url"));
+        });
     }
 
     [Test]
@@ -138,9 +144,12 @@ public sealed class CohereVisionTests
         Assert.That(response.IsSuccess, Is.True);
 
         var body = getBody();
-        Assert.That(body, Is.Not.Null);
-        Assert.That(body, Does.Contain("What do you see?"));
-        Assert.That(body, Does.Not.Contain("abc123base64"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(body, Is.Not.Null);
+            Assert.That(body, Does.Contain("What do you see?"));
+            Assert.That(body, Does.Not.Contain("abc123base64"));
+        });
     }
 
     [Test]
@@ -165,10 +174,13 @@ public sealed class CohereVisionTests
         await client.GetChatCompletionAsync(request);
 
         var body = getBody();
-        Assert.That(body, Is.Not.Null);
-        // Both text parts should be concatenated
-        Assert.That(body, Does.Contain("First part."));
-        Assert.That(body, Does.Contain("Second part."));
+        Assert.Multiple(() =>
+        {
+            Assert.That(body, Is.Not.Null);
+            // Both text parts should be concatenated
+            Assert.That(body, Does.Contain("First part."));
+            Assert.That(body, Does.Contain("Second part."));
+        });
     }
 
     [Test]
@@ -187,8 +199,11 @@ public sealed class CohereVisionTests
         Assert.That(response.IsSuccess, Is.True);
 
         var body = getBody();
-        Assert.That(body, Is.Not.Null);
-        Assert.That(body, Does.Contain("Hello, world!"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(body, Is.Not.Null);
+            Assert.That(body, Does.Contain("Hello, world!"));
+        });
     }
 
     [Test]
@@ -207,7 +222,10 @@ public sealed class CohereVisionTests
         Assert.That(response.IsSuccess, Is.True);
 
         var body = getBody();
-        Assert.That(body, Does.Contain("Describe:"));
-        Assert.That(body, Does.Not.Contain("image_url"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(body, Does.Contain("Describe:"));
+            Assert.That(body, Does.Not.Contain("image_url"));
+        });
     }
 }

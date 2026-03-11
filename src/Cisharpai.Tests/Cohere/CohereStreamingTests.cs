@@ -93,7 +93,7 @@ public sealed class CohereStreamingTests
         }
 
         var textChunks = chunks.Where(c => !string.IsNullOrEmpty(c.Content)).ToList();
-        Assert.That(textChunks.Count, Is.GreaterThanOrEqualTo(2));
+        Assert.That(textChunks, Has.Count.GreaterThanOrEqualTo(2));
 
         var combined = string.Concat(textChunks.Select(c => c.Content));
         Assert.That(combined, Is.EqualTo("Hello, world!"));
@@ -138,8 +138,11 @@ public sealed class CohereStreamingTests
         }
 
         var lastChunk = chunks.Last();
-        Assert.That(lastChunk.PromptTokens, Is.EqualTo(15));
-        Assert.That(lastChunk.CompletionTokens, Is.EqualTo(3));
+        Assert.Multiple(() =>
+        {
+            Assert.That(lastChunk.PromptTokens, Is.EqualTo(15));
+            Assert.That(lastChunk.CompletionTokens, Is.EqualTo(3));
+        });
     }
 
     [Test]
@@ -156,8 +159,11 @@ public sealed class CohereStreamingTests
         await foreach (var _ in feature.GetChatCompletionStreamAsync(request)) { }
 
         var body = getBody();
-        Assert.That(body, Is.Not.Null);
-        Assert.That(body, Does.Contain("\"stream\":true"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(body, Is.Not.Null);
+            Assert.That(body, Does.Contain("\"stream\":true"));
+        });
     }
 
     [Test]
@@ -195,8 +201,11 @@ public sealed class CohereStreamingTests
         var client = new CohereChatCompletionClient(httpClient, options);
 
         var feature = client.Features.Get<IStreamingChatFeature>();
-        Assert.That(feature, Is.Not.Null);
-        Assert.That(feature, Is.SameAs(client));
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
     }
 
     [Test]
@@ -226,8 +235,11 @@ public sealed class CohereStreamingTests
         }
 
         var textChunks = chunks.Where(c => !string.IsNullOrEmpty(c.Content)).ToList();
-        Assert.That(textChunks.Count, Is.EqualTo(1));
-        Assert.That(textChunks[0].Content, Is.EqualTo("Hello"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(textChunks, Has.Count.EqualTo(1));
+            Assert.That(textChunks[0].Content, Is.EqualTo("Hello"));
+        });
     }
 
     [Test]

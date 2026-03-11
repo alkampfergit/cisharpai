@@ -81,7 +81,7 @@ public sealed class AzureOpenAiEmbeddingClient : IEmbeddingClient
 
         var isBase64 = string.Equals(encodingFormat, "base64", StringComparison.OrdinalIgnoreCase);
 
-        IReadOnlyList<float[]> embeddings;
+        List<float[]> embeddings;
         IReadOnlyList<string>? base64Embeddings = null;
 
         if (isBase64)

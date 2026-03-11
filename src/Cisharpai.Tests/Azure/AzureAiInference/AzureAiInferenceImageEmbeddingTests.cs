@@ -30,9 +30,12 @@ public sealed class AzureAiInferenceImageEmbeddingTests
 
             Assert.That(capturedBody, Is.Not.Null);
             var doc = JsonDocument.Parse(capturedBody!);
-            Assert.That(doc.RootElement.GetProperty("model").GetString(), Is.EqualTo("clip-model"));
-            Assert.That(doc.RootElement.GetProperty("input").GetArrayLength(), Is.EqualTo(1));
-            Assert.That(doc.RootElement.GetProperty("input")[0].GetProperty("image").GetString(), Is.Not.Null.And.Not.Empty);
+            Assert.Multiple(() =>
+            {
+                Assert.That(doc.RootElement.GetProperty("model").GetString(), Is.EqualTo("clip-model"));
+                Assert.That(doc.RootElement.GetProperty("input").GetArrayLength(), Is.EqualTo(1));
+                Assert.That(doc.RootElement.GetProperty("input")[0].GetProperty("image").GetString(), Is.Not.Null.And.Not.Empty);
+            });
         }
         finally
         {
@@ -58,10 +61,13 @@ public sealed class AzureAiInferenceImageEmbeddingTests
         {
             var response = await client.GetImageEmbeddingAsync(imagePath, "clip-model");
 
-            Assert.That(response.IsSuccess, Is.True);
-            Assert.That(response.Embeddings, Has.Count.EqualTo(1));
-            Assert.That(response.Embeddings[0], Has.Length.EqualTo(3));
-            Assert.That(response.Dimensions, Is.EqualTo(3));
+            Assert.Multiple(() =>
+            {
+                Assert.That(response.IsSuccess, Is.True);
+                Assert.That(response.Embeddings, Has.Count.EqualTo(1));
+                Assert.That(response.Embeddings[0], Has.Length.EqualTo(3));
+                Assert.That(response.Dimensions, Is.EqualTo(3));
+            });
         }
         finally
         {
@@ -119,8 +125,11 @@ public sealed class AzureAiInferenceImageEmbeddingTests
         {
             var response = await client.GetImageEmbeddingAsync(imagePath, "clip-model");
 
-            Assert.That(response.IsSuccess, Is.False);
-            Assert.That(response.ErrorMessage, Is.Not.Null.And.Not.Empty);
+            Assert.Multiple(() =>
+            {
+                Assert.That(response.IsSuccess, Is.False);
+                Assert.That(response.ErrorMessage, Is.Not.Null.And.Not.Empty);
+            });
         }
         finally
         {

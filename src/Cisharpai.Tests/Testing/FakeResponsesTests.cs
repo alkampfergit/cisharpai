@@ -6,16 +6,21 @@ namespace Cisharpai.Tests.Testing;
 [TestFixture]
 public class FakeResponsesTests
 {
+    private static readonly float[] DefaultEmbedding = [0.1f, 0.2f, 0.3f];
+    private static readonly float[] CustomEmbedding = [1.0f, 2.0f];
     [Test]
     public void Chat_CreatesSuccessfulResponse()
     {
         var response = FakeResponses.Chat("Hello world");
 
-        Assert.That(response.Content, Is.EqualTo("Hello world"));
-        Assert.That(response.Model, Is.EqualTo("fake-model"));
-        Assert.That(response.IsSuccess, Is.True);
-        Assert.That(response.PromptTokens, Is.EqualTo(10));
-        Assert.That(response.CompletionTokens, Is.EqualTo(5));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Content, Is.EqualTo("Hello world"));
+            Assert.That(response.Model, Is.EqualTo("fake-model"));
+            Assert.That(response.IsSuccess, Is.True);
+            Assert.That(response.PromptTokens, Is.EqualTo(10));
+            Assert.That(response.CompletionTokens, Is.EqualTo(5));
+        });
     }
 
     [Test]
@@ -23,9 +28,12 @@ public class FakeResponsesTests
     {
         var response = FakeResponses.Chat("Hi", model: "gpt-4", promptTokens: 100, completionTokens: 50);
 
-        Assert.That(response.Model, Is.EqualTo("gpt-4"));
-        Assert.That(response.PromptTokens, Is.EqualTo(100));
-        Assert.That(response.CompletionTokens, Is.EqualTo(50));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Model, Is.EqualTo("gpt-4"));
+            Assert.That(response.PromptTokens, Is.EqualTo(100));
+            Assert.That(response.CompletionTokens, Is.EqualTo(50));
+        });
     }
 
     [Test]
@@ -33,9 +41,12 @@ public class FakeResponsesTests
     {
         var response = FakeResponses.ChatError("rate limit exceeded");
 
-        Assert.That(response.IsSuccess, Is.False);
-        Assert.That(response.ErrorMessage, Is.EqualTo("rate limit exceeded"));
-        Assert.That(response.Content, Is.Empty);
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.False);
+            Assert.That(response.ErrorMessage, Is.EqualTo("rate limit exceeded"));
+            Assert.That(response.Content, Is.Empty);
+        });
     }
 
     [Test]
@@ -43,10 +54,13 @@ public class FakeResponsesTests
     {
         var response = FakeResponses.ToolCall("get_weather", """{"city":"Paris"}""");
 
-        Assert.That(response.ToolCalls, Has.Count.EqualTo(1));
-        Assert.That(response.ToolCalls![0].FunctionName, Is.EqualTo("get_weather"));
-        Assert.That(response.ToolCalls[0].Arguments.GetProperty("city").GetString(), Is.EqualTo("Paris"));
-        Assert.That(response.IsSuccess, Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.ToolCalls, Has.Count.EqualTo(1));
+            Assert.That(response.ToolCalls![0].FunctionName, Is.EqualTo("get_weather"));
+            Assert.That(response.ToolCalls[0].Arguments.GetProperty("city").GetString(), Is.EqualTo("Paris"));
+            Assert.That(response.IsSuccess, Is.True);
+        });
     }
 
     [Test]
@@ -64,9 +78,12 @@ public class FakeResponsesTests
             ("get_weather", """{"city":"Paris"}"""),
             ("get_time", """{"timezone":"UTC"}"""));
 
-        Assert.That(response.ToolCalls, Has.Count.EqualTo(2));
-        Assert.That(response.ToolCalls![0].FunctionName, Is.EqualTo("get_weather"));
-        Assert.That(response.ToolCalls[1].FunctionName, Is.EqualTo("get_time"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.ToolCalls, Has.Count.EqualTo(2));
+            Assert.That(response.ToolCalls![0].FunctionName, Is.EqualTo("get_weather"));
+            Assert.That(response.ToolCalls[1].FunctionName, Is.EqualTo("get_time"));
+        });
     }
 
     [Test]
@@ -74,9 +91,12 @@ public class FakeResponsesTests
     {
         var response = FakeResponses.GroundedChat("answer with citations");
 
-        Assert.That(response.Content, Is.EqualTo("answer with citations"));
-        Assert.That(response.Citations, Is.Empty);
-        Assert.That(response.IsSuccess, Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Content, Is.EqualTo("answer with citations"));
+            Assert.That(response.Citations, Is.Empty);
+            Assert.That(response.IsSuccess, Is.True);
+        });
     }
 
     [Test]
@@ -88,8 +108,11 @@ public class FakeResponsesTests
         };
         var response = FakeResponses.GroundedChat("Paris is great", citations);
 
-        Assert.That(response.Citations, Has.Count.EqualTo(1));
-        Assert.That(response.Citations[0].Text, Is.EqualTo("Paris"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Citations, Has.Count.EqualTo(1));
+            Assert.That(response.Citations[0].Text, Is.EqualTo("Paris"));
+        });
     }
 
     [Test]
@@ -97,13 +120,16 @@ public class FakeResponsesTests
     {
         var chunks = FakeResponses.StreamingChunks("Hello", " ", "world");
 
-        Assert.That(chunks, Has.Count.EqualTo(3));
-        Assert.That(chunks[0].Content, Is.EqualTo("Hello"));
-        Assert.That(chunks[0].FinishReason, Is.Null);
-        Assert.That(chunks[1].Content, Is.EqualTo(" "));
-        Assert.That(chunks[1].FinishReason, Is.Null);
-        Assert.That(chunks[2].Content, Is.EqualTo("world"));
-        Assert.That(chunks[2].FinishReason, Is.EqualTo("stop"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(chunks, Has.Count.EqualTo(3));
+            Assert.That(chunks[0].Content, Is.EqualTo("Hello"));
+            Assert.That(chunks[0].FinishReason, Is.Null);
+            Assert.That(chunks[1].Content, Is.EqualTo(" "));
+            Assert.That(chunks[1].FinishReason, Is.Null);
+            Assert.That(chunks[2].Content, Is.EqualTo("world"));
+            Assert.That(chunks[2].FinishReason, Is.EqualTo("stop"));
+        });
     }
 
     [Test]
@@ -111,8 +137,11 @@ public class FakeResponsesTests
     {
         var chunks = FakeResponses.StreamingChunks("done");
 
-        Assert.That(chunks, Has.Count.EqualTo(1));
-        Assert.That(chunks[0].FinishReason, Is.EqualTo("stop"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(chunks, Has.Count.EqualTo(1));
+            Assert.That(chunks[0].FinishReason, Is.EqualTo("stop"));
+        });
     }
 
     [Test]
@@ -120,10 +149,13 @@ public class FakeResponsesTests
     {
         var response = FakeResponses.Embedding();
 
-        Assert.That(response.IsSuccess, Is.True);
-        Assert.That(response.Embeddings, Has.Count.EqualTo(1));
-        Assert.That(response.Embeddings[0], Is.EqualTo(new[] { 0.1f, 0.2f, 0.3f }));
-        Assert.That(response.Model, Is.EqualTo("fake-model"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.True);
+            Assert.That(response.Embeddings, Has.Count.EqualTo(1));
+            Assert.That(response.Embeddings[0], Is.EqualTo(DefaultEmbedding));
+            Assert.That(response.Model, Is.EqualTo("fake-model"));
+        });
     }
 
     [Test]
@@ -131,7 +163,7 @@ public class FakeResponsesTests
     {
         var response = FakeResponses.Embedding([1.0f, 2.0f]);
 
-        Assert.That(response.Embeddings[0], Is.EqualTo(new[] { 1.0f, 2.0f }));
+        Assert.That(response.Embeddings[0], Is.EqualTo(CustomEmbedding));
     }
 
     [Test]
@@ -147,7 +179,10 @@ public class FakeResponsesTests
     {
         var response = FakeResponses.EmbeddingError("model not found");
 
-        Assert.That(response.IsSuccess, Is.False);
-        Assert.That(response.ErrorMessage, Is.EqualTo("model not found"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.False);
+            Assert.That(response.ErrorMessage, Is.EqualTo("model not found"));
+        });
     }
 }

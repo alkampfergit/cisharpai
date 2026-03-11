@@ -9,9 +9,12 @@ public sealed class ToolResultTests
     {
         var result = new ToolResult("call-1", "sunny, 22C");
 
-        Assert.That(result.ToolCallId, Is.EqualTo("call-1"));
-        Assert.That(result.Content, Is.EqualTo("sunny, 22C"));
-        Assert.That(result.IsError, Is.False);
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.ToolCallId, Is.EqualTo("call-1"));
+            Assert.That(result.Content, Is.EqualTo("sunny, 22C"));
+            Assert.That(result.IsError, Is.False);
+        });
     }
 
     [Test]
@@ -36,7 +39,10 @@ public sealed class ToolResultTests
         var result = new ToolResult("call-1", "data");
         var modified = result with { Content = "new data" };
 
-        Assert.That(modified.Content, Is.EqualTo("new data"));
-        Assert.That(result.Content, Is.EqualTo("data"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(modified.Content, Is.EqualTo("new data"));
+            Assert.That(result.Content, Is.EqualTo("data"));
+        });
     }
 }

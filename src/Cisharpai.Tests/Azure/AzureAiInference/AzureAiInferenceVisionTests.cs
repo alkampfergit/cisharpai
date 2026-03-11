@@ -76,9 +76,12 @@ public sealed class AzureAiInferenceVisionTests
         Assert.That(response.IsSuccess, Is.True);
 
         var body = getBody()!;
-        Assert.That(body, Does.Contain("\"type\":\"image_url\""));
-        Assert.That(body, Does.Contain("data:image/png;base64,abc123"));
-        Assert.That(body, Does.Contain("What is this?"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(body, Does.Contain("\"type\":\"image_url\""));
+            Assert.That(body, Does.Contain("data:image/png;base64,abc123"));
+            Assert.That(body, Does.Contain("What is this?"));
+        });
     }
 
     [Test]
@@ -94,8 +97,11 @@ public sealed class AzureAiInferenceVisionTests
         await client.GetChatCompletionAsync(request);
 
         var body = getBody()!;
-        Assert.That(body, Does.Contain("data:image/jpeg;base64,base64data=="));
-        Assert.That(body, Does.Contain("Analyze:"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(body, Does.Contain("data:image/jpeg;base64,base64data=="));
+            Assert.That(body, Does.Contain("Analyze:"));
+        });
     }
 
     [Test]
@@ -110,8 +116,11 @@ public sealed class AzureAiInferenceVisionTests
         await client.GetChatCompletionAsync(request);
 
         var body = getBody()!;
-        Assert.That(body, Does.Contain("Hello!"));
-        Assert.That(body, Does.Not.Contain("\"type\":\"image_url\""));
+        Assert.Multiple(() =>
+        {
+            Assert.That(body, Does.Contain("Hello!"));
+            Assert.That(body, Does.Not.Contain("\"type\":\"image_url\""));
+        });
     }
 
     [Test]
@@ -131,7 +140,10 @@ public sealed class AzureAiInferenceVisionTests
         await client.GetChatCompletionAsync(request);
 
         var body = getBody()!;
-        Assert.That(body, Does.Contain("\"type\":\"text\""));
-        Assert.That(body, Does.Contain("Hello"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(body, Does.Contain("\"type\":\"text\""));
+            Assert.That(body, Does.Contain("Hello"));
+        });
     }
 }

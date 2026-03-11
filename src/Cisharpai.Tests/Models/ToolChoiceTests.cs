@@ -27,29 +27,41 @@ public sealed class ToolChoiceTests
     {
         var choice = ToolChoice.Specific("get_weather");
 
-        Assert.That(choice.IsSpecific, Is.True);
-        Assert.That(choice.FunctionName, Is.EqualTo("get_weather"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(choice.IsSpecific, Is.True);
+            Assert.That(choice.FunctionName, Is.EqualTo("get_weather"));
+        });
     }
 
     [Test]
     public void Auto_IsNotSpecific()
     {
-        Assert.That(ToolChoice.Auto.IsSpecific, Is.False);
-        Assert.That(ToolChoice.Auto.FunctionName, Is.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(ToolChoice.Auto.IsSpecific, Is.False);
+            Assert.That(ToolChoice.Auto.FunctionName, Is.Null);
+        });
     }
 
     [Test]
     public void None_IsNotSpecific()
     {
-        Assert.That(ToolChoice.None.IsSpecific, Is.False);
-        Assert.That(ToolChoice.None.FunctionName, Is.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(ToolChoice.None.IsSpecific, Is.False);
+            Assert.That(ToolChoice.None.FunctionName, Is.Null);
+        });
     }
 
     [Test]
     public void Required_IsNotSpecific()
     {
-        Assert.That(ToolChoice.Required.IsSpecific, Is.False);
-        Assert.That(ToolChoice.Required.FunctionName, Is.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(ToolChoice.Required.IsSpecific, Is.False);
+            Assert.That(ToolChoice.Required.FunctionName, Is.Null);
+        });
     }
 
     [Test]

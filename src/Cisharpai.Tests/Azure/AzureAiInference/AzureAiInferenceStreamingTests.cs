@@ -111,8 +111,11 @@ public sealed class AzureAiInferenceStreamingTests
         }
 
         var finishChunk = chunks.FirstOrDefault(c => c.FinishReason is not null);
-        Assert.That(finishChunk, Is.Not.Null);
-        Assert.That(finishChunk!.FinishReason, Is.EqualTo("stop"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(finishChunk, Is.Not.Null);
+            Assert.That(finishChunk!.FinishReason, Is.EqualTo("stop"));
+        });
     }
 
     [Test]
@@ -132,9 +135,12 @@ public sealed class AzureAiInferenceStreamingTests
         }
 
         var usageChunk = chunks.FirstOrDefault(c => c.PromptTokens.HasValue);
-        Assert.That(usageChunk, Is.Not.Null);
-        Assert.That(usageChunk!.PromptTokens, Is.EqualTo(10));
-        Assert.That(usageChunk.CompletionTokens, Is.EqualTo(5));
+        Assert.Multiple(() =>
+        {
+            Assert.That(usageChunk, Is.Not.Null);
+            Assert.That(usageChunk!.PromptTokens, Is.EqualTo(10));
+            Assert.That(usageChunk.CompletionTokens, Is.EqualTo(5));
+        });
     }
 
     [Test]
@@ -170,8 +176,11 @@ public sealed class AzureAiInferenceStreamingTests
         var client = new AzureAiInferenceChatCompletionClient(httpClient, options);
 
         var feature = client.Features.Get<IStreamingChatFeature>();
-        Assert.That(feature, Is.Not.Null);
-        Assert.That(feature, Is.SameAs(client));
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
     }
 
     [Test]

@@ -134,7 +134,7 @@ public sealed class CohereGroundedChatTests
     private Func<string?>? _capturedBodyAccessor;
     private string? CapturedBody { get; set; }
 
-    private async Task<(GroundedChatCompletionResponse response, string? capturedBody)> ExecuteGroundedChat(
+    private static async Task<(GroundedChatCompletionResponse response, string? capturedBody)> ExecuteGroundedChat(
         string responseJson,
         GroundedChatOptions? options = null,
         ChatCompletionRequest? request = null)
@@ -168,9 +168,12 @@ public sealed class CohereGroundedChatTests
 
         Assert.That(capturedBody, Is.Not.Null);
         var doc = JsonDocument.Parse(capturedBody!);
-        Assert.That(doc.RootElement.TryGetProperty("documents", out var documents), Is.True);
-        Assert.That(documents.ValueKind, Is.EqualTo(JsonValueKind.Array));
-        Assert.That(documents.GetArrayLength(), Is.EqualTo(2));
+        Assert.Multiple(() =>
+        {
+            Assert.That(doc.RootElement.TryGetProperty("documents", out var documents), Is.True);
+            Assert.That(documents.ValueKind, Is.EqualTo(JsonValueKind.Array));
+            Assert.That(documents.GetArrayLength(), Is.EqualTo(2));
+        });
     }
 
     [Test]
@@ -183,9 +186,12 @@ public sealed class CohereGroundedChatTests
         Assert.That(firstDoc.GetProperty("id").GetString(), Is.EqualTo("doc-1"));
 
         var data = firstDoc.GetProperty("data");
-        Assert.That(data.ValueKind, Is.EqualTo(JsonValueKind.Object));
-        Assert.That(data.GetProperty("title").GetString(), Is.EqualTo("France"));
-        Assert.That(data.GetProperty("snippet").GetString(), Is.EqualTo("Paris is the capital of France."));
+        Assert.Multiple(() =>
+        {
+            Assert.That(data.ValueKind, Is.EqualTo(JsonValueKind.Object));
+            Assert.That(data.GetProperty("title").GetString(), Is.EqualTo("France"));
+            Assert.That(data.GetProperty("snippet").GetString(), Is.EqualTo("Paris is the capital of France."));
+        });
     }
 
     [Test]
@@ -200,8 +206,11 @@ public sealed class CohereGroundedChatTests
         Assert.That(firstDoc.GetProperty("id").GetString(), Is.EqualTo("doc-1"));
 
         var data = firstDoc.GetProperty("data");
-        Assert.That(data.ValueKind, Is.EqualTo(JsonValueKind.String));
-        Assert.That(data.GetString(), Is.EqualTo("Paris is the capital of France."));
+        Assert.Multiple(() =>
+        {
+            Assert.That(data.ValueKind, Is.EqualTo(JsonValueKind.String));
+            Assert.That(data.GetString(), Is.EqualTo("Paris is the capital of France."));
+        });
     }
 
     [Test]
@@ -277,10 +286,13 @@ public sealed class CohereGroundedChatTests
 
         var doc = JsonDocument.Parse(capturedBody!);
         // Verify snake_case: citation_options not citationOptions
-        Assert.That(doc.RootElement.TryGetProperty("citation_options", out _), Is.True);
-        Assert.That(doc.RootElement.TryGetProperty("citationOptions", out _), Is.False);
-        // max_tokens not maxTokens
-        Assert.That(doc.RootElement.TryGetProperty("maxTokens", out _), Is.False);
+        Assert.Multiple(() =>
+        {
+            Assert.That(doc.RootElement.TryGetProperty("citation_options", out _), Is.True);
+            Assert.That(doc.RootElement.TryGetProperty("citationOptions", out _), Is.False);
+            // max_tokens not maxTokens
+            Assert.That(doc.RootElement.TryGetProperty("maxTokens", out _), Is.False);
+        });
     }
 
     [Test]
@@ -311,11 +323,14 @@ public sealed class CohereGroundedChatTests
     {
         var (response, _) = await ExecuteGroundedChat(GroundedResponseWithCitations);
 
-        Assert.That(response.IsSuccess, Is.True);
-        Assert.That(response.Citations, Has.Count.EqualTo(1));
-        Assert.That(response.Citations[0].Start, Is.EqualTo(27));
-        Assert.That(response.Citations[0].End, Is.EqualTo(32));
-        Assert.That(response.Citations[0].Text, Is.EqualTo("Paris"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.True);
+            Assert.That(response.Citations, Has.Count.EqualTo(1));
+            Assert.That(response.Citations[0].Start, Is.EqualTo(27));
+            Assert.That(response.Citations[0].End, Is.EqualTo(32));
+            Assert.That(response.Citations[0].Text, Is.EqualTo("Paris"));
+        });
     }
 
     [Test]
@@ -324,11 +339,14 @@ public sealed class CohereGroundedChatTests
         var (response, _) = await ExecuteGroundedChat(GroundedResponseWithCitations);
 
         var sources = response.Citations[0].Sources;
-        Assert.That(sources, Has.Count.EqualTo(1));
-        Assert.That(sources[0].Id, Is.EqualTo("doc-1"));
-        Assert.That(sources[0].Data, Is.Not.Null);
-        Assert.That(sources[0].Data!["title"], Is.EqualTo("France"));
-        Assert.That(sources[0].Data!["snippet"], Is.EqualTo("Paris is the capital of France."));
+        Assert.Multiple(() =>
+        {
+            Assert.That(sources, Has.Count.EqualTo(1));
+            Assert.That(sources[0].Id, Is.EqualTo("doc-1"));
+            Assert.That(sources[0].Data, Is.Not.Null);
+            Assert.That(sources[0].Data!["title"], Is.EqualTo("France"));
+            Assert.That(sources[0].Data!["snippet"], Is.EqualTo("Paris is the capital of France."));
+        });
     }
 
     [Test]
@@ -344,8 +362,11 @@ public sealed class CohereGroundedChatTests
     {
         var (response, _) = await ExecuteGroundedChat(GroundedResponseNoCitations);
 
-        Assert.That(response.IsSuccess, Is.True);
-        Assert.That(response.Citations, Is.Empty);
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.True);
+            Assert.That(response.Citations, Is.Empty);
+        });
     }
 
     [Test]
@@ -361,8 +382,11 @@ public sealed class CohereGroundedChatTests
     {
         var (response, _) = await ExecuteGroundedChat(GroundedResponseWithCitations);
 
-        Assert.That(response.ChatCompletion.PromptTokens, Is.EqualTo(300));
-        Assert.That(response.ChatCompletion.CompletionTokens, Is.EqualTo(15));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.ChatCompletion.PromptTokens, Is.EqualTo(300));
+            Assert.That(response.ChatCompletion.CompletionTokens, Is.EqualTo(15));
+        });
     }
 
     [Test]
@@ -385,8 +409,11 @@ public sealed class CohereGroundedChatTests
             GroundedResponseWithCitations,
             request: request);
 
-        Assert.That(response.ChatCompletion.RawResponseJson, Is.Not.Null.And.Not.Empty);
-        Assert.That(response.ChatCompletion.RawRequestJson, Is.Not.Null.And.Not.Empty);
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.ChatCompletion.RawResponseJson, Is.Not.Null.And.Not.Empty);
+            Assert.That(response.ChatCompletion.RawRequestJson, Is.Not.Null.And.Not.Empty);
+        });
     }
 
     #endregion
@@ -408,9 +435,12 @@ public sealed class CohereGroundedChatTests
         var response = await client.GetGroundedChatCompletionAsync(
             CreateRequest(), CreateOptionsWithKeyValueDocs());
 
-        Assert.That(response.IsSuccess, Is.False);
-        Assert.That(response.ErrorMessage, Is.Not.Null.And.Not.Empty);
-        Assert.That(response.Citations, Is.Empty);
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.False);
+            Assert.That(response.ErrorMessage, Is.Not.Null.And.Not.Empty);
+            Assert.That(response.Citations, Is.Empty);
+        });
     }
 
     [Test]
@@ -451,8 +481,11 @@ public sealed class CohereGroundedChatTests
 
         var feature = client.Features.Get<IGroundedChatFeature>();
 
-        Assert.That(feature, Is.Not.Null);
-        Assert.That(feature, Is.SameAs(client));
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
     }
 
     #endregion
@@ -547,11 +580,14 @@ public sealed class CohereGroundedChatTests
 
         var (response, _) = await ExecuteGroundedChat(responseWithMultipleCitations);
 
-        Assert.That(response.Citations, Has.Count.EqualTo(2));
-        Assert.That(response.Citations[0].Text, Is.EqualTo("Paris"));
-        Assert.That(response.Citations[0].Sources[0].Id, Is.EqualTo("doc-1"));
-        Assert.That(response.Citations[1].Text, Is.EqualTo("Berlin"));
-        Assert.That(response.Citations[1].Sources[0].Id, Is.EqualTo("doc-2"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Citations, Has.Count.EqualTo(2));
+            Assert.That(response.Citations[0].Text, Is.EqualTo("Paris"));
+            Assert.That(response.Citations[0].Sources[0].Id, Is.EqualTo("doc-1"));
+            Assert.That(response.Citations[1].Text, Is.EqualTo("Berlin"));
+            Assert.That(response.Citations[1].Sources[0].Id, Is.EqualTo("doc-2"));
+        });
     }
 
     #endregion

@@ -59,9 +59,12 @@ public sealed class FeatureCollectionTests
 
         var entries = collection.ToList();
 
-        Assert.That(entries, Has.Count.EqualTo(2));
-        Assert.That(entries.Any(e => e.Key == typeof(ITestFeature) && e.Value == feature1), Is.True);
-        Assert.That(entries.Any(e => e.Key == typeof(IAnotherTestFeature) && e.Value == feature2), Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(entries, Has.Count.EqualTo(2));
+            Assert.That(entries.Any(e => e.Key == typeof(ITestFeature) && e.Value == feature1), Is.True);
+            Assert.That(entries.Any(e => e.Key == typeof(IAnotherTestFeature) && e.Value == feature2), Is.True);
+        });
     }
 
     [Test]
@@ -73,8 +76,11 @@ public sealed class FeatureCollectionTests
         collection.Set<ITestFeature>(feature1);
         collection.Set<IAnotherTestFeature>(feature2);
 
-        Assert.That(collection.Get<ITestFeature>(), Is.SameAs(feature1));
-        Assert.That(collection.Get<IAnotherTestFeature>(), Is.SameAs(feature2));
+        Assert.Multiple(() =>
+        {
+            Assert.That(collection.Get<ITestFeature>(), Is.SameAs(feature1));
+            Assert.That(collection.Get<IAnotherTestFeature>(), Is.SameAs(feature2));
+        });
     }
 
     [Test]

@@ -197,7 +197,7 @@ public sealed class CohereEmbeddingClient : IEmbeddingClient, IImageEmbeddingFea
     {
         var floatEmbeddings = raw.Embeddings.Float;
 
-        IReadOnlyList<float[]> embeddings = floatEmbeddings is not null
+        List<float[]> embeddings = floatEmbeddings is not null
             ? floatEmbeddings.Select(e => e.ToArray()).ToList()
             : [];
 

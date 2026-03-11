@@ -203,7 +203,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
     /// </summary>
     public const int DefaultMaxTokens = 8192;
 
-    private async Task<AnthropicChatRequest> BuildRequestAsync(
+    private static async Task<AnthropicChatRequest> BuildRequestAsync(
         ChatCompletionRequest request,
         CancellationToken cancellationToken)
     {
@@ -285,7 +285,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         return new ToolCallingResponse(chatCompletion, toolCalls);
     }
 
-    private static IReadOnlyList<ToolCall>? MapResponseToolCalls(List<AnthropicContentBlock> contentBlocks)
+    private static List<ToolCall>? MapResponseToolCalls(List<AnthropicContentBlock> contentBlocks)
     {
         var toolUseBlocks = contentBlocks
             .Where(c => c.Type == "tool_use" && c.Id is not null && c.Name is not null && c.Input.HasValue)

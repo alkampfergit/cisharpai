@@ -59,11 +59,14 @@ public sealed class AnthropicVisionTests
 
         var body = getBody()!;
         // Anthropic uses raw base64, NOT data URIs
-        Assert.That(body, Does.Contain("\"type\":\"image\""));
-        Assert.That(body, Does.Contain("\"type\":\"base64\""));
-        Assert.That(body, Does.Contain("abc123"));
-        Assert.That(body, Does.Not.Contain("data:image/png;base64,"));
-        Assert.That(body, Does.Contain("\"media_type\":\"image/png\""));
+        Assert.Multiple(() =>
+        {
+            Assert.That(body, Does.Contain("\"type\":\"image\""));
+            Assert.That(body, Does.Contain("\"type\":\"base64\""));
+            Assert.That(body, Does.Contain("abc123"));
+            Assert.That(body, Does.Not.Contain("data:image/png;base64,"));
+            Assert.That(body, Does.Contain("\"media_type\":\"image/png\""));
+        });
     }
 
     [Test]
@@ -87,9 +90,12 @@ public sealed class AnthropicVisionTests
         await client.GetChatCompletionAsync(request);
 
         var body = getBody()!;
-        Assert.That(body, Does.Contain("\"source\""));
-        Assert.That(body, Does.Contain("\"media_type\":\"image/jpeg\""));
-        Assert.That(body, Does.Contain("\"data\":\"base64data==\""));
+        Assert.Multiple(() =>
+        {
+            Assert.That(body, Does.Contain("\"source\""));
+            Assert.That(body, Does.Contain("\"media_type\":\"image/jpeg\""));
+            Assert.That(body, Does.Contain("\"data\":\"base64data==\""));
+        });
     }
 
     [Test]
@@ -112,8 +118,11 @@ public sealed class AnthropicVisionTests
             Assert.That(response.IsSuccess, Is.True);
 
             var body = getBody()!;
-            Assert.That(body, Does.Contain("\"type\":\"image\""));
-            Assert.That(body, Does.Contain("\"type\":\"base64\""));
+            Assert.Multiple(() =>
+            {
+                Assert.That(body, Does.Contain("\"type\":\"image\""));
+                Assert.That(body, Does.Contain("\"type\":\"base64\""));
+            });
             // Should be actual base64 of the file bytes
             var expectedBase64 = Convert.ToBase64String(imgBytes);
             Assert.That(body, Does.Contain($"\"data\":\"{expectedBase64}\""));
@@ -137,8 +146,11 @@ public sealed class AnthropicVisionTests
         await client.GetChatCompletionAsync(request);
 
         var body = getBody()!;
-        Assert.That(body, Does.Contain("Hello!"));
-        Assert.That(body, Does.Not.Contain("\"type\":\"image\""));
+        Assert.Multiple(() =>
+        {
+            Assert.That(body, Does.Contain("Hello!"));
+            Assert.That(body, Does.Not.Contain("\"type\":\"image\""));
+        });
     }
 
     [Test]
@@ -162,8 +174,11 @@ public sealed class AnthropicVisionTests
 
         var body = getBody()!;
         // Anthropic image block: {"type":"image","source":{"type":"base64","media_type":"...","data":"..."}}
-        Assert.That(body, Does.Contain("\"type\":\"image\""));
-        Assert.That(body, Does.Contain("\"media_type\":\"image/webp\""));
-        Assert.That(body, Does.Contain("\"data\":\"mydata\""));
+        Assert.Multiple(() =>
+        {
+            Assert.That(body, Does.Contain("\"type\":\"image\""));
+            Assert.That(body, Does.Contain("\"media_type\":\"image/webp\""));
+            Assert.That(body, Does.Contain("\"data\":\"mydata\""));
+        });
     }
 }

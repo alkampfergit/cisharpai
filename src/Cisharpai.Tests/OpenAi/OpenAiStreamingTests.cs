@@ -87,7 +87,7 @@ public sealed class OpenAiStreamingTests
         }
 
         var textChunks = chunks.Where(c => !string.IsNullOrEmpty(c.Content)).ToList();
-        Assert.That(textChunks.Count, Is.GreaterThanOrEqualTo(2));
+        Assert.That(textChunks, Has.Count.GreaterThanOrEqualTo(2));
 
         var combined = string.Concat(textChunks.Select(c => c.Content));
         Assert.That(combined, Is.EqualTo("Hello, world!"));
@@ -110,8 +110,11 @@ public sealed class OpenAiStreamingTests
         }
 
         var finishChunk = chunks.FirstOrDefault(c => c.FinishReason is not null);
-        Assert.That(finishChunk, Is.Not.Null);
-        Assert.That(finishChunk!.FinishReason, Is.EqualTo("stop"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(finishChunk, Is.Not.Null);
+            Assert.That(finishChunk!.FinishReason, Is.EqualTo("stop"));
+        });
     }
 
     [Test]
@@ -131,9 +134,12 @@ public sealed class OpenAiStreamingTests
         }
 
         var usageChunk = chunks.FirstOrDefault(c => c.PromptTokens.HasValue);
-        Assert.That(usageChunk, Is.Not.Null);
-        Assert.That(usageChunk!.PromptTokens, Is.EqualTo(10));
-        Assert.That(usageChunk.CompletionTokens, Is.EqualTo(5));
+        Assert.Multiple(() =>
+        {
+            Assert.That(usageChunk, Is.Not.Null);
+            Assert.That(usageChunk!.PromptTokens, Is.EqualTo(10));
+            Assert.That(usageChunk.CompletionTokens, Is.EqualTo(5));
+        });
     }
 
     [Test]
@@ -190,9 +196,12 @@ public sealed class OpenAiStreamingTests
         }
 
         var completedChunk = chunks.FirstOrDefault(c => c.FinishReason is not null);
-        Assert.That(completedChunk, Is.Not.Null);
-        Assert.That(completedChunk!.FinishReason, Is.EqualTo("completed"));
-        Assert.That(completedChunk.Model, Is.EqualTo("gpt-5"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(completedChunk, Is.Not.Null);
+            Assert.That(completedChunk!.FinishReason, Is.EqualTo("completed"));
+            Assert.That(completedChunk.Model, Is.EqualTo("gpt-5"));
+        });
     }
 
     [Test]
@@ -204,8 +213,11 @@ public sealed class OpenAiStreamingTests
         var client = new OpenAiChatCompletionClient(httpClient, new OpenAiClientOptions { ApiKey = "test-key" });
 
         var feature = client.Features.Get<IStreamingChatFeature>();
-        Assert.That(feature, Is.Not.Null);
-        Assert.That(feature, Is.SameAs(client));
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
     }
 
     [Test]
@@ -225,7 +237,10 @@ public sealed class OpenAiStreamingTests
         }
 
         var textChunks = chunks.Where(c => !string.IsNullOrEmpty(c.Content) && c.Model is not null).ToList();
-        Assert.That(textChunks, Is.Not.Empty);
-        Assert.That(textChunks[0].Model, Is.EqualTo("gpt-4o"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(textChunks, Is.Not.Empty);
+            Assert.That(textChunks[0].Model, Is.EqualTo("gpt-4o"));
+        });
     }
 }

@@ -111,8 +111,11 @@ public sealed class AzureOpenAiStreamingTests
         }
 
         var finishChunk = chunks.FirstOrDefault(c => c.FinishReason is not null);
-        Assert.That(finishChunk, Is.Not.Null);
-        Assert.That(finishChunk!.FinishReason, Is.EqualTo("stop"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(finishChunk, Is.Not.Null);
+            Assert.That(finishChunk!.FinishReason, Is.EqualTo("stop"));
+        });
     }
 
     [Test]
@@ -132,9 +135,12 @@ public sealed class AzureOpenAiStreamingTests
         }
 
         var usageChunk = chunks.FirstOrDefault(c => c.PromptTokens.HasValue);
-        Assert.That(usageChunk, Is.Not.Null);
-        Assert.That(usageChunk!.PromptTokens, Is.EqualTo(10));
-        Assert.That(usageChunk.CompletionTokens, Is.EqualTo(5));
+        Assert.Multiple(() =>
+        {
+            Assert.That(usageChunk, Is.Not.Null);
+            Assert.That(usageChunk!.PromptTokens, Is.EqualTo(10));
+            Assert.That(usageChunk.CompletionTokens, Is.EqualTo(5));
+        });
     }
 
     [Test]
@@ -171,8 +177,11 @@ public sealed class AzureOpenAiStreamingTests
         var client = new AzureOpenAiChatCompletionClient(httpClient, options);
 
         var feature = client.Features.Get<IStreamingChatFeature>();
-        Assert.That(feature, Is.Not.Null);
-        Assert.That(feature, Is.SameAs(client));
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
     }
 
     [Test]
@@ -189,8 +198,11 @@ public sealed class AzureOpenAiStreamingTests
         await foreach (var _ in feature.GetChatCompletionStreamAsync(request)) { }
 
         var body = getBody()!;
-        Assert.That(body, Does.Contain("\"stream\":true"));
-        Assert.That(body, Does.Contain("max_completion_tokens"));
-        Assert.That(body, Does.Not.Contain("\"max_tokens\""));
+        Assert.Multiple(() =>
+        {
+            Assert.That(body, Does.Contain("\"stream\":true"));
+            Assert.That(body, Does.Contain("max_completion_tokens"));
+            Assert.That(body, Does.Not.Contain("\"max_tokens\""));
+        });
     }
 }

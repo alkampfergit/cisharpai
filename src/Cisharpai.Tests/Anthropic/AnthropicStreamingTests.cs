@@ -85,7 +85,7 @@ public sealed class AnthropicStreamingTests
         }
 
         var textChunks = chunks.Where(c => !string.IsNullOrEmpty(c.Content)).ToList();
-        Assert.That(textChunks.Count, Is.GreaterThanOrEqualTo(2));
+        Assert.That(textChunks, Has.Count.GreaterThanOrEqualTo(2));
 
         var combined = string.Concat(textChunks.Select(c => c.Content));
         Assert.That(combined, Is.EqualTo("Hello, world!"));
@@ -108,8 +108,11 @@ public sealed class AnthropicStreamingTests
         }
 
         var finishChunk = chunks.FirstOrDefault(c => c.FinishReason is not null);
-        Assert.That(finishChunk, Is.Not.Null);
-        Assert.That(finishChunk!.FinishReason, Is.EqualTo("end_turn"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(finishChunk, Is.Not.Null);
+            Assert.That(finishChunk!.FinishReason, Is.EqualTo("end_turn"));
+        });
     }
 
     [Test]
@@ -130,8 +133,11 @@ public sealed class AnthropicStreamingTests
 
         // The message_delta chunk should have output_tokens
         var usageChunk = chunks.FirstOrDefault(c => c.CompletionTokens.HasValue);
-        Assert.That(usageChunk, Is.Not.Null);
-        Assert.That(usageChunk!.CompletionTokens, Is.EqualTo(5));
+        Assert.Multiple(() =>
+        {
+            Assert.That(usageChunk, Is.Not.Null);
+            Assert.That(usageChunk!.CompletionTokens, Is.EqualTo(5));
+        });
     }
 
     [Test]
@@ -159,8 +165,11 @@ public sealed class AnthropicStreamingTests
         var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions { ApiKey = "test-key" });
 
         var feature = client.Features.Get<IStreamingChatFeature>();
-        Assert.That(feature, Is.Not.Null);
-        Assert.That(feature, Is.SameAs(client));
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
     }
 
     [Test]
@@ -181,8 +190,11 @@ public sealed class AnthropicStreamingTests
 
         // After message_start, text chunks should have the model
         var textChunks = chunks.Where(c => !string.IsNullOrEmpty(c.Content) && c.Model is not null).ToList();
-        Assert.That(textChunks, Is.Not.Empty);
-        Assert.That(textChunks[0].Model, Is.EqualTo("claude-3-5-sonnet-20241022"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(textChunks, Is.Not.Empty);
+            Assert.That(textChunks[0].Model, Is.EqualTo("claude-3-5-sonnet-20241022"));
+        });
     }
 
     [Test]

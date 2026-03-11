@@ -99,12 +99,15 @@ public sealed class ImageDataUriHelperTests
     [Test]
     public void GetMimeType_ReturnsCorrectTypes()
     {
-        Assert.That(ImageDataUriHelper.GetMimeType("image.png"), Is.EqualTo("image/png"));
-        Assert.That(ImageDataUriHelper.GetMimeType("image.jpg"), Is.EqualTo("image/jpeg"));
-        Assert.That(ImageDataUriHelper.GetMimeType("image.jpeg"), Is.EqualTo("image/jpeg"));
-        Assert.That(ImageDataUriHelper.GetMimeType("image.webp"), Is.EqualTo("image/webp"));
-        Assert.That(ImageDataUriHelper.GetMimeType("image.gif"), Is.EqualTo("image/gif"));
-        Assert.That(ImageDataUriHelper.GetMimeType("image.tiff"), Is.EqualTo("application/octet-stream"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(ImageDataUriHelper.GetMimeType("image.png"), Is.EqualTo("image/png"));
+            Assert.That(ImageDataUriHelper.GetMimeType("image.jpg"), Is.EqualTo("image/jpeg"));
+            Assert.That(ImageDataUriHelper.GetMimeType("image.jpeg"), Is.EqualTo("image/jpeg"));
+            Assert.That(ImageDataUriHelper.GetMimeType("image.webp"), Is.EqualTo("image/webp"));
+            Assert.That(ImageDataUriHelper.GetMimeType("image.gif"), Is.EqualTo("image/gif"));
+            Assert.That(ImageDataUriHelper.GetMimeType("image.tiff"), Is.EqualTo("application/octet-stream"));
+        });
     }
 
     private static string CreateTempFile(string extension, byte[] content)

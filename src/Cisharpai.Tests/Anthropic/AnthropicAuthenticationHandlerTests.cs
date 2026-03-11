@@ -17,10 +17,13 @@ public sealed class AnthropicAuthenticationHandlerTests
 
         await client.GetAsync("/v1/messages");
 
-        Assert.That(innerHandler.LastRequest!.Headers.Contains("x-api-key"), Is.True);
-        Assert.That(
-            innerHandler.LastRequest.Headers.GetValues("x-api-key").First(),
-            Is.EqualTo("sk-ant-test"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(innerHandler.LastRequest!.Headers.Contains("x-api-key"), Is.True);
+            Assert.That(
+                innerHandler.LastRequest.Headers.GetValues("x-api-key").First(),
+                Is.EqualTo("sk-ant-test"));
+        });
     }
 
     [Test]
@@ -35,10 +38,13 @@ public sealed class AnthropicAuthenticationHandlerTests
 
         await client.GetAsync("/v1/messages");
 
-        Assert.That(innerHandler.LastRequest!.Headers.Contains("anthropic-version"), Is.True);
-        Assert.That(
-            innerHandler.LastRequest.Headers.GetValues("anthropic-version").First(),
-            Is.EqualTo("2023-06-01"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(innerHandler.LastRequest!.Headers.Contains("anthropic-version"), Is.True);
+            Assert.That(
+                innerHandler.LastRequest.Headers.GetValues("anthropic-version").First(),
+                Is.EqualTo("2023-06-01"));
+        });
     }
 
     [Test]

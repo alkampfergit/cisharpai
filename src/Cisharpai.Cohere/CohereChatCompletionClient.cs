@@ -332,7 +332,7 @@ public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOut
         return new ToolCallingResponse(chatCompletion, toolCalls);
     }
 
-    private static IReadOnlyList<ToolCall>? MapResponseToolCalls(List<CohereToolCall>? toolCalls)
+    private static List<ToolCall>? MapResponseToolCalls(List<CohereToolCall>? toolCalls)
     {
         if (toolCalls is null || toolCalls.Count == 0)
             return null;
@@ -518,7 +518,7 @@ public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOut
         }).ToList();
     }
 
-    private static IReadOnlyList<Citation> MapCitations(List<CohereChatCitation>? citations)
+    private static List<Citation> MapCitations(List<CohereChatCitation>? citations)
     {
         if (citations is null || citations.Count == 0)
             return [];

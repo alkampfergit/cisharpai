@@ -84,8 +84,11 @@ public sealed class JsonOutputOptionsTests
             JsonSchema: """{"type":"object"}""",
             Strict: false);
 
-        Assert.That(options.Strict, Is.False);
-        Assert.DoesNotThrow(() => options.Validate());
+        Assert.Multiple(() =>
+        {
+            Assert.That(options.Strict, Is.False);
+            Assert.DoesNotThrow(() => options.Validate());
+        });
     }
 
     [Test]
@@ -98,9 +101,12 @@ public sealed class JsonOutputOptionsTests
             JsonSchema: invalidJson);
 
         var ex = Assert.Throws<ArgumentException>(() => options.Validate());
-        Assert.That(ex!.ParamName, Is.EqualTo("JsonSchema"));
-        Assert.That(ex.Message, Does.Contain(invalidJson));
-        Assert.That(ex.Message, Does.Contain("invalid JSON"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(ex!.ParamName, Is.EqualTo("JsonSchema"));
+            Assert.That(ex.Message, Does.Contain(invalidJson));
+            Assert.That(ex.Message, Does.Contain("invalid JSON"));
+        });
     }
 
     [Test]

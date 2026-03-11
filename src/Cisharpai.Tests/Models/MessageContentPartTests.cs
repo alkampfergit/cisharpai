@@ -22,8 +22,11 @@ public sealed class MessageContentPartTests
     public void ImageBase64ContentPart_Stores_Data_And_MediaType()
     {
         var part = new ImageBase64ContentPart("base64data", "image/png");
-        Assert.That(part.Base64Data, Is.EqualTo("base64data"));
-        Assert.That(part.MediaType, Is.EqualTo("image/png"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(part.Base64Data, Is.EqualTo("base64data"));
+            Assert.That(part.MediaType, Is.EqualTo("image/png"));
+        });
     }
 
     [Test]
@@ -67,9 +70,12 @@ public sealed class MessageContentPartTests
     {
         var toolCall = new ToolCall("id1", "myFunc", System.Text.Json.JsonDocument.Parse("{}").RootElement);
         var msg = new LlmMessage(LlmRole.Assistant, "content", ToolCalls: new[] { toolCall });
-        Assert.That(msg.Content, Is.EqualTo("content"));
-        Assert.That(msg.ToolCalls, Is.Not.Null);
-        Assert.That(msg.ContentParts, Is.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(msg.Content, Is.EqualTo("content"));
+            Assert.That(msg.ToolCalls, Is.Not.Null);
+            Assert.That(msg.ContentParts, Is.Null);
+        });
     }
 
     [Test]
@@ -83,10 +89,13 @@ public sealed class MessageContentPartTests
 
         var msg = new LlmMessage(LlmRole.User, string.Empty, ContentParts: parts);
 
-        Assert.That(msg.ContentParts, Is.Not.Null);
-        Assert.That(msg.ContentParts!.Count, Is.EqualTo(2));
-        Assert.That(msg.ContentParts[0], Is.InstanceOf<TextContentPart>());
-        Assert.That(msg.ContentParts[1], Is.InstanceOf<ImageFileContentPart>());
+        Assert.Multiple(() =>
+        {
+            Assert.That(msg.ContentParts, Is.Not.Null);
+            Assert.That(msg.ContentParts!, Has.Count.EqualTo(2));
+            Assert.That(msg.ContentParts[0], Is.InstanceOf<TextContentPart>());
+            Assert.That(msg.ContentParts[1], Is.InstanceOf<ImageFileContentPart>());
+        });
     }
 
     [Test]
@@ -94,18 +103,27 @@ public sealed class MessageContentPartTests
     {
         var msg = LlmMessage.WithImage("describe", "/path.png");
 
-        Assert.That(msg.Role, Is.EqualTo(LlmRole.User));
-        Assert.That(msg.Content, Is.EqualTo(string.Empty));
-        Assert.That(msg.ContentParts, Is.Not.Null);
-        Assert.That(msg.ContentParts!.Count, Is.EqualTo(2));
+        Assert.Multiple(() =>
+        {
+            Assert.That(msg.Role, Is.EqualTo(LlmRole.User));
+            Assert.That(msg.Content, Is.EqualTo(string.Empty));
+            Assert.That(msg.ContentParts, Is.Not.Null);
+            Assert.That(msg.ContentParts!, Has.Count.EqualTo(2));
+        });
 
         var textPart = msg.ContentParts[0] as TextContentPart;
-        Assert.That(textPart, Is.Not.Null);
-        Assert.That(textPart!.Text, Is.EqualTo("describe"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(textPart, Is.Not.Null);
+            Assert.That(textPart!.Text, Is.EqualTo("describe"));
+        });
 
         var imagePart = msg.ContentParts[1] as ImageFileContentPart;
-        Assert.That(imagePart, Is.Not.Null);
-        Assert.That(imagePart!.FilePath, Is.EqualTo("/path.png"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(imagePart, Is.Not.Null);
+            Assert.That(imagePart!.FilePath, Is.EqualTo("/path.png"));
+        });
     }
 
     [Test]
@@ -113,18 +131,27 @@ public sealed class MessageContentPartTests
     {
         var msg = LlmMessage.WithBase64Image("describe", "base64data", "image/png");
 
-        Assert.That(msg.Role, Is.EqualTo(LlmRole.User));
-        Assert.That(msg.Content, Is.EqualTo(string.Empty));
-        Assert.That(msg.ContentParts, Is.Not.Null);
-        Assert.That(msg.ContentParts!.Count, Is.EqualTo(2));
+        Assert.Multiple(() =>
+        {
+            Assert.That(msg.Role, Is.EqualTo(LlmRole.User));
+            Assert.That(msg.Content, Is.EqualTo(string.Empty));
+            Assert.That(msg.ContentParts, Is.Not.Null);
+            Assert.That(msg.ContentParts!, Has.Count.EqualTo(2));
+        });
 
         var textPart = msg.ContentParts[0] as TextContentPart;
-        Assert.That(textPart, Is.Not.Null);
-        Assert.That(textPart!.Text, Is.EqualTo("describe"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(textPart, Is.Not.Null);
+            Assert.That(textPart!.Text, Is.EqualTo("describe"));
+        });
 
         var imagePart = msg.ContentParts[1] as ImageBase64ContentPart;
-        Assert.That(imagePart, Is.Not.Null);
-        Assert.That(imagePart!.Base64Data, Is.EqualTo("base64data"));
-        Assert.That(imagePart.MediaType, Is.EqualTo("image/png"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(imagePart, Is.Not.Null);
+            Assert.That(imagePart!.Base64Data, Is.EqualTo("base64data"));
+            Assert.That(imagePart.MediaType, Is.EqualTo("image/png"));
+        });
     }
 }

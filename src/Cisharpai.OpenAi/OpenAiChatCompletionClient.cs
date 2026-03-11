@@ -572,7 +572,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         return new ToolCallingResponse(chatCompletion, toolCalls);
     }
 
-    private static IReadOnlyList<ToolCall>? MapResponseToolCalls(List<OpenAiToolCall>? toolCalls)
+    private static List<ToolCall>? MapResponseToolCalls(List<OpenAiToolCall>? toolCalls)
     {
         if (toolCalls is null || toolCalls.Count == 0)
             return null;

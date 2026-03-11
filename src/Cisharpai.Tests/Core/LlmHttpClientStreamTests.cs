@@ -39,9 +39,12 @@ public sealed class LlmHttpClientStreamTests
             results.Add(chunk);
         }
 
-        Assert.That(results.Count, Is.EqualTo(2));
-        Assert.That(results[0], Is.EqualTo("{\"content\":\"Hello\"}"));
-        Assert.That(results[1], Is.EqualTo("{\"content\":\" world\"}"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(results, Has.Count.EqualTo(2));
+            Assert.That(results[0], Is.EqualTo("{\"content\":\"Hello\"}"));
+            Assert.That(results[1], Is.EqualTo("{\"content\":\" world\"}"));
+        });
     }
 
     [Test]
@@ -67,8 +70,11 @@ public sealed class LlmHttpClientStreamTests
             results.Add(chunk);
         }
 
-        Assert.That(results.Count, Is.EqualTo(1));
-        Assert.That(results[0], Is.EqualTo("{\"content\":\"first\"}"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(results, Has.Count.EqualTo(1));
+            Assert.That(results[0], Is.EqualTo("{\"content\":\"first\"}"));
+        });
     }
 
     [Test]
@@ -96,7 +102,7 @@ public sealed class LlmHttpClientStreamTests
             results.Add(chunk);
         }
 
-        Assert.That(results.Count, Is.EqualTo(2));
+        Assert.That(results, Has.Count.EqualTo(2));
     }
 
     [Test]
@@ -122,9 +128,12 @@ public sealed class LlmHttpClientStreamTests
             results.Add(chunk);
         }
 
-        Assert.That(results.Count, Is.EqualTo(2));
-        Assert.That(results[0], Does.Contain("content_block_delta"));
-        Assert.That(results[1], Does.Contain("message_stop"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(results, Has.Count.EqualTo(2));
+            Assert.That(results[0], Does.Contain("content_block_delta"));
+            Assert.That(results[1], Does.Contain("message_stop"));
+        });
     }
 
     [Test]
@@ -151,7 +160,7 @@ public sealed class LlmHttpClientStreamTests
             results.Add(chunk);
         }
 
-        Assert.That(results.Count, Is.EqualTo(3));
+        Assert.That(results, Has.Count.EqualTo(3));
         // No exception should be thrown — enumeration completes normally
     }
 
@@ -201,10 +210,13 @@ public sealed class LlmHttpClientStreamTests
             results.Add(chunk);
         }
 
-        Assert.That(capturedBody, Does.Contain("\"name\""));
-        Assert.That(capturedBody, Does.Contain("\"stream\":true"));
-        Assert.That(capturedBody, Does.Contain("\"customParam\":\"value\""));
-        Assert.That(results.Count, Is.EqualTo(1));
+        Assert.Multiple(() =>
+        {
+            Assert.That(capturedBody, Does.Contain("\"name\""));
+            Assert.That(capturedBody, Does.Contain("\"stream\":true"));
+            Assert.That(capturedBody, Does.Contain("\"customParam\":\"value\""));
+            Assert.That(results, Has.Count.EqualTo(1));
+        });
     }
 
     [Test]
@@ -241,7 +253,10 @@ public sealed class LlmHttpClientStreamTests
             }
         });
 
-        Assert.That(results.Count, Is.GreaterThanOrEqualTo(1));
-        Assert.That(ex, Is.Not.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(results, Has.Count.GreaterThanOrEqualTo(1));
+            Assert.That(ex, Is.Not.Null);
+        });
     }
 }

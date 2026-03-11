@@ -158,10 +158,13 @@ public sealed class AzureAiInferenceToolCallingTests
         Assert.That(tool.GetProperty("type").GetString(), Is.EqualTo("function"));
 
         var function = tool.GetProperty("function");
-        Assert.That(function.GetProperty("name").GetString(), Is.EqualTo("get_weather"));
-        Assert.That(function.GetProperty("description").GetString(), Is.EqualTo("Get current weather"));
-        Assert.That(function.GetProperty("strict").GetBoolean(), Is.True);
-        Assert.That(function.GetProperty("parameters").GetProperty("type").GetString(), Is.EqualTo("object"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(function.GetProperty("name").GetString(), Is.EqualTo("get_weather"));
+            Assert.That(function.GetProperty("description").GetString(), Is.EqualTo("Get current weather"));
+            Assert.That(function.GetProperty("strict").GetBoolean(), Is.True);
+            Assert.That(function.GetProperty("parameters").GetProperty("type").GetString(), Is.EqualTo("object"));
+        });
     }
 
     [Test]
@@ -250,8 +253,11 @@ public sealed class AzureAiInferenceToolCallingTests
 
         var doc = JsonDocument.Parse(capturedBody!);
         var toolChoice = doc.RootElement.GetProperty("tool_choice");
-        Assert.That(toolChoice.GetProperty("type").GetString(), Is.EqualTo("function"));
-        Assert.That(toolChoice.GetProperty("function").GetProperty("name").GetString(), Is.EqualTo("get_weather"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(toolChoice.GetProperty("type").GetString(), Is.EqualTo("function"));
+            Assert.That(toolChoice.GetProperty("function").GetProperty("name").GetString(), Is.EqualTo("get_weather"));
+        });
     }
 
     [Test]
@@ -294,15 +300,21 @@ public sealed class AzureAiInferenceToolCallingTests
 
         var response = await client.GetChatCompletionWithToolsAsync(CreateRequest(), CreateToolOptions());
 
-        Assert.That(response.IsSuccess, Is.True);
-        Assert.That(response.ToolCalls, Is.Not.Null);
-        Assert.That(response.ToolCalls!.Count, Is.EqualTo(1));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.True);
+            Assert.That(response.ToolCalls, Is.Not.Null);
+            Assert.That(response.ToolCalls!, Has.Count.EqualTo(1));
+        });
 
         var toolCall = response.ToolCalls[0];
-        Assert.That(toolCall.Id, Is.EqualTo("call_abc123"));
-        Assert.That(toolCall.FunctionName, Is.EqualTo("get_weather"));
-        Assert.That(toolCall.Arguments.GetProperty("city").GetString(), Is.EqualTo("Paris"));
-        Assert.That(toolCall.Arguments.GetProperty("unit").GetString(), Is.EqualTo("celsius"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(toolCall.Id, Is.EqualTo("call_abc123"));
+            Assert.That(toolCall.FunctionName, Is.EqualTo("get_weather"));
+            Assert.That(toolCall.Arguments.GetProperty("city").GetString(), Is.EqualTo("Paris"));
+            Assert.That(toolCall.Arguments.GetProperty("unit").GetString(), Is.EqualTo("celsius"));
+        });
     }
 
     [Test]
@@ -319,11 +331,14 @@ public sealed class AzureAiInferenceToolCallingTests
 
         var response = await client.GetChatCompletionWithToolsAsync(CreateRequest(), CreateToolOptions());
 
-        Assert.That(response.ToolCalls!.Count, Is.EqualTo(2));
-        Assert.That(response.ToolCalls[0].Id, Is.EqualTo("call_1"));
-        Assert.That(response.ToolCalls[1].Id, Is.EqualTo("call_2"));
-        Assert.That(response.ToolCalls[0].Arguments.GetProperty("city").GetString(), Is.EqualTo("Paris"));
-        Assert.That(response.ToolCalls[1].Arguments.GetProperty("city").GetString(), Is.EqualTo("London"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.ToolCalls!, Has.Count.EqualTo(2));
+            Assert.That(response.ToolCalls[0].Id, Is.EqualTo("call_1"));
+            Assert.That(response.ToolCalls[1].Id, Is.EqualTo("call_2"));
+            Assert.That(response.ToolCalls[0].Arguments.GetProperty("city").GetString(), Is.EqualTo("Paris"));
+            Assert.That(response.ToolCalls[1].Arguments.GetProperty("city").GetString(), Is.EqualTo("London"));
+        });
     }
 
     [Test]
@@ -340,9 +355,12 @@ public sealed class AzureAiInferenceToolCallingTests
 
         var response = await client.GetChatCompletionWithToolsAsync(CreateRequest(), CreateToolOptions());
 
-        Assert.That(response.IsSuccess, Is.True);
-        Assert.That(response.ToolCalls, Is.Null);
-        Assert.That(response.Content, Is.EqualTo("The weather in Paris is sunny."));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.True);
+            Assert.That(response.ToolCalls, Is.Null);
+            Assert.That(response.Content, Is.EqualTo("The weather in Paris is sunny."));
+        });
     }
 
     [Test]
@@ -359,8 +377,11 @@ public sealed class AzureAiInferenceToolCallingTests
 
         var response = await client.GetChatCompletionWithToolsAsync(CreateRequest(), CreateToolOptions());
 
-        Assert.That(response.ChatCompletion.PromptTokens, Is.EqualTo(50));
-        Assert.That(response.ChatCompletion.CompletionTokens, Is.EqualTo(20));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.ChatCompletion.PromptTokens, Is.EqualTo(50));
+            Assert.That(response.ChatCompletion.CompletionTokens, Is.EqualTo(20));
+        });
     }
 
     #endregion
@@ -399,9 +420,12 @@ public sealed class AzureAiInferenceToolCallingTests
 
         // Tool result message
         var toolMsg = msgs[2];
-        Assert.That(toolMsg.GetProperty("role").GetString(), Is.EqualTo("tool"));
-        Assert.That(toolMsg.GetProperty("content").GetString(), Is.EqualTo("Sunny, 22C"));
-        Assert.That(toolMsg.GetProperty("tool_call_id").GetString(), Is.EqualTo("call_1"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(toolMsg.GetProperty("role").GetString(), Is.EqualTo("tool"));
+            Assert.That(toolMsg.GetProperty("content").GetString(), Is.EqualTo("Sunny, 22C"));
+            Assert.That(toolMsg.GetProperty("tool_call_id").GetString(), Is.EqualTo("call_1"));
+        });
     }
 
     [Test]
@@ -438,11 +462,14 @@ public sealed class AzureAiInferenceToolCallingTests
         var assistantMsg = msgs[1];
         Assert.That(assistantMsg.GetProperty("role").GetString(), Is.EqualTo("assistant"));
         var toolCalls = assistantMsg.GetProperty("tool_calls");
-        Assert.That(toolCalls.GetArrayLength(), Is.EqualTo(1));
-        Assert.That(toolCalls[0].GetProperty("id").GetString(), Is.EqualTo("call_1"));
-        Assert.That(toolCalls[0].GetProperty("type").GetString(), Is.EqualTo("function"));
-        Assert.That(toolCalls[0].GetProperty("function").GetProperty("name").GetString(), Is.EqualTo("get_weather"));
-        Assert.That(toolCalls[0].GetProperty("function").GetProperty("arguments").GetString(), Is.EqualTo("""{"city":"Paris"}"""));
+        Assert.Multiple(() =>
+        {
+            Assert.That(toolCalls.GetArrayLength(), Is.EqualTo(1));
+            Assert.That(toolCalls[0].GetProperty("id").GetString(), Is.EqualTo("call_1"));
+            Assert.That(toolCalls[0].GetProperty("type").GetString(), Is.EqualTo("function"));
+            Assert.That(toolCalls[0].GetProperty("function").GetProperty("name").GetString(), Is.EqualTo("get_weather"));
+            Assert.That(toolCalls[0].GetProperty("function").GetProperty("arguments").GetString(), Is.EqualTo("""{"city":"Paris"}"""));
+        });
     }
 
     #endregion
@@ -463,8 +490,11 @@ public sealed class AzureAiInferenceToolCallingTests
 
         var response = await client.GetChatCompletionWithToolsAsync(CreateRequest(), CreateToolOptions());
 
-        Assert.That(response.IsSuccess, Is.False);
-        Assert.That(response.ErrorMessage, Is.Not.Null.And.Not.Empty);
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.False);
+            Assert.That(response.ErrorMessage, Is.Not.Null.And.Not.Empty);
+        });
     }
 
     [Test]
@@ -499,8 +529,11 @@ public sealed class AzureAiInferenceToolCallingTests
 
         var feature = client.Features.Get<IToolCallingFeature>();
 
-        Assert.That(feature, Is.Not.Null);
-        Assert.That(feature, Is.SameAs(client));
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
     }
 
     #endregion
@@ -556,9 +589,12 @@ public sealed class AzureAiInferenceToolCallingTests
 
         await client.GetChatCompletionWithToolsAsync(CreateRequest(), CreateToolOptions());
 
-        Assert.That(capturedUri, Is.Not.Null);
-        Assert.That(capturedUri!.PathAndQuery, Does.Contain("models/chat/completions"));
-        Assert.That(capturedUri.PathAndQuery, Does.Contain($"api-version={ApiVersion}"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(capturedUri, Is.Not.Null);
+            Assert.That(capturedUri!.PathAndQuery, Does.Contain("models/chat/completions"));
+            Assert.That(capturedUri.PathAndQuery, Does.Contain($"api-version={ApiVersion}"));
+        });
     }
 
     [Test]

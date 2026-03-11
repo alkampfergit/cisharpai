@@ -22,8 +22,11 @@ public class FakeServiceCollectionExtensionsTests
             new Cisharpai.Models.ChatCompletionRequest(
                 [new Cisharpai.Models.LlmMessage(Cisharpai.Models.LlmRole.User, "test")]));
 
-        Assert.That(result.Content, Is.EqualTo("DI works"));
-        Assert.That(fake.CallCount, Is.EqualTo(1));
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Content, Is.EqualTo("DI works"));
+            Assert.That(fake.CallCount, Is.EqualTo(1));
+        });
     }
 
     [Test]
@@ -35,8 +38,11 @@ public class FakeServiceCollectionExtensionsTests
         var provider = services.BuildServiceProvider();
         var client = provider.GetRequiredService<IChatCompletionClient>();
 
-        Assert.That(client.Features.Get<IStreamingChatFeature>(), Is.Not.Null);
-        Assert.That(client.Features.Get<IToolCallingFeature>(), Is.Not.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(client.Features.Get<IStreamingChatFeature>(), Is.Not.Null);
+            Assert.That(client.Features.Get<IToolCallingFeature>(), Is.Not.Null);
+        });
     }
 
     [Test]
@@ -48,8 +54,11 @@ public class FakeServiceCollectionExtensionsTests
         var provider = services.BuildServiceProvider();
         var client = provider.GetRequiredService<IChatCompletionClient>();
 
-        Assert.That(client.Features.Get<IStreamingChatFeature>(), Is.Not.Null);
-        Assert.That(client.Features.Get<IToolCallingFeature>(), Is.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(client.Features.Get<IStreamingChatFeature>(), Is.Not.Null);
+            Assert.That(client.Features.Get<IToolCallingFeature>(), Is.Null);
+        });
     }
 
     [Test]
@@ -65,8 +74,11 @@ public class FakeServiceCollectionExtensionsTests
         var result = await client.GetEmbeddingsAsync(
             new Cisharpai.Models.EmbeddingRequest(["hello"]));
 
-        Assert.That(result.IsSuccess, Is.True);
-        Assert.That(fake.CallCount, Is.EqualTo(1));
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.IsSuccess, Is.True);
+            Assert.That(fake.CallCount, Is.EqualTo(1));
+        });
     }
 
     [Test]
@@ -78,8 +90,11 @@ public class FakeServiceCollectionExtensionsTests
         var provider = services.BuildServiceProvider();
         var client = provider.GetRequiredService<IEmbeddingClient>();
 
-        Assert.That(client.Features.Get<IImageEmbeddingFeature>(), Is.Not.Null);
-        Assert.That(client.Features.Get<IMultimodalEmbeddingFeature>(), Is.Not.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(client.Features.Get<IImageEmbeddingFeature>(), Is.Not.Null);
+            Assert.That(client.Features.Get<IMultimodalEmbeddingFeature>(), Is.Not.Null);
+        });
     }
 
     [Test]
@@ -91,7 +106,10 @@ public class FakeServiceCollectionExtensionsTests
         var provider = services.BuildServiceProvider();
         var client = provider.GetRequiredService<IEmbeddingClient>();
 
-        Assert.That(client.Features.Get<IImageEmbeddingFeature>(), Is.Not.Null);
-        Assert.That(client.Features.Get<IMultimodalEmbeddingFeature>(), Is.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(client.Features.Get<IImageEmbeddingFeature>(), Is.Not.Null);
+            Assert.That(client.Features.Get<IMultimodalEmbeddingFeature>(), Is.Null);
+        });
     }
 }

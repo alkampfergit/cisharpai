@@ -32,17 +32,23 @@ public sealed class CohereMultimodalEmbeddingTests
 
         Assert.That(capturedBody, Is.Not.Null);
         var doc = JsonDocument.Parse(capturedBody!);
-        Assert.That(doc.RootElement.GetProperty("model").GetString(), Is.EqualTo("embed-v4.0"));
-        Assert.That(doc.RootElement.GetProperty("inputs").GetArrayLength(), Is.EqualTo(1));
+        Assert.Multiple(() =>
+        {
+            Assert.That(doc.RootElement.GetProperty("model").GetString(), Is.EqualTo("embed-v4.0"));
+            Assert.That(doc.RootElement.GetProperty("inputs").GetArrayLength(), Is.EqualTo(1));
+        });
 
         var content = doc.RootElement.GetProperty("inputs")[0].GetProperty("content");
-        Assert.That(content.GetArrayLength(), Is.EqualTo(1));
-        Assert.That(content[0].GetProperty("type").GetString(), Is.EqualTo("text"));
-        Assert.That(content[0].GetProperty("text").GetString(), Is.EqualTo("Hello world"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(content.GetArrayLength(), Is.EqualTo(1));
+            Assert.That(content[0].GetProperty("type").GetString(), Is.EqualTo("text"));
+            Assert.That(content[0].GetProperty("text").GetString(), Is.EqualTo("Hello world"));
 
-        // texts and images should not be present
-        Assert.That(doc.RootElement.TryGetProperty("texts", out _), Is.False);
-        Assert.That(doc.RootElement.TryGetProperty("images", out _), Is.False);
+            // texts and images should not be present
+            Assert.That(doc.RootElement.TryGetProperty("texts", out _), Is.False);
+            Assert.That(doc.RootElement.TryGetProperty("images", out _), Is.False);
+        });
     }
 
     [Test]
@@ -116,9 +122,12 @@ public sealed class CohereMultimodalEmbeddingTests
 
             var doc = JsonDocument.Parse(capturedBody!);
             var content = doc.RootElement.GetProperty("inputs")[0].GetProperty("content");
-            Assert.That(content.GetArrayLength(), Is.EqualTo(2));
-            Assert.That(content[0].GetProperty("type").GetString(), Is.EqualTo("text"));
-            Assert.That(content[1].GetProperty("type").GetString(), Is.EqualTo("image_url"));
+            Assert.Multiple(() =>
+            {
+                Assert.That(content.GetArrayLength(), Is.EqualTo(2));
+                Assert.That(content[0].GetProperty("type").GetString(), Is.EqualTo("text"));
+                Assert.That(content[1].GetProperty("type").GetString(), Is.EqualTo("image_url"));
+            });
         }
         finally
         {
@@ -151,8 +160,11 @@ public sealed class CohereMultimodalEmbeddingTests
         var response = await client.GetMultimodalEmbeddingsAsync(inputs, "embed-v4.0");
 
         var doc = JsonDocument.Parse(capturedBody!);
-        Assert.That(doc.RootElement.GetProperty("inputs").GetArrayLength(), Is.EqualTo(2));
-        Assert.That(response.Embeddings, Has.Count.EqualTo(2));
+        Assert.Multiple(() =>
+        {
+            Assert.That(doc.RootElement.GetProperty("inputs").GetArrayLength(), Is.EqualTo(2));
+            Assert.That(response.Embeddings, Has.Count.EqualTo(2));
+        });
     }
 
     [Test]
@@ -233,8 +245,11 @@ public sealed class CohereMultimodalEmbeddingTests
         var response = await client.GetMultimodalEmbeddingsAsync(
             inputs, "embed-v4.0", includeRawResponse: true);
 
-        Assert.That(response.RawResponseJson, Is.Not.Null);
-        Assert.That(response.RawRequestJson, Is.Not.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.RawResponseJson, Is.Not.Null);
+            Assert.That(response.RawRequestJson, Is.Not.Null);
+        });
     }
 
     [Test]
@@ -257,9 +272,12 @@ public sealed class CohereMultimodalEmbeddingTests
 
         var response = await client.GetMultimodalEmbeddingsAsync(inputs, "embed-v4.0");
 
-        Assert.That(response.IsSuccess, Is.False);
-        Assert.That(response.ErrorMessage, Is.Not.Null.And.Not.Empty);
-        Assert.That(response.Embeddings, Is.Empty);
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.False);
+            Assert.That(response.ErrorMessage, Is.Not.Null.And.Not.Empty);
+            Assert.That(response.Embeddings, Is.Empty);
+        });
     }
 
     [Test]
@@ -281,8 +299,11 @@ public sealed class CohereMultimodalEmbeddingTests
 
         var response = await client.GetMultimodalEmbeddingsAsync(inputs, "embed-v4.0");
 
-        Assert.That(response.IsSuccess, Is.True);
-        Assert.That(response.TotalTokens, Is.EqualTo(1610), "Should sum input_tokens (10) + image_tokens (1600)");
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.True);
+            Assert.That(response.TotalTokens, Is.EqualTo(1610), "Should sum input_tokens (10) + image_tokens (1600)");
+        });
     }
 
     [Test]

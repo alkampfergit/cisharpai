@@ -344,7 +344,7 @@ public sealed class AzureAiInferenceChatCompletionClient : IChatCompletionClient
         };
     }
 
-    private static IReadOnlyList<ToolCall>? MapResponseToolCalls(List<AzureAiInferenceToolCall>? toolCalls)
+    private static List<ToolCall>? MapResponseToolCalls(List<AzureAiInferenceToolCall>? toolCalls)
     {
         if (toolCalls is null || toolCalls.Count == 0)
             return null;

@@ -17,9 +17,12 @@ public sealed class OpenAiAuthenticationHandlerTests
 
         await client.GetAsync("/v1/models");
 
-        Assert.That(innerHandler.LastRequest!.Headers.Authorization, Is.Not.Null);
-        Assert.That(innerHandler.LastRequest.Headers.Authorization!.Scheme, Is.EqualTo("Bearer"));
-        Assert.That(innerHandler.LastRequest.Headers.Authorization.Parameter, Is.EqualTo("sk-test-key"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(innerHandler.LastRequest!.Headers.Authorization, Is.Not.Null);
+            Assert.That(innerHandler.LastRequest.Headers.Authorization!.Scheme, Is.EqualTo("Bearer"));
+            Assert.That(innerHandler.LastRequest.Headers.Authorization.Parameter, Is.EqualTo("sk-test-key"));
+        });
     }
 
     [Test]
@@ -34,12 +37,15 @@ public sealed class OpenAiAuthenticationHandlerTests
 
         await client.GetAsync("/v1/models");
 
-        Assert.That(
-            innerHandler.LastRequest!.Headers.Contains("OpenAI-Organization"),
-            Is.True);
-        Assert.That(
-            innerHandler.LastRequest.Headers.GetValues("OpenAI-Organization").First(),
-            Is.EqualTo("org-123"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                innerHandler.LastRequest!.Headers.Contains("OpenAI-Organization"),
+                Is.True);
+            Assert.That(
+                innerHandler.LastRequest.Headers.GetValues("OpenAI-Organization").First(),
+                Is.EqualTo("org-123"));
+        });
     }
 
     [Test]

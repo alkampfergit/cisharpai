@@ -7,6 +7,14 @@ namespace Cisharpai.Tests.Testing;
 [TestFixture]
 public class FakeEmbeddingClientTests
 {
+    private static readonly float[] DefaultEmbedding = [0.1f, 0.2f, 0.3f];
+    private static readonly float[] SingleHalf = [0.5f];
+    private static readonly float[] SingleNine = [0.9f];
+    private static readonly string[] HelloWorld = ["hello", "world"];
+    private static readonly float[] TwoFloats45 = [0.4f, 0.5f];
+    private static readonly float[] SingleOne = [0.1f];
+    private static readonly float[] SingleSeven = [0.7f];
+
     [Test]
     public async Task GetEmbeddingsAsync_ReturnsDefaultResponse()
     {
@@ -17,9 +25,12 @@ public class FakeEmbeddingClientTests
 
         var result = await fake.GetEmbeddingsAsync(new EmbeddingRequest(["hello"]));
 
-        Assert.That(result.IsSuccess, Is.True);
-        Assert.That(result.Embeddings, Has.Count.EqualTo(1));
-        Assert.That(result.Embeddings[0], Is.EqualTo(new[] { 0.1f, 0.2f, 0.3f }));
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.IsSuccess, Is.True);
+            Assert.That(result.Embeddings, Has.Count.EqualTo(1));
+            Assert.That(result.Embeddings[0], Is.EqualTo(DefaultEmbedding));
+        });
     }
 
     [Test]
@@ -34,8 +45,11 @@ public class FakeEmbeddingClientTests
         var first = await fake.GetEmbeddingsAsync(new EmbeddingRequest(["a"]));
         var second = await fake.GetEmbeddingsAsync(new EmbeddingRequest(["b"]));
 
-        Assert.That(first.Embeddings[0], Is.EqualTo(new[] { 0.5f }));
-        Assert.That(second.Embeddings[0], Is.EqualTo(new[] { 0.9f }));
+        Assert.Multiple(() =>
+        {
+            Assert.That(first.Embeddings[0], Is.EqualTo(SingleHalf));
+            Assert.That(second.Embeddings[0], Is.EqualTo(SingleNine));
+        });
     }
 
     [Test]
@@ -57,8 +71,11 @@ public class FakeEmbeddingClientTests
 
         await fake.GetEmbeddingsAsync(new EmbeddingRequest(["hello", "world"]));
 
-        Assert.That(fake.ReceivedRequests, Has.Count.EqualTo(1));
-        Assert.That(fake.ReceivedRequests[0].Input, Is.EqualTo(new[] { "hello", "world" }));
+        Assert.Multiple(() =>
+        {
+            Assert.That(fake.ReceivedRequests, Has.Count.EqualTo(1));
+            Assert.That(fake.ReceivedRequests[0].Input, Is.EqualTo(HelloWorld));
+        });
     }
 
     [Test]
@@ -71,10 +88,13 @@ public class FakeEmbeddingClientTests
 
         var result = await fake.GetImageEmbeddingAsync("/path/to/image.png", "model-v1");
 
-        Assert.That(result.Embeddings[0], Is.EqualTo(new[] { 0.4f, 0.5f }));
-        Assert.That(fake.ReceivedImageRequests, Has.Count.EqualTo(1));
-        Assert.That(fake.ReceivedImageRequests[0].ImagePath, Is.EqualTo("/path/to/image.png"));
-        Assert.That(fake.ReceivedImageRequests[0].Model, Is.EqualTo("model-v1"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Embeddings[0], Is.EqualTo(TwoFloats45));
+            Assert.That(fake.ReceivedImageRequests, Has.Count.EqualTo(1));
+            Assert.That(fake.ReceivedImageRequests[0].ImagePath, Is.EqualTo("/path/to/image.png"));
+            Assert.That(fake.ReceivedImageRequests[0].Model, Is.EqualTo("model-v1"));
+        });
     }
 
     [Test]
@@ -87,7 +107,7 @@ public class FakeEmbeddingClientTests
 
         var result = await fake.GetImageEmbeddingAsync("/img.png", "model");
 
-        Assert.That(result.Embeddings[0], Is.EqualTo(new[] { 0.1f }));
+        Assert.That(result.Embeddings[0], Is.EqualTo(SingleOne));
     }
 
     [Test]
@@ -105,8 +125,11 @@ public class FakeEmbeddingClientTests
 
         var result = await fake.GetMultimodalEmbeddingsAsync(inputs, "model");
 
-        Assert.That(result.Embeddings[0], Is.EqualTo(new[] { 0.7f }));
-        Assert.That(fake.ReceivedMultimodalRequests, Has.Count.EqualTo(1));
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Embeddings[0], Is.EqualTo(SingleSeven));
+            Assert.That(fake.ReceivedMultimodalRequests, Has.Count.EqualTo(1));
+        });
     }
 
     [Test]
@@ -130,8 +153,11 @@ public class FakeEmbeddingClientTests
     {
         var fake = new FakeEmbeddingClient();
 
-        Assert.That(fake.Features.Get<IImageEmbeddingFeature>(), Is.Not.Null);
-        Assert.That(fake.Features.Get<IMultimodalEmbeddingFeature>(), Is.Not.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(fake.Features.Get<IImageEmbeddingFeature>(), Is.Not.Null);
+            Assert.That(fake.Features.Get<IMultimodalEmbeddingFeature>(), Is.Not.Null);
+        });
     }
 
     [Test]
@@ -139,8 +165,11 @@ public class FakeEmbeddingClientTests
     {
         var fake = new FakeEmbeddingClient(FakeEmbeddingFeatures.ImageEmbedding);
 
-        Assert.That(fake.Features.Get<IImageEmbeddingFeature>(), Is.Not.Null);
-        Assert.That(fake.Features.Get<IMultimodalEmbeddingFeature>(), Is.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(fake.Features.Get<IImageEmbeddingFeature>(), Is.Not.Null);
+            Assert.That(fake.Features.Get<IMultimodalEmbeddingFeature>(), Is.Null);
+        });
     }
 
     [Test]
@@ -148,8 +177,11 @@ public class FakeEmbeddingClientTests
     {
         var fake = new FakeEmbeddingClient(FakeEmbeddingFeatures.None);
 
-        Assert.That(fake.Features.Get<IImageEmbeddingFeature>(), Is.Null);
-        Assert.That(fake.Features.Get<IMultimodalEmbeddingFeature>(), Is.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(fake.Features.Get<IImageEmbeddingFeature>(), Is.Null);
+            Assert.That(fake.Features.Get<IMultimodalEmbeddingFeature>(), Is.Null);
+        });
     }
 
     [Test]
@@ -164,7 +196,10 @@ public class FakeEmbeddingClientTests
 
         fake.Reset();
 
-        Assert.That(fake.ReceivedRequests, Is.Empty);
-        Assert.That(fake.CallCount, Is.EqualTo(0));
+        Assert.Multiple(() =>
+        {
+            Assert.That(fake.ReceivedRequests, Is.Empty);
+            Assert.That(fake.CallCount, Is.EqualTo(0));
+        });
     }
 }

@@ -310,7 +310,7 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         };
     }
 
-    private static IReadOnlyList<ToolCall>? MapResponseToolCalls(List<AzureOpenAiToolCall>? toolCalls)
+    private static List<ToolCall>? MapResponseToolCalls(List<AzureOpenAiToolCall>? toolCalls)
     {
         if (toolCalls is null || toolCalls.Count == 0)
             return null;
