@@ -33,9 +33,9 @@ public sealed class AzureOpenAiVisionTests
     private static (AzureOpenAiChatCompletionClient, Func<string?>) CreateCapturingClient(string responseJson)
     {
         string? capturedBody = null;
-        var handler = new MockHttpMessageHandler(async (req, _) =>
+        var handler = new MockHttpMessageHandler(async (req, ct) =>
         {
-            capturedBody = await req.Content!.ReadAsStringAsync();
+            capturedBody = await req.Content!.ReadAsStringAsync(ct);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(responseJson, Encoding.UTF8, "application/json")

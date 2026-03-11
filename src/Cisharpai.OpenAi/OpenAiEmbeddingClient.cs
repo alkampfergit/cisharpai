@@ -42,13 +42,13 @@ public sealed class OpenAiEmbeddingClient : IEmbeddingClient
             if (request.IncludeRawResponse)
             {
                 var (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<OpenAiEmbeddingRequest, OpenAiEmbeddingResponse>(
-                    EmbeddingsEndpoint, providerRequest, cancellationToken, request.ExtraParameters);
+                    EmbeddingsEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
                 return MapResponse(raw, request.EncodingFormat, rawResponseJson, rawRequestJson);
             }
 
             return MapResponse(
                 await _client.PostAsync<OpenAiEmbeddingRequest, OpenAiEmbeddingResponse>(
-                    EmbeddingsEndpoint, providerRequest, cancellationToken, request.ExtraParameters),
+                    EmbeddingsEndpoint, providerRequest, request.ExtraParameters, cancellationToken),
                 request.EncodingFormat);
         }
         catch (LlmHttpRequestException ex)

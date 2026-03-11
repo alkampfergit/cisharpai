@@ -413,7 +413,7 @@ public sealed class LlmHttpClientTests
         cts.Cancel();
 
         Assert.ThrowsAsync<TaskCanceledException>(async () =>
-            await client.PostAsync<object, JsonElement>("api/test", new { }, cts.Token));
+            await client.PostAsync<object, JsonElement>("api/test", new { }, cancellationToken: cts.Token));
     }
 
     [Test]
@@ -431,7 +431,7 @@ public sealed class LlmHttpClientTests
         cts.Cancel();
 
         Assert.ThrowsAsync<TaskCanceledException>(async () =>
-            await client.PostWithRawAsync<object, JsonElement>("api/test", new { }, cts.Token));
+            await client.PostWithRawAsync<object, JsonElement>("api/test", new { }, cancellationToken: cts.Token));
     }
 
     private sealed class TestResponse

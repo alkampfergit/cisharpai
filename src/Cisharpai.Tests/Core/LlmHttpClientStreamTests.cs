@@ -192,9 +192,9 @@ public sealed class LlmHttpClientStreamTests
     public async Task Extra_Parameters_Merged_Into_Request()
     {
         string? capturedBody = null;
-        var handler = new MockHttpMessageHandler(async (request, _) =>
+        var handler = new MockHttpMessageHandler(async (request, ct) =>
         {
-            capturedBody = await request.Content!.ReadAsStringAsync();
+            capturedBody = await request.Content!.ReadAsStringAsync(ct);
             const string sseContent = "data: {\"result\":true}\n\ndata: [DONE]\n";
             return CreateSseResponse(sseContent);
         });
@@ -243,7 +243,7 @@ public sealed class LlmHttpClientStreamTests
 
         var ex = Assert.ThrowsAsync<OperationCanceledException>(async () =>
         {
-            await foreach (var chunk in client.PostStreamAsync<object>("api/test", new { }, cts.Token))
+            await foreach (var chunk in client.PostStreamAsync<object>("api/test", new { }, cancellationToken: cts.Token))
             {
                 results.Add(chunk);
                 if (results.Count == 1)

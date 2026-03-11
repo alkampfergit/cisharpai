@@ -184,7 +184,7 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
                 StreamOptions = new AzureOpenAiStreamOptions { IncludeUsage = true }
             };
 
-        await foreach (var json in _client.PostStreamAsync<object>(uri, providerRequest, cancellationToken, request.ExtraParameters))
+        await foreach (var json in _client.PostStreamAsync<object>(uri, providerRequest, request.ExtraParameters, cancellationToken))
         {
             AzureOpenAiStreamChunk? chunk;
             try
@@ -234,12 +234,12 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         if (request.IncludeRawResponse)
         {
             (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<object, AzureOpenAiChatResponse>(
-                uri, providerRequest, cancellationToken, request.ExtraParameters);
+                uri, providerRequest, request.ExtraParameters, cancellationToken);
         }
         else
         {
             raw = await _client.PostAsync<object, AzureOpenAiChatResponse>(
-                uri, providerRequest, cancellationToken, request.ExtraParameters);
+                uri, providerRequest, request.ExtraParameters, cancellationToken);
         }
 
         var choice = raw.Choices.FirstOrDefault();
@@ -268,12 +268,12 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         if (request.IncludeRawResponse)
         {
             (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<object, AzureOpenAiChatResponse>(
-                uri, providerRequest, cancellationToken, request.ExtraParameters);
+                uri, providerRequest, request.ExtraParameters, cancellationToken);
         }
         else
         {
             raw = await _client.PostAsync<object, AzureOpenAiChatResponse>(
-                uri, providerRequest, cancellationToken, request.ExtraParameters);
+                uri, providerRequest, request.ExtraParameters, cancellationToken);
         }
 
         return MapToolCallingResponse(raw, rawResponseJson, rawRequestJson);

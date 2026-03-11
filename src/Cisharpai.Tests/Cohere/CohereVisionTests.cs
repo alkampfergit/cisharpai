@@ -53,9 +53,9 @@ public sealed class CohereVisionTests
     private static CohereChatCompletionClient CreateCapturingClient(string responseJson, out Func<string?> getBody)
     {
         string? capturedBody = null;
-        var handler = new MockHttpMessageHandler(async (req, _) =>
+        var handler = new MockHttpMessageHandler(async (req, ct) =>
         {
-            capturedBody = await req.Content!.ReadAsStringAsync();
+            capturedBody = await req.Content!.ReadAsStringAsync(ct);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(responseJson, System.Text.Encoding.UTF8, "application/json")

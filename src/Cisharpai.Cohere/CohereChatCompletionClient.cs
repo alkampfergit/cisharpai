@@ -121,12 +121,12 @@ public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOut
             if (request.IncludeRawResponse)
             {
                 (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<CohereChatRequest, CohereChatResponse>(
-                    ChatEndpoint, providerRequest, cancellationToken, request.ExtraParameters);
+                    ChatEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
             }
             else
             {
                 raw = await _client.PostAsync<CohereChatRequest, CohereChatResponse>(
-                    ChatEndpoint, providerRequest, cancellationToken, request.ExtraParameters);
+                    ChatEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
             }
 
             var content = string.Join("", raw.Message.Content
@@ -178,12 +178,12 @@ public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOut
             if (request.IncludeRawResponse)
             {
                 (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<CohereChatRequest, CohereChatResponse>(
-                    ChatEndpoint, providerRequest, cancellationToken, request.ExtraParameters);
+                    ChatEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
             }
             else
             {
                 raw = await _client.PostAsync<CohereChatRequest, CohereChatResponse>(
-                    ChatEndpoint, providerRequest, cancellationToken, request.ExtraParameters);
+                    ChatEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
             }
 
             return MapToolCallingResponse(raw, request.Model!, rawResponseJson, rawRequestJson);
@@ -210,7 +210,7 @@ public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOut
         string? model = null;
         int? inputTokens = null;
 
-        await foreach (var json in _client.PostStreamAsync(ChatEndpoint, providerRequest, cancellationToken, request.ExtraParameters))
+        await foreach (var json in _client.PostStreamAsync(ChatEndpoint, providerRequest, request.ExtraParameters, cancellationToken))
         {
             CohereStreamEvent? evt;
             try
@@ -288,12 +288,12 @@ public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOut
         if (request.IncludeRawResponse)
         {
             (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<CohereChatRequest, CohereChatResponse>(
-                ChatEndpoint, providerRequest, cancellationToken, request.ExtraParameters);
+                ChatEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
         }
         else
         {
             raw = await _client.PostAsync<CohereChatRequest, CohereChatResponse>(
-                ChatEndpoint, providerRequest, cancellationToken, request.ExtraParameters);
+                ChatEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
         }
 
         var content = string.Join("", raw.Message.Content

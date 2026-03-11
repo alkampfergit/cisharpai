@@ -27,8 +27,8 @@ public sealed class LlmHttpClient
     public async Task<TResponse> PostAsync<TRequest, TResponse>(
         string uri,
         TRequest payload,
-        CancellationToken cancellationToken = default,
-        JsonElement? extraParameters = null)
+        JsonElement? extraParameters = null,
+        CancellationToken cancellationToken = default)
     {
         var json = SerializeAndMerge(payload, extraParameters);
 
@@ -72,8 +72,8 @@ public sealed class LlmHttpClient
     public async Task<(TResponse Result, string RawResponseJson, string RawRequestJson)> PostWithRawAsync<TRequest, TResponse>(
         string uri,
         TRequest payload,
-        CancellationToken cancellationToken = default,
-        JsonElement? extraParameters = null)
+        JsonElement? extraParameters = null,
+        CancellationToken cancellationToken = default)
     {
         var requestJson = SerializeAndMerge(payload, extraParameters);
 
@@ -120,8 +120,8 @@ public sealed class LlmHttpClient
     public async IAsyncEnumerable<string> PostStreamAsync<TRequest>(
         string uri,
         TRequest payload,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default,
-        JsonElement? extraParameters = null)
+        JsonElement? extraParameters = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         var json = SerializeAndMerge(payload, extraParameters);
 

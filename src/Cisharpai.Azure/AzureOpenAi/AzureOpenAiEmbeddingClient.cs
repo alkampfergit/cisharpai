@@ -49,14 +49,14 @@ public sealed class AzureOpenAiEmbeddingClient : IEmbeddingClient
                 (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<
                     AzureOpenAiEmbeddingRequest,
                     AzureOpenAiEmbeddingResponse>(
-                    uri, providerRequest, cancellationToken, request.ExtraParameters);
+                    uri, providerRequest, request.ExtraParameters, cancellationToken);
             }
             else
             {
                 raw = await _client.PostAsync<
                     AzureOpenAiEmbeddingRequest,
                     AzureOpenAiEmbeddingResponse>(
-                    uri, providerRequest, cancellationToken, request.ExtraParameters);
+                    uri, providerRequest, request.ExtraParameters, cancellationToken);
             }
 
             return MapResponse(raw, request.EncodingFormat, rawResponseJson, rawRequestJson);

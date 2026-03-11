@@ -16,7 +16,7 @@ public sealed class OpenAiVisionIntegrationTests
         DotEnv.Load();
     }
 
-    private IChatCompletionClient CreateClient()
+    private static IChatCompletionClient CreateClient()
     {
         var apiKey = Environment.GetEnvironmentVariable(DotEnv.OpenAiTestApiKey);
         Assert.That(apiKey, Is.Not.Null.And.Not.Empty,
@@ -48,8 +48,11 @@ public sealed class OpenAiVisionIntegrationTests
 
         var response = await client.GetChatCompletionAsync(request);
 
-        Assert.That(response.IsSuccess, Is.True, response.ErrorMessage);
-        Assert.That(response.Content, Is.Not.Null.And.Not.Empty);
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.True, response.ErrorMessage);
+            Assert.That(response.Content, Is.Not.Null.And.Not.Empty);
+        });
     }
 
     [Test]
@@ -72,8 +75,11 @@ public sealed class OpenAiVisionIntegrationTests
 
             var response = await client.GetChatCompletionAsync(request);
 
-            Assert.That(response.IsSuccess, Is.True, response.ErrorMessage);
-            Assert.That(response.Content, Is.Not.Null.And.Not.Empty);
+            Assert.Multiple(() =>
+            {
+                Assert.That(response.IsSuccess, Is.True, response.ErrorMessage);
+                Assert.That(response.Content, Is.Not.Null.And.Not.Empty);
+            });
         }
         finally
         {

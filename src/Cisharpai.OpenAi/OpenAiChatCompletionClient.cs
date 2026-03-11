@@ -158,7 +158,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
             StreamOptions = new OpenAiStreamOptions { IncludeUsage = true }
         };
 
-        await foreach (var json in _client.PostStreamAsync(ChatCompletionsEndpoint, providerRequest, cancellationToken, request.ExtraParameters))
+        await foreach (var json in _client.PostStreamAsync(ChatCompletionsEndpoint, providerRequest, request.ExtraParameters, cancellationToken))
         {
             OpenAiStreamChunk? chunk;
             try
@@ -217,7 +217,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         int? promptTokens = null;
         int? completionTokens = null;
 
-        await foreach (var json in _client.PostStreamAsync(ResponsesEndpoint, providerRequest, cancellationToken, request.ExtraParameters))
+        await foreach (var json in _client.PostStreamAsync(ResponsesEndpoint, providerRequest, request.ExtraParameters, cancellationToken))
         {
             OpenAiResponsesStreamEvent? evt;
             try
@@ -273,13 +273,13 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         if (request.IncludeRawResponse)
         {
             var (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<OpenAiChatRequest, OpenAiChatResponse>(
-                ChatCompletionsEndpoint, providerRequest, cancellationToken, request.ExtraParameters);
+                ChatCompletionsEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
             return MapChatResponse(raw, rawResponseJson, rawRequestJson);
         }
 
         return MapChatResponse(
             await _client.PostAsync<OpenAiChatRequest, OpenAiChatResponse>(
-                ChatCompletionsEndpoint, providerRequest, cancellationToken, request.ExtraParameters));
+                ChatCompletionsEndpoint, providerRequest, request.ExtraParameters, cancellationToken));
     }
 
     private async Task<ChatCompletionResponse> SendLegacyChatWithJsonAsync(
@@ -301,13 +301,13 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         if (request.IncludeRawResponse)
         {
             var (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<OpenAiChatRequest, OpenAiChatResponse>(
-                ChatCompletionsEndpoint, providerRequest, cancellationToken, request.ExtraParameters);
+                ChatCompletionsEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
             return MapChatResponse(raw, rawResponseJson, rawRequestJson);
         }
 
         return MapChatResponse(
             await _client.PostAsync<OpenAiChatRequest, OpenAiChatResponse>(
-                ChatCompletionsEndpoint, providerRequest, cancellationToken, request.ExtraParameters));
+                ChatCompletionsEndpoint, providerRequest, request.ExtraParameters, cancellationToken));
     }
 
     private async Task<ToolCallingResponse> SendLegacyChatWithToolsAsync(
@@ -342,13 +342,13 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         if (request.IncludeRawResponse)
         {
             var (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<OpenAiReasoningRequest, OpenAiChatResponse>(
-                ChatCompletionsEndpoint, providerRequest, cancellationToken, request.ExtraParameters);
+                ChatCompletionsEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
             return MapChatResponse(raw, rawResponseJson, rawRequestJson);
         }
 
         return MapChatResponse(
             await _client.PostAsync<OpenAiReasoningRequest, OpenAiChatResponse>(
-                ChatCompletionsEndpoint, providerRequest, cancellationToken, request.ExtraParameters));
+                ChatCompletionsEndpoint, providerRequest, request.ExtraParameters, cancellationToken));
     }
 
     private async Task<ChatCompletionResponse> SendReasoningChatWithJsonAsync(
@@ -369,13 +369,13 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         if (request.IncludeRawResponse)
         {
             var (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<OpenAiReasoningRequest, OpenAiChatResponse>(
-                ChatCompletionsEndpoint, providerRequest, cancellationToken, request.ExtraParameters);
+                ChatCompletionsEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
             return MapChatResponse(raw, rawResponseJson, rawRequestJson);
         }
 
         return MapChatResponse(
             await _client.PostAsync<OpenAiReasoningRequest, OpenAiChatResponse>(
-                ChatCompletionsEndpoint, providerRequest, cancellationToken, request.ExtraParameters));
+                ChatCompletionsEndpoint, providerRequest, request.ExtraParameters, cancellationToken));
     }
 
     private async Task<ToolCallingResponse> SendReasoningChatWithToolsAsync(
@@ -399,12 +399,12 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         if (request.IncludeRawResponse)
         {
             (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<OpenAiReasoningRequest, OpenAiChatResponse>(
-                ChatCompletionsEndpoint, providerRequest, cancellationToken, request.ExtraParameters);
+                ChatCompletionsEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
         }
         else
         {
             raw = await _client.PostAsync<OpenAiReasoningRequest, OpenAiChatResponse>(
-                ChatCompletionsEndpoint, providerRequest, cancellationToken, request.ExtraParameters);
+                ChatCompletionsEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
         }
 
         return MapToolCallingResponse(raw, rawResponseJson, rawRequestJson);
@@ -422,12 +422,12 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         if (request.IncludeRawResponse)
         {
             (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<OpenAiChatRequest, OpenAiChatResponse>(
-                ChatCompletionsEndpoint, providerRequest, cancellationToken, request.ExtraParameters);
+                ChatCompletionsEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
         }
         else
         {
             raw = await _client.PostAsync<OpenAiChatRequest, OpenAiChatResponse>(
-                ChatCompletionsEndpoint, providerRequest, cancellationToken, request.ExtraParameters);
+                ChatCompletionsEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
         }
 
         return MapToolCallingResponse(raw, rawResponseJson, rawRequestJson);
@@ -492,12 +492,12 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         if (request.IncludeRawResponse)
         {
             (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<OpenAiResponsesApiRequest, OpenAiResponsesApiResponse>(
-                ResponsesEndpoint, providerRequest, cancellationToken, request.ExtraParameters);
+                ResponsesEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
         }
         else
         {
             raw = await _client.PostAsync<OpenAiResponsesApiRequest, OpenAiResponsesApiResponse>(
-                ResponsesEndpoint, providerRequest, cancellationToken, request.ExtraParameters);
+                ResponsesEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
         }
 
         var content = raw.Output

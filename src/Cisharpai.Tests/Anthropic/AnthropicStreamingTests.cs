@@ -53,9 +53,9 @@ public sealed class AnthropicStreamingTests
     {
         string? capturedBody = null;
         var bytes = Encoding.UTF8.GetBytes(sseContent);
-        var handler = new MockHttpMessageHandler(async (req, _) =>
+        var handler = new MockHttpMessageHandler(async (req, ct) =>
         {
-            capturedBody = await req.Content!.ReadAsStringAsync();
+            capturedBody = await req.Content!.ReadAsStringAsync(ct);
             var stream = new MemoryStream(bytes);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {

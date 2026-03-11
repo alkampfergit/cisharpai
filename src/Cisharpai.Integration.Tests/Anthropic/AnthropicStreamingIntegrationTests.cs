@@ -13,7 +13,7 @@ public sealed class AnthropicStreamingIntegrationTests
         DotEnv.Load();
     }
 
-    private IChatCompletionClient CreateClient()
+    private static IChatCompletionClient CreateClient()
     {
         var apiKey = Environment.GetEnvironmentVariable(DotEnv.AnthropicTestApiKey);
         Assert.That(apiKey, Is.Not.Null.And.Not.Empty,

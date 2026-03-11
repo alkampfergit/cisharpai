@@ -93,8 +93,8 @@ public sealed class MessageContentPartTests
         {
             Assert.That(msg.ContentParts, Is.Not.Null);
             Assert.That(msg.ContentParts!, Has.Count.EqualTo(2));
-            Assert.That(msg.ContentParts[0], Is.InstanceOf<TextContentPart>());
-            Assert.That(msg.ContentParts[1], Is.InstanceOf<ImageFileContentPart>());
+            Assert.That(msg.ContentParts![0], Is.InstanceOf<TextContentPart>());
+            Assert.That(msg.ContentParts![1], Is.InstanceOf<ImageFileContentPart>());
         });
     }
 

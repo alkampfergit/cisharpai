@@ -13,7 +13,7 @@ public sealed class CohereStreamingIntegrationTests
         DotEnv.Load();
     }
 
-    private IChatCompletionClient CreateClient()
+    private static IChatCompletionClient CreateClient()
     {
         var apiKey = Environment.GetEnvironmentVariable(DotEnv.CohereTestApiKey);
         Assert.That(apiKey, Is.Not.Null.And.Not.Empty,

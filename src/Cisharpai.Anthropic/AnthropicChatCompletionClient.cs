@@ -112,12 +112,12 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
             if (request.IncludeRawResponse)
             {
                 (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<AnthropicChatRequest, AnthropicChatResponse>(
-                    "messages", providerRequest, cancellationToken, request.ExtraParameters);
+                    "messages", providerRequest, request.ExtraParameters, cancellationToken);
             }
             else
             {
                 raw = await _client.PostAsync<AnthropicChatRequest, AnthropicChatResponse>(
-                    "messages", providerRequest, cancellationToken, request.ExtraParameters);
+                    "messages", providerRequest, request.ExtraParameters, cancellationToken);
             }
 
             return MapToolCallingResponse(raw, rawResponseJson, rawRequestJson);
@@ -144,7 +144,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         string? model = null;
         int? inputTokens = null;
 
-        await foreach (var json in _client.PostStreamAsync("messages", providerRequest, cancellationToken, request.ExtraParameters))
+        await foreach (var json in _client.PostStreamAsync("messages", providerRequest, request.ExtraParameters, cancellationToken))
         {
             AnthropicStreamEvent? evt;
             try
@@ -232,12 +232,12 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         if (request.IncludeRawResponse)
         {
             (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<AnthropicChatRequest, AnthropicChatResponse>(
-                "messages", providerRequest, cancellationToken, request.ExtraParameters);
+                "messages", providerRequest, request.ExtraParameters, cancellationToken);
         }
         else
         {
             raw = await _client.PostAsync<AnthropicChatRequest, AnthropicChatResponse>(
-                "messages", providerRequest, cancellationToken, request.ExtraParameters);
+                "messages", providerRequest, request.ExtraParameters, cancellationToken);
         }
 
         var content = string.Join("", raw.Content

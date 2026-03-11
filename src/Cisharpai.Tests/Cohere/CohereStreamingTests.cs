@@ -57,9 +57,9 @@ public sealed class CohereStreamingTests
     private static CohereChatCompletionClient CreateCapturingStreamingClient(string sseContent, out Func<string?> getBody)
     {
         string? capturedBody = null;
-        var handler = new MockHttpMessageHandler(async (req, _) =>
+        var handler = new MockHttpMessageHandler(async (req, ct) =>
         {
-            capturedBody = await req.Content!.ReadAsStringAsync();
+            capturedBody = await req.Content!.ReadAsStringAsync(ct);
             var bytes = Encoding.UTF8.GetBytes(sseContent);
             var stream = new MemoryStream(bytes);
             return new HttpResponseMessage(HttpStatusCode.OK)
