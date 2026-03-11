@@ -2,6 +2,7 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Cisharpai.Features;
 using Cisharpai.Features.Chat;
+using Cisharpai.Helpers;
 using Cisharpai.Models;
 using Cisharpai.Anthropic.Models;
 
@@ -66,7 +67,8 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         {
             jsonOutputOptions.Validate();
 
-            var messages = EnsureJsonKeywordInSystemMessage(request.Messages, jsonOutputOptions);
+            var messages = JsonOutputHelper.EnsureJsonKeywordInSystemMessage(
+                request.Messages, jsonOutputOptions, "Respond with raw JSON only, no markdown formatting.");
             var updatedRequest = request with { Messages = messages };
 
             var providerRequest = await BuildRequestAsync(updatedRequest, cancellationToken);
@@ -78,7 +80,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
             // message injection, but Claude often wraps output in markdown code fences.
             // Strip them so callers always receive raw JSON.
             if (jsonOutputOptions.Mode == JsonOutputMode.JsonMode && response.IsSuccess)
-                response = response with { Content = StripMarkdownCodeFences(response.Content) };
+                response = response with { Content = JsonOutputHelper.StripMarkdownCodeFences(response.Content) };
 
             return response;
         }
@@ -347,55 +349,6 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
                 Schema = JsonDocument.Parse(options.JsonSchema!).RootElement.Clone()
             }
         };
-    }
-
-    private static IReadOnlyList<LlmMessage> EnsureJsonKeywordInSystemMessage(
-        IReadOnlyList<LlmMessage> messages,
-        JsonOutputOptions options)
-    {
-        if (options.Mode != JsonOutputMode.JsonMode)
-            return messages;
-
-        var systemMessage = messages.FirstOrDefault(m => m.Role == LlmRole.System);
-
-        if (systemMessage is not null &&
-            systemMessage.Content.Contains("JSON", StringComparison.OrdinalIgnoreCase))
-            return messages;
-
-        var result = new List<LlmMessage>(messages);
-
-        if (systemMessage is not null)
-        {
-            var index = result.IndexOf(systemMessage);
-            result[index] = new LlmMessage(LlmRole.System, systemMessage.Content + " Respond with raw JSON only, no markdown formatting.");
-        }
-        else
-        {
-            result.Insert(0, new LlmMessage(LlmRole.System, "Respond with raw JSON only, no markdown formatting."));
-        }
-
-        return result;
-    }
-
-    internal static string StripMarkdownCodeFences(string content)
-    {
-        var trimmed = content.Trim();
-        if (!trimmed.StartsWith("```", StringComparison.Ordinal))
-            return content;
-
-        // Remove opening fence (```json, ```JSON, or just ```)
-        var firstNewline = trimmed.IndexOf('\n');
-        if (firstNewline < 0)
-            return content;
-
-        trimmed = trimmed[(firstNewline + 1)..];
-
-        // Remove closing fence
-        var lastFence = trimmed.LastIndexOf("```", StringComparison.Ordinal);
-        if (lastFence >= 0)
-            trimmed = trimmed[..lastFence];
-
-        return trimmed.Trim();
     }
 
     private static async Task<List<AnthropicMessage>> MapMessagesAsync(

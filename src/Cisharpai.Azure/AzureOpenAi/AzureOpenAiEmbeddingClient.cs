@@ -1,4 +1,5 @@
 using Cisharpai.Features;
+using Cisharpai.Helpers;
 using Cisharpai.Models;
 using Cisharpai.Azure.AzureOpenAi.Models;
 

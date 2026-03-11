@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Cisharpai.Features;
 using Cisharpai.Features.Chat;
+using Cisharpai.Helpers;
 using Cisharpai.Models;
 using Cisharpai.Cohere.Models;
 
@@ -71,7 +72,8 @@ public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOut
         {
             jsonOutputOptions.Validate();
 
-            var messages = EnsureJsonKeywordInSystemMessage(request.Messages, jsonOutputOptions);
+            var messages = JsonOutputHelper.EnsureJsonKeywordInSystemMessage(
+                request.Messages, jsonOutputOptions, "Respond with raw JSON only, no markdown formatting.");
             var updatedRequest = request with { Messages = messages };
 
             var providerRequest = BuildRequest(updatedRequest);
@@ -80,7 +82,7 @@ public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOut
             var response = await ExecuteAsync(providerRequest, request, cancellationToken);
 
             if (jsonOutputOptions.Mode == JsonOutputMode.JsonMode && response.IsSuccess)
-                response = response with { Content = StripMarkdownCodeFences(response.Content) };
+                response = response with { Content = JsonOutputHelper.StripMarkdownCodeFences(response.Content) };
 
             return response;
         }
@@ -327,30 +329,11 @@ public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOut
             RawResponseJson: rawResponseJson,
             RawRequestJson: rawRequestJson);
 
-        var toolCalls = MapResponseToolCalls(raw.Message.ToolCalls);
+        var toolCalls = ToolCallingHelper.MapResponseToolCalls(
+            raw.Message.ToolCalls,
+            tc => (tc.Id, tc.Function.Name, tc.Function.Arguments));
 
         return new ToolCallingResponse(chatCompletion, toolCalls);
-    }
-
-    private static List<ToolCall>? MapResponseToolCalls(List<CohereToolCall>? toolCalls)
-    {
-        if (toolCalls is null || toolCalls.Count == 0)
-            return null;
-
-        return toolCalls.Select(tc =>
-        {
-            JsonElement arguments;
-            try
-            {
-                arguments = JsonDocument.Parse(tc.Function.Arguments).RootElement.Clone();
-            }
-            catch
-            {
-                arguments = JsonDocument.Parse($"\"{tc.Function.Arguments}\"").RootElement.Clone();
-            }
-
-            return new ToolCall(tc.Id, tc.Function.Name, arguments);
-        }).ToList();
     }
 
     private static List<CohereToolDefinition> MapToolDefinitions(IReadOnlyList<ToolDefinition> tools)
@@ -394,7 +377,7 @@ public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOut
         {
             var msg = new CohereChatMessage
             {
-                Role = MapRole(m.Role),
+                Role = RoleMapper.MapRole(m.Role),
                 Content = ExtractTextContent(m)
             };
 
@@ -456,53 +439,6 @@ public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOut
         };
     }
 
-    private static IReadOnlyList<LlmMessage> EnsureJsonKeywordInSystemMessage(
-        IReadOnlyList<LlmMessage> messages,
-        JsonOutputOptions options)
-    {
-        if (options.Mode != JsonOutputMode.JsonMode)
-            return messages;
-
-        var systemMessage = messages.FirstOrDefault(m => m.Role == LlmRole.System);
-
-        if (systemMessage is not null &&
-            systemMessage.Content.Contains("JSON", StringComparison.OrdinalIgnoreCase))
-            return messages;
-
-        var result = new List<LlmMessage>(messages);
-
-        if (systemMessage is not null)
-        {
-            var index = result.IndexOf(systemMessage);
-            result[index] = new LlmMessage(LlmRole.System, systemMessage.Content + " Respond with raw JSON only, no markdown formatting.");
-        }
-        else
-        {
-            result.Insert(0, new LlmMessage(LlmRole.System, "Respond with raw JSON only, no markdown formatting."));
-        }
-
-        return result;
-    }
-
-    internal static string StripMarkdownCodeFences(string content)
-    {
-        var trimmed = content.Trim();
-        if (!trimmed.StartsWith("```", StringComparison.Ordinal))
-            return content;
-
-        var firstNewline = trimmed.IndexOf('\n');
-        if (firstNewline < 0)
-            return content;
-
-        trimmed = trimmed[(firstNewline + 1)..];
-
-        var lastFence = trimmed.LastIndexOf("```", StringComparison.Ordinal);
-        if (lastFence >= 0)
-            trimmed = trimmed[..lastFence];
-
-        return trimmed.Trim();
-    }
-
     private static List<CohereChatDocument> MapDocuments(IReadOnlyList<DocumentChunk> documents)
     {
         return documents.Select(doc =>
@@ -545,12 +481,4 @@ public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOut
         _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, null)
     };
 
-    private static string MapRole(LlmRole role) => role switch
-    {
-        LlmRole.System => "system",
-        LlmRole.User => "user",
-        LlmRole.Assistant => "assistant",
-        LlmRole.Tool => "tool",
-        _ => throw new ArgumentOutOfRangeException(nameof(role), role, null)
-    };
 }
