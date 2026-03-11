@@ -45,6 +45,10 @@ Cisharpai is a unified .NET client library that provides shared interfaces for i
 - [Vision](vision.md) -- sending images in chat messages
 - [Streaming](streaming.md) -- streaming chat completions token-by-token
 
+### Testing
+
+- [Testing with Cisharpai](testing.md) -- fake clients, response factories, DI helpers, and testing patterns
+
 ### Reference
 
 - [Provider Feature Matrix](provider-features.md) -- complete feature support table

@@ -29,6 +29,7 @@
     <ProjectReference Include="..\Cisharpai.Azure\Cisharpai.Azure.csproj" />
     <ProjectReference Include="..\Cisharpai.Cohere\Cisharpai.Cohere.csproj" />
     <ProjectReference Include="..\Cisharpai.Tests.Common\Cisharpai.Tests.Common.csproj" />
+    <ProjectReference Include="..\Cisharpai.Testing\Cisharpai.Testing.csproj" />
   </ItemGroup>
 
 </Project>

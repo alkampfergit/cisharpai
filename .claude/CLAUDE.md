@@ -31,6 +31,15 @@ Project structure can be find here: [project_overview.md](../memories/project_ov
 
 @../memories/project_overview.md
 
+## Post-Change Checklist
+
+When modifying core features (new feature interface, new provider, new model support, changed API):
+1. Update `wiki/` — relevant feature guide(s), `wiki/provider-features.md` matrix, `wiki/index.md` TOC if new page
+2. Update `wiki/testing.md` — if new feature interfaces are added, document how to fake them
+3. Update `memories/project_overview.md` — reflect structural changes
+4. Update `Cisharpai.Testing` — add queues/defaults/capture for any new feature interface on fake clients
+5. Update `scripts/build.ps1` `$packProjects` if a new publishable project is added
+
 ## Beade integration
 
 If the prompt is related to beads tool you can find the documentation here: [beads-guide.md](../memories/beads-guide.md)

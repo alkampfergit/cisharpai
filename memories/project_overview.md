@@ -122,6 +122,16 @@ Each supported provider has its own project providing concrete implementations o
     *   `Models/CohereEmbedRequest.cs`: Request DTO with `Texts`, `Images`, `Inputs` (v4, mutually exclusive), `InputType`, `EmbeddingTypes`, `OutputDimension` (v4 Matryoshka).
     *   `Models/CohereEmbedResponse.cs`: Response DTO with `CohereEmbeddings`, `CohereBilledUnits` (includes `ImageTokens` for v4), `CohereImageMetadata`.
 
+### Testing Package (`src/Cisharpai.Testing/`)
+Lightweight fake clients for unit testing application code that depends on Cisharpai interfaces. No real HTTP calls are made.
+
+*   **`FakeChatCompletionClient.cs`**: Fake implementation of `IChatCompletionClient`, `IStreamingChatFeature`, `IToolCallingFeature`, `IJsonOutputFeature`, `IGroundedChatFeature`. Supports response queues, defaults, and request capture.
+*   **`FakeEmbeddingClient.cs`**: Fake implementation of `IEmbeddingClient`, `IImageEmbeddingFeature`, `IMultimodalEmbeddingFeature`. Supports response queues, defaults, and request capture.
+*   **`FakeResponses.cs`**: Static factory methods for creating common fake responses (`Chat`, `ChatError`, `ToolCall`, `ToolCalls`, `GroundedChat`, `StreamingChunks`, `Embedding`, `Embeddings`, `EmbeddingError`).
+*   **`FakeChatFeatures.cs`**: `[Flags]` enum controlling which features are registered on the fake chat client.
+*   **`FakeEmbeddingFeatures.cs`**: `[Flags]` enum controlling which features are registered on the fake embedding client.
+*   **`FakeServiceCollectionExtensions.cs`**: DI helpers (`AddFakeChatCompletionClient`, `AddFakeEmbeddingClient`) that register fakes and return the instance for setup/assertions.
+
 ### Console App (`src/Cisharp.Console/`)
 Interactive demo application showcasing all provider integrations through a scenario-based menu.
 
@@ -231,6 +241,10 @@ Project documentation pages.
     *   `Cohere/CohereVisionTests.cs`: Tests for Cohere vision skip behavior (mixed text+image, image-only, base64, multiple text parts, normal message, WithImage factory).
     *   `Cohere/CohereStreamingTests.cs`: Tests for Cohere streaming (content-delta/message-end events, text chunks in order, finish reason, token counts, stream:true in request, feature discovery).
     *   `Core/HttpClientBuilderExtensionsTests.cs`: Tests for `AddCisharpaiResilienceHandler()` and `AddCisharpaiStreamingResilienceHandler()` extension methods.
+    *   `Testing/FakeChatCompletionClientTests.cs`: Tests for `FakeChatCompletionClient` (queued/default responses, request capture, feature opt-out, reset, streaming, tool calling, JSON output, grounded chat).
+    *   `Testing/FakeEmbeddingClientTests.cs`: Tests for `FakeEmbeddingClient` (queued/default responses, request capture, feature opt-out, image/multimodal embedding).
+    *   `Testing/FakeResponsesTests.cs`: Tests for `FakeResponses` static factories (all response types, custom parameters, error responses).
+    *   `Testing/FakeServiceCollectionExtensionsTests.cs`: Tests for DI registration helpers (resolution, feature discovery, selective features).
 *   **`src/Cisharpai.Integration.Tests/`**: Integration tests verifying connection to real APIs.
     *   `EnvironmentConfigurationTests.cs`: Single test that validates all required environment variables for all providers. If any are missing, it fails with a clear error message showing which variables are missing and provides example `.env` file content to fix it.
     *   `DotEnv.cs`: Helper class that delegates to `DotEnvLoader` and re-exports `TestEnvironmentVariables` constants for backwards compatibility.

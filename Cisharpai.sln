@@ -21,6 +21,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cisharpai.Cohere", "src\Cis
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cisharpai.Azure", "src\Cisharpai.Azure\Cisharpai.Azure.csproj", "{E48EF4AD-D4D8-4575-BDB7-66C0370F2D8B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cisharpai.Testing", "src\Cisharpai.Testing\Cisharpai.Testing.csproj", "{61939F5E-FDEA-4DAC-BC16-5213731122AC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -127,6 +129,18 @@ Global
 		{E48EF4AD-D4D8-4575-BDB7-66C0370F2D8B}.Release|x64.Build.0 = Release|Any CPU
 		{E48EF4AD-D4D8-4575-BDB7-66C0370F2D8B}.Release|x86.ActiveCfg = Release|Any CPU
 		{E48EF4AD-D4D8-4575-BDB7-66C0370F2D8B}.Release|x86.Build.0 = Release|Any CPU
+		{61939F5E-FDEA-4DAC-BC16-5213731122AC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{61939F5E-FDEA-4DAC-BC16-5213731122AC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{61939F5E-FDEA-4DAC-BC16-5213731122AC}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{61939F5E-FDEA-4DAC-BC16-5213731122AC}.Debug|x64.Build.0 = Debug|Any CPU
+		{61939F5E-FDEA-4DAC-BC16-5213731122AC}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{61939F5E-FDEA-4DAC-BC16-5213731122AC}.Debug|x86.Build.0 = Debug|Any CPU
+		{61939F5E-FDEA-4DAC-BC16-5213731122AC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{61939F5E-FDEA-4DAC-BC16-5213731122AC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{61939F5E-FDEA-4DAC-BC16-5213731122AC}.Release|x64.ActiveCfg = Release|Any CPU
+		{61939F5E-FDEA-4DAC-BC16-5213731122AC}.Release|x64.Build.0 = Release|Any CPU
+		{61939F5E-FDEA-4DAC-BC16-5213731122AC}.Release|x86.ActiveCfg = Release|Any CPU
+		{61939F5E-FDEA-4DAC-BC16-5213731122AC}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -140,5 +154,6 @@ Global
 		{2D0EBC9E-3D05-4E0B-AF79-1252E0D1B6AB} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{4977A505-D071-42C8-80B2-6F56FC3590E2} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{E48EF4AD-D4D8-4575-BDB7-66C0370F2D8B} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{61939F5E-FDEA-4DAC-BC16-5213731122AC} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal

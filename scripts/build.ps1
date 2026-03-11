@@ -119,7 +119,8 @@ $packProjects = @(
     "$rootDirectory/src/Cisharpai.OpenAi/Cisharpai.OpenAi.csproj",
     "$rootDirectory/src/Cisharpai.Azure/Cisharpai.Azure.csproj",
     "$rootDirectory/src/Cisharpai.Anthropic/Cisharpai.Anthropic.csproj",
-    "$rootDirectory/src/Cisharpai.Cohere/Cisharpai.Cohere.csproj"
+    "$rootDirectory/src/Cisharpai.Cohere/Cisharpai.Cohere.csproj",
+    "$rootDirectory/src/Cisharpai.Testing/Cisharpai.Testing.csproj"
 )
 
 foreach ($proj in $packProjects) {
