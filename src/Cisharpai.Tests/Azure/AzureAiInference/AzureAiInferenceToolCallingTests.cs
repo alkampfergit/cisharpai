@@ -334,10 +334,10 @@ public sealed class AzureAiInferenceToolCallingTests
         Assert.Multiple(() =>
         {
             Assert.That(response.ToolCalls!, Has.Count.EqualTo(2));
-            Assert.That(response.ToolCalls[0].Id, Is.EqualTo("call_1"));
-            Assert.That(response.ToolCalls[1].Id, Is.EqualTo("call_2"));
-            Assert.That(response.ToolCalls[0].Arguments.GetProperty("city").GetString(), Is.EqualTo("Paris"));
-            Assert.That(response.ToolCalls[1].Arguments.GetProperty("city").GetString(), Is.EqualTo("London"));
+            Assert.That(response.ToolCalls![0].Id, Is.EqualTo("call_1"));
+            Assert.That(response.ToolCalls![1].Id, Is.EqualTo("call_2"));
+            Assert.That(response.ToolCalls![0].Arguments.GetProperty("city").GetString(), Is.EqualTo("Paris"));
+            Assert.That(response.ToolCalls![1].Arguments.GetProperty("city").GetString(), Is.EqualTo("London"));
         });
     }
 

@@ -54,7 +54,7 @@ public sealed class LlmMessageToolTests
             Assert.That(msg.Role, Is.EqualTo(LlmRole.Assistant));
             Assert.That(msg.ToolCalls, Is.Not.Null);
             Assert.That(msg.ToolCalls!, Has.Count.EqualTo(1));
-            Assert.That(msg.ToolCalls[0].FunctionName, Is.EqualTo("get_weather"));
+            Assert.That(msg.ToolCalls![0].FunctionName, Is.EqualTo("get_weather"));
         });
     }
 

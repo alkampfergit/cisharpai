@@ -81,7 +81,7 @@ public sealed class ToolCallingResponseTests
         {
             Assert.That(response.ToolCalls, Is.Not.Null);
             Assert.That(response.ToolCalls!, Has.Count.EqualTo(1));
-            Assert.That(response.ToolCalls[0].FunctionName, Is.EqualTo("get_weather"));
+            Assert.That(response.ToolCalls![0].FunctionName, Is.EqualTo("get_weather"));
         });
     }
 

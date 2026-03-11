@@ -298,8 +298,8 @@ public sealed class AnthropicToolCallingTests
         Assert.Multiple(() =>
         {
             Assert.That(response.ToolCalls!, Has.Count.EqualTo(2));
-            Assert.That(response.ToolCalls[0].Id, Is.EqualTo("toolu_1"));
-            Assert.That(response.ToolCalls[1].Id, Is.EqualTo("toolu_2"));
+            Assert.That(response.ToolCalls![0].Id, Is.EqualTo("toolu_1"));
+            Assert.That(response.ToolCalls![1].Id, Is.EqualTo("toolu_2"));
             // Also has text content
             Assert.That(response.Content, Is.EqualTo("I'll check the weather for both cities."));
         });
