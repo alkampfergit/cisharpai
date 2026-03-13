@@ -191,6 +191,11 @@ Project documentation pages.
 *   **`Directory.Packages.props`**: Central package version management.
 *   **`.envsample`**: Template `.env` file listing all required environment variables with placeholder values for all providers.
 
+### Developer Agent Customizations
+Project-scoped Claude agents live in `.claude/agents/`.
+
+*   **`pr-check-fixer.md`**: Custom PR remediation agent that works only on the pull request associated with the current branch. It uses the `pr-expert` skill to iteratively diagnose failing checks, implement fixes, run validation, commit and push changes, and watch remote PR checks until all fixable blockers are resolved.
+
 ### Testing
 *   **`src/Cisharpai.Tests.Common/`**: Shared test utilities referenced by all test projects.
     *   `DotEnvLoader.cs`: Static utility class to load environment variables from a `.env` file. Searches current and parent directories.

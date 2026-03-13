@@ -374,39 +374,15 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         return result;
     }
 
-    private static async Task<List<AzureOpenAiContentPart>> MapContentPartsAsync(
+    private static Task<List<AzureOpenAiContentPart>> MapContentPartsAsync(
         IReadOnlyList<MessageContentPart> contentParts,
         CancellationToken ct)
     {
-        var parts = new List<AzureOpenAiContentPart>();
-        foreach (var part in contentParts)
-        {
-            switch (part)
-            {
-                case TextContentPart text:
-                    parts.Add(new AzureOpenAiContentPart { Type = "text", Text = text.Text });
-                    break;
-                case ImageFileContentPart file:
-                    var dataUri = await ImageDataUriHelper.ToDataUriAsync(file.FilePath, ct);
-                    parts.Add(new AzureOpenAiContentPart
-                    {
-                        Type = "image_url",
-                        ImageUrl = new AzureOpenAiImageUrl { Url = dataUri }
-                    });
-                    break;
-                case ImageBase64ContentPart base64:
-                    parts.Add(new AzureOpenAiContentPart
-                    {
-                        Type = "image_url",
-                        ImageUrl = new AzureOpenAiImageUrl
-                        {
-                            Url = $"data:{base64.MediaType};base64,{base64.Base64Data}"
-                        }
-                    });
-                    break;
-            }
-        }
-        return parts;
+        return ContentPartHelper.MapOpenAiStyleContentPartsAsync(
+            contentParts,
+            text => new AzureOpenAiContentPart { Type = "text", Text = text },
+            url => new AzureOpenAiContentPart { Type = "image_url", ImageUrl = new AzureOpenAiImageUrl { Url = url } },
+            ct);
     }
 
     private static List<AzureOpenAiToolCall> MapToolCalls(IReadOnlyList<ToolCall> toolCalls)

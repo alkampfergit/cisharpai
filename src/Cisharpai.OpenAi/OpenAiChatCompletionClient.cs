@@ -663,39 +663,15 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         return result;
     }
 
-    private static async Task<List<OpenAiContentPart>> MapContentPartsAsync(
+    private static Task<List<OpenAiContentPart>> MapContentPartsAsync(
         IReadOnlyList<MessageContentPart> contentParts,
         CancellationToken ct)
     {
-        var parts = new List<OpenAiContentPart>();
-        foreach (var part in contentParts)
-        {
-            switch (part)
-            {
-                case TextContentPart text:
-                    parts.Add(new OpenAiContentPart { Type = "text", Text = text.Text });
-                    break;
-                case ImageFileContentPart file:
-                    var dataUri = await ImageDataUriHelper.ToDataUriAsync(file.FilePath, ct);
-                    parts.Add(new OpenAiContentPart
-                    {
-                        Type = "image_url",
-                        ImageUrl = new OpenAiImageUrl { Url = dataUri }
-                    });
-                    break;
-                case ImageBase64ContentPart base64:
-                    parts.Add(new OpenAiContentPart
-                    {
-                        Type = "image_url",
-                        ImageUrl = new OpenAiImageUrl
-                        {
-                            Url = $"data:{base64.MediaType};base64,{base64.Base64Data}"
-                        }
-                    });
-                    break;
-            }
-        }
-        return parts;
+        return ContentPartHelper.MapOpenAiStyleContentPartsAsync(
+            contentParts,
+            text => new OpenAiContentPart { Type = "text", Text = text },
+            url => new OpenAiContentPart { Type = "image_url", ImageUrl = new OpenAiImageUrl { Url = url } },
+            ct);
     }
 
     private static List<OpenAiToolCall> MapToolCalls(IReadOnlyList<ToolCall> toolCalls)

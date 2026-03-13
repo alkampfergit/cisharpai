@@ -408,39 +408,15 @@ public sealed class AzureAiInferenceChatCompletionClient : IChatCompletionClient
         return result;
     }
 
-    private static async Task<List<AzureAiInferenceContentPart>> MapContentPartsAsync(
+    private static Task<List<AzureAiInferenceContentPart>> MapContentPartsAsync(
         IReadOnlyList<MessageContentPart> contentParts,
         CancellationToken ct)
     {
-        var parts = new List<AzureAiInferenceContentPart>();
-        foreach (var part in contentParts)
-        {
-            switch (part)
-            {
-                case TextContentPart text:
-                    parts.Add(new AzureAiInferenceContentPart { Type = "text", Text = text.Text });
-                    break;
-                case ImageFileContentPart file:
-                    var dataUri = await ImageDataUriHelper.ToDataUriAsync(file.FilePath, ct);
-                    parts.Add(new AzureAiInferenceContentPart
-                    {
-                        Type = "image_url",
-                        ImageUrl = new AzureAiInferenceImageUrl { Url = dataUri }
-                    });
-                    break;
-                case ImageBase64ContentPart base64:
-                    parts.Add(new AzureAiInferenceContentPart
-                    {
-                        Type = "image_url",
-                        ImageUrl = new AzureAiInferenceImageUrl
-                        {
-                            Url = $"data:{base64.MediaType};base64,{base64.Base64Data}"
-                        }
-                    });
-                    break;
-            }
-        }
-        return parts;
+        return ContentPartHelper.MapOpenAiStyleContentPartsAsync(
+            contentParts,
+            text => new AzureAiInferenceContentPart { Type = "text", Text = text },
+            url => new AzureAiInferenceContentPart { Type = "image_url", ImageUrl = new AzureAiInferenceImageUrl { Url = url } },
+            ct);
     }
 
     private static List<AzureAiInferenceToolCall> MapToolCalls(IReadOnlyList<ToolCall> toolCalls)
