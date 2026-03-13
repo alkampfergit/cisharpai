@@ -40,22 +40,7 @@ public sealed class LlmHttpClient
         using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
             .ConfigureAwait(false);
 
-        if (!response.IsSuccessStatusCode)
-        {
-            string? responseBody = null;
-            try
-            {
-                responseBody = await response.Content.ReadAsStringAsync(cancellationToken)
-                    .ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                var detail = ex.InnerException?.Message ?? ex.Message;
-                responseBody = $"[Failed to read response body: {detail}]";
-            }
-
-            throw new LlmHttpRequestException(response.StatusCode, responseBody);
-        }
+        await EnsureSuccessOrThrowAsync(response, cancellationToken);
 
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -85,22 +70,7 @@ public sealed class LlmHttpClient
         using var response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
             .ConfigureAwait(false);
 
-        if (!response.IsSuccessStatusCode)
-        {
-            string? responseBody = null;
-            try
-            {
-                responseBody = await response.Content.ReadAsStringAsync(cancellationToken)
-                    .ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                var detail = ex.InnerException?.Message ?? ex.Message;
-                responseBody = $"[Failed to read response body: {detail}]";
-            }
-
-            throw new LlmHttpRequestException(response.StatusCode, responseBody);
-        }
+        await EnsureSuccessOrThrowAsync(response, cancellationToken);
 
         var rawResponseJson = await response.Content.ReadAsStringAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -136,22 +106,7 @@ public sealed class LlmHttpClient
             response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken)
                 .ConfigureAwait(false);
 
-            if (!response.IsSuccessStatusCode)
-            {
-                string? responseBody = null;
-                try
-                {
-                    responseBody = await response.Content.ReadAsStringAsync(cancellationToken)
-                        .ConfigureAwait(false);
-                }
-                catch (Exception ex)
-                {
-                    var detail = ex.InnerException?.Message ?? ex.Message;
-                    responseBody = $"[Failed to read response body: {detail}]";
-                }
-
-                throw new LlmHttpRequestException(response.StatusCode, responseBody);
-            }
+            await EnsureSuccessOrThrowAsync(response, cancellationToken);
 
             await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken)
                 .ConfigureAwait(false);
@@ -177,6 +132,27 @@ public sealed class LlmHttpClient
         {
             response?.Dispose();
         }
+    }
+
+    private static async Task EnsureSuccessOrThrowAsync(
+        HttpResponseMessage response,
+        CancellationToken cancellationToken)
+    {
+        if (response.IsSuccessStatusCode) return;
+
+        string? responseBody = null;
+        try
+        {
+            responseBody = await response.Content.ReadAsStringAsync(cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            var detail = ex.InnerException?.Message ?? ex.Message;
+            responseBody = $"[Failed to read response body: {detail}]";
+        }
+
+        throw new LlmHttpRequestException(response.StatusCode, responseBody);
     }
 
     private string SerializeAndMerge<TRequest>(TRequest payload, JsonElement? extraParameters)
