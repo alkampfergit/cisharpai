@@ -88,8 +88,11 @@ public sealed class FeatureDiscoveryTests
 
         var feature = client.Features.Get<IImageEmbeddingFeature>();
 
-        Assert.That(feature, Is.Not.Null);
-        Assert.That(feature, Is.SameAs(client));
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
     }
 
     // --- Azure OpenAI clients: no image embedding feature ---
@@ -175,8 +178,11 @@ public sealed class FeatureDiscoveryTests
 
         var feature = client.Features.Get<IImageEmbeddingFeature>();
 
-        Assert.That(feature, Is.Not.Null);
-        Assert.That(feature, Is.SameAs(client));
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
     }
 
     [Test]
@@ -187,8 +193,11 @@ public sealed class FeatureDiscoveryTests
 
         var feature = client.Features.Get<IMultimodalEmbeddingFeature>();
 
-        Assert.That(feature, Is.Not.Null);
-        Assert.That(feature, Is.SameAs(client));
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
     }
 
     // --- Generic feature discovery pattern ---
@@ -197,7 +206,7 @@ public sealed class FeatureDiscoveryTests
     public void FeatureDiscovery_ViaInterface_WorksForCohereClient()
     {
         using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        IEmbeddingClient client = new CohereEmbeddingClient(httpClient, new CohereClientOptions());
+        var client = new CohereEmbeddingClient(httpClient, new CohereClientOptions());
 
         var imageFeature = client.Features.Get<IImageEmbeddingFeature>();
 
@@ -208,7 +217,7 @@ public sealed class FeatureDiscoveryTests
     public void FeatureDiscovery_ViaInterface_ReturnsNullForOpenAiClient()
     {
         using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.openai.com/v1/") };
-        IEmbeddingClient client = new OpenAiEmbeddingClient(httpClient, new OpenAiClientOptions());
+        var client = new OpenAiEmbeddingClient(httpClient, new OpenAiClientOptions());
 
         var imageFeature = client.Features.Get<IImageEmbeddingFeature>();
 
@@ -219,7 +228,7 @@ public sealed class FeatureDiscoveryTests
     public void FeatureDiscovery_ViaInterface_WorksForCohereMultimodal()
     {
         using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        IEmbeddingClient client = new CohereEmbeddingClient(httpClient, new CohereClientOptions());
+        var client = new CohereEmbeddingClient(httpClient, new CohereClientOptions());
 
         var multimodalFeature = client.Features.Get<IMultimodalEmbeddingFeature>();
 
@@ -236,8 +245,11 @@ public sealed class FeatureDiscoveryTests
 
         var feature = client.Features.Get<IJsonOutputFeature>();
 
-        Assert.That(feature, Is.Not.Null);
-        Assert.That(feature, Is.SameAs(client));
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
     }
 
     [Test]
@@ -249,8 +261,11 @@ public sealed class FeatureDiscoveryTests
 
         var feature = client.Features.Get<IJsonOutputFeature>();
 
-        Assert.That(feature, Is.Not.Null);
-        Assert.That(feature, Is.SameAs(client));
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
     }
 
     [Test]
@@ -262,8 +277,11 @@ public sealed class FeatureDiscoveryTests
 
         var feature = client.Features.Get<IJsonOutputFeature>();
 
-        Assert.That(feature, Is.Not.Null);
-        Assert.That(feature, Is.SameAs(client));
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
     }
 
     [Test]
@@ -274,8 +292,11 @@ public sealed class FeatureDiscoveryTests
 
         var feature = client.Features.Get<IJsonOutputFeature>();
 
-        Assert.That(feature, Is.Not.Null);
-        Assert.That(feature, Is.SameAs(client));
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
     }
 
     [Test]
@@ -297,15 +318,18 @@ public sealed class FeatureDiscoveryTests
 
         var feature = client.Features.Get<IGroundedChatFeature>();
 
-        Assert.That(feature, Is.Not.Null);
-        Assert.That(feature, Is.SameAs(client));
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
     }
 
     [Test]
     public void FeatureDiscovery_ViaInterface_WorksForCohereGroundedChat()
     {
         using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        IChatCompletionClient client = new CohereChatCompletionClient(httpClient, new CohereClientOptions());
+        var client = new CohereChatCompletionClient(httpClient, new CohereClientOptions());
 
         var groundedFeature = client.Features.Get<IGroundedChatFeature>();
 
@@ -369,8 +393,11 @@ public sealed class FeatureDiscoveryTests
 
         var feature = client.Features.Get<IJsonOutputFeature>();
 
-        Assert.That(feature, Is.Not.Null);
-        Assert.That(feature, Is.SameAs(client));
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
     }
 
     [Test]
@@ -386,7 +413,7 @@ public sealed class FeatureDiscoveryTests
     public void FeatureDiscovery_ViaInterface_WorksForCohereJsonOutput()
     {
         using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        IChatCompletionClient client = new CohereChatCompletionClient(httpClient, new CohereClientOptions());
+        var client = new CohereChatCompletionClient(httpClient, new CohereClientOptions());
 
         var jsonFeature = client.Features.Get<IJsonOutputFeature>();
 
@@ -397,7 +424,7 @@ public sealed class FeatureDiscoveryTests
     public void FeatureDiscovery_ViaInterface_WorksForOpenAiJsonOutput()
     {
         using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.openai.com/v1/") };
-        IChatCompletionClient client = new OpenAiChatCompletionClient(httpClient, new OpenAiClientOptions());
+        var client = new OpenAiChatCompletionClient(httpClient, new OpenAiClientOptions());
 
         var jsonFeature = client.Features.Get<IJsonOutputFeature>();
 
@@ -414,8 +441,11 @@ public sealed class FeatureDiscoveryTests
 
         var feature = client.Features.Get<IToolCallingFeature>();
 
-        Assert.That(feature, Is.Not.Null);
-        Assert.That(feature, Is.SameAs(client));
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
     }
 
     [Test]
@@ -426,8 +456,11 @@ public sealed class FeatureDiscoveryTests
 
         var feature = client.Features.Get<IToolCallingFeature>();
 
-        Assert.That(feature, Is.Not.Null);
-        Assert.That(feature, Is.SameAs(client));
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
     }
 
     [Test]
@@ -438,8 +471,11 @@ public sealed class FeatureDiscoveryTests
 
         var feature = client.Features.Get<IToolCallingFeature>();
 
-        Assert.That(feature, Is.Not.Null);
-        Assert.That(feature, Is.SameAs(client));
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
     }
 
     [Test]
@@ -451,8 +487,11 @@ public sealed class FeatureDiscoveryTests
 
         var feature = client.Features.Get<IToolCallingFeature>();
 
-        Assert.That(feature, Is.Not.Null);
-        Assert.That(feature, Is.SameAs(client));
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
     }
 
     [Test]
@@ -464,8 +503,11 @@ public sealed class FeatureDiscoveryTests
 
         var feature = client.Features.Get<IToolCallingFeature>();
 
-        Assert.That(feature, Is.Not.Null);
-        Assert.That(feature, Is.SameAs(client));
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
     }
 
     [Test]
@@ -482,7 +524,7 @@ public sealed class FeatureDiscoveryTests
     {
         using var httpClient = new HttpClient { BaseAddress = new Uri("https://test.openai.azure.com/") };
         var options = new AzureOpenAiClientOptions { DeploymentName = "test", ApiKey = "key" };
-        IChatCompletionClient client = new AzureOpenAiChatCompletionClient(httpClient, options);
+        var client = new AzureOpenAiChatCompletionClient(httpClient, options);
 
         var toolFeature = client.Features.Get<IToolCallingFeature>();
 
@@ -494,10 +536,129 @@ public sealed class FeatureDiscoveryTests
     {
         using var httpClient = new HttpClient { BaseAddress = new Uri("https://test.inference.azure.com/") };
         var options = new AzureAiInferenceClientOptions { ModelId = "test-model", ApiKey = "key" };
-        IChatCompletionClient client = new AzureAiInferenceChatCompletionClient(httpClient, options);
+        var client = new AzureAiInferenceChatCompletionClient(httpClient, options);
 
         var toolFeature = client.Features.Get<IToolCallingFeature>();
 
         Assert.That(toolFeature, Is.Not.Null);
+    }
+
+    // --- Streaming Chat Feature discovery ---
+
+    [Test]
+    public void OpenAiChatCompletionClient_ExposesStreamingChatFeature()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.openai.com/v1/") };
+        var client = new OpenAiChatCompletionClient(httpClient, new OpenAiClientOptions());
+
+        var feature = client.Features.Get<IStreamingChatFeature>();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
+    }
+
+    [Test]
+    public void AnthropicChatCompletionClient_ExposesStreamingChatFeature()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
+
+        var feature = client.Features.Get<IStreamingChatFeature>();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
+    }
+
+    [Test]
+    public void CohereChatCompletionClient_ExposesStreamingChatFeature()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.cohere.com/v2/") };
+        var client = new CohereChatCompletionClient(httpClient, new CohereClientOptions());
+
+        var feature = client.Features.Get<IStreamingChatFeature>();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
+    }
+
+    [Test]
+    public void AzureOpenAiChatCompletionClient_ExposesStreamingChatFeature()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://test.openai.azure.com/") };
+        var options = new AzureOpenAiClientOptions { DeploymentName = "test", ApiKey = "key" };
+        var client = new AzureOpenAiChatCompletionClient(httpClient, options);
+
+        var feature = client.Features.Get<IStreamingChatFeature>();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
+    }
+
+    [Test]
+    public void AzureAiInferenceChatCompletionClient_ExposesStreamingChatFeature()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://test.inference.azure.com/") };
+        var options = new AzureAiInferenceClientOptions { ModelId = "test-model", ApiKey = "key" };
+        var client = new AzureAiInferenceChatCompletionClient(httpClient, options);
+
+        var feature = client.Features.Get<IStreamingChatFeature>();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
+    }
+
+    [Test]
+    public void OpenAiEmbeddingClient_DoesNotExposeStreamingChatFeature()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.openai.com/v1/") };
+        var client = new OpenAiEmbeddingClient(httpClient, new OpenAiClientOptions());
+
+        Assert.That(client.Features.Get<IStreamingChatFeature>(), Is.Null);
+    }
+
+    [Test]
+    public void CohereEmbeddingClient_DoesNotExposeStreamingChatFeature()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.cohere.com/v2/") };
+        var client = new CohereEmbeddingClient(httpClient, new CohereClientOptions());
+
+        Assert.That(client.Features.Get<IStreamingChatFeature>(), Is.Null);
+    }
+
+    [Test]
+    public void FeatureDiscovery_ViaInterface_WorksForOpenAiStreaming()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.openai.com/v1/") };
+        var client = new OpenAiChatCompletionClient(httpClient, new OpenAiClientOptions());
+
+        var streamFeature = client.Features.Get<IStreamingChatFeature>();
+
+        Assert.That(streamFeature, Is.Not.Null);
+    }
+
+    [Test]
+    public void FeatureDiscovery_ViaInterface_WorksForAnthropicStreaming()
+    {
+        using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
+
+        var streamFeature = client.Features.Get<IStreamingChatFeature>();
+
+        Assert.That(streamFeature, Is.Not.Null);
     }
 }

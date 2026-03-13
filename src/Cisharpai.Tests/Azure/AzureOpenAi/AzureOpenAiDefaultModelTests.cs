@@ -75,8 +75,11 @@ public sealed class AzureOpenAiDefaultModelTests
 
         // Legacy format uses max_tokens, not max_completion_tokens
         var doc = JsonDocument.Parse(getCapturedBody()!);
-        Assert.That(doc.RootElement.TryGetProperty("max_tokens", out _), Is.True);
-        Assert.That(doc.RootElement.TryGetProperty("max_completion_tokens", out _), Is.False);
+        Assert.Multiple(() =>
+        {
+            Assert.That(doc.RootElement.TryGetProperty("max_tokens", out _), Is.True);
+            Assert.That(doc.RootElement.TryGetProperty("max_completion_tokens", out _), Is.False);
+        });
     }
 
     [Test]
@@ -94,8 +97,11 @@ public sealed class AzureOpenAiDefaultModelTests
         Assert.That(response.IsSuccess, Is.True);
 
         var doc = JsonDocument.Parse(getCapturedBody()!);
-        Assert.That(doc.RootElement.TryGetProperty("max_tokens", out _), Is.True);
-        Assert.That(doc.RootElement.TryGetProperty("max_completion_tokens", out _), Is.False);
+        Assert.Multiple(() =>
+        {
+            Assert.That(doc.RootElement.TryGetProperty("max_tokens", out _), Is.True);
+            Assert.That(doc.RootElement.TryGetProperty("max_completion_tokens", out _), Is.False);
+        });
     }
 
     [Test]
@@ -114,8 +120,11 @@ public sealed class AzureOpenAiDefaultModelTests
 
         // Reasoning format uses max_completion_tokens instead of max_tokens
         var doc = JsonDocument.Parse(getCapturedBody()!);
-        Assert.That(doc.RootElement.TryGetProperty("max_completion_tokens", out _), Is.True);
-        Assert.That(doc.RootElement.TryGetProperty("max_tokens", out _), Is.False);
+        Assert.Multiple(() =>
+        {
+            Assert.That(doc.RootElement.TryGetProperty("max_completion_tokens", out _), Is.True);
+            Assert.That(doc.RootElement.TryGetProperty("max_tokens", out _), Is.False);
+        });
     }
 
     [Test]
@@ -136,8 +145,11 @@ public sealed class AzureOpenAiDefaultModelTests
 
         // Should use reasoning format from request model, not legacy from default
         var doc = JsonDocument.Parse(getCapturedBody()!);
-        Assert.That(doc.RootElement.TryGetProperty("max_completion_tokens", out _), Is.True);
-        Assert.That(doc.RootElement.TryGetProperty("max_tokens", out _), Is.False);
+        Assert.Multiple(() =>
+        {
+            Assert.That(doc.RootElement.TryGetProperty("max_completion_tokens", out _), Is.True);
+            Assert.That(doc.RootElement.TryGetProperty("max_tokens", out _), Is.False);
+        });
     }
 
     [Test]
@@ -157,10 +169,13 @@ public sealed class AzureOpenAiDefaultModelTests
         Assert.That(response.IsSuccess, Is.True);
 
         var doc = JsonDocument.Parse(getCapturedBody()!);
-        Assert.That(doc.RootElement.TryGetProperty("max_completion_tokens", out _), Is.True);
-        Assert.That(doc.RootElement.TryGetProperty("max_tokens", out _), Is.False);
-        Assert.That(doc.RootElement.GetProperty("response_format").GetProperty("type").GetString(),
-            Is.EqualTo("json_object"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(doc.RootElement.TryGetProperty("max_completion_tokens", out _), Is.True);
+            Assert.That(doc.RootElement.TryGetProperty("max_tokens", out _), Is.False);
+            Assert.That(doc.RootElement.GetProperty("response_format").GetProperty("type").GetString(),
+                Is.EqualTo("json_object"));
+        });
     }
 
     [Test]
@@ -180,8 +195,11 @@ public sealed class AzureOpenAiDefaultModelTests
         Assert.That(response.IsSuccess, Is.True);
 
         var doc = JsonDocument.Parse(getCapturedBody()!);
-        Assert.That(doc.RootElement.TryGetProperty("max_tokens", out _), Is.True);
-        Assert.That(doc.RootElement.TryGetProperty("max_completion_tokens", out _), Is.False);
+        Assert.Multiple(() =>
+        {
+            Assert.That(doc.RootElement.TryGetProperty("max_tokens", out _), Is.True);
+            Assert.That(doc.RootElement.TryGetProperty("max_completion_tokens", out _), Is.False);
+        });
     }
 
     [Test]

@@ -39,4 +39,31 @@ public static class HttpClientBuilderExtensions
 
         return builder;
     }
+
+    /// <summary>
+    /// Adds a resilience handler optimized for streaming (SSE) requests.
+    /// Disables per-attempt and total request timeouts to prevent cutting off
+    /// long-running streams, while keeping retry and circuit breaker at default settings.
+    /// </summary>
+    /// <remarks>
+    /// Use this handler for HttpClients that will be used with <see cref="Features.Chat.IStreamingChatFeature"/>.
+    /// The standard <see cref="AddCisharpaiResilienceHandler"/> sets 60s/90s timeouts which
+    /// would terminate any stream running longer than those limits.
+    /// </remarks>
+    public static IHttpClientBuilder AddCisharpaiStreamingResilienceHandler(this IHttpClientBuilder builder)
+    {
+        builder.AddStandardResilienceHandler(options =>
+        {
+            options.AttemptTimeout = new HttpTimeoutStrategyOptions
+            {
+                Timeout = Timeout.InfiniteTimeSpan
+            };
+            options.TotalRequestTimeout = new HttpTimeoutStrategyOptions
+            {
+                Timeout = Timeout.InfiniteTimeSpan
+            };
+            // Retry and circuit breaker remain at default settings
+        });
+        return builder;
+    }
 }

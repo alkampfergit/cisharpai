@@ -251,10 +251,13 @@ public sealed class AnthropicJsonOutputTests
             .GetProperty("schema");
 
         // Verify it's a JSON object, not a serialized string
-        Assert.That(schema.ValueKind, Is.EqualTo(JsonValueKind.Object));
-        Assert.That(schema.GetProperty("properties").GetProperty("name").GetProperty("type").GetString(), Is.EqualTo("string"));
-        Assert.That(schema.GetProperty("properties").GetProperty("age").GetProperty("type").GetString(), Is.EqualTo("integer"));
-        Assert.That(schema.GetProperty("additionalProperties").GetBoolean(), Is.False);
+        Assert.Multiple(() =>
+        {
+            Assert.That(schema.ValueKind, Is.EqualTo(JsonValueKind.Object));
+            Assert.That(schema.GetProperty("properties").GetProperty("name").GetProperty("type").GetString(), Is.EqualTo("string"));
+            Assert.That(schema.GetProperty("properties").GetProperty("age").GetProperty("type").GetString(), Is.EqualTo("integer"));
+            Assert.That(schema.GetProperty("additionalProperties").GetBoolean(), Is.False);
+        });
     }
 
     [Test]
@@ -317,8 +320,11 @@ public sealed class AnthropicJsonOutputTests
 
         var response = await client.GetChatCompletionWithJsonOutputAsync(request, jsonOptions);
 
-        Assert.That(response.Refusal, Is.EqualTo("I cannot assist with that request."));
-        Assert.That(response.Content, Is.Empty);
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Refusal, Is.EqualTo("I cannot assist with that request."));
+            Assert.That(response.Content, Is.Empty);
+        });
     }
 
     [Test]
@@ -344,9 +350,12 @@ public sealed class AnthropicJsonOutputTests
 
         var response = await client.GetChatCompletionWithJsonOutputAsync(request, jsonOptions);
 
-        Assert.That(response.Content, Is.EqualTo("{\"name\":\"John\",\"age\":30}"));
-        Assert.That(response.Refusal, Is.Null);
-        Assert.That(response.IsSuccess, Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Content, Is.EqualTo("{\"name\":\"John\",\"age\":30}"));
+            Assert.That(response.Refusal, Is.Null);
+            Assert.That(response.IsSuccess, Is.True);
+        });
     }
 
     #endregion
@@ -495,8 +504,11 @@ public sealed class AnthropicJsonOutputTests
 
         var feature = client.Features.Get<IJsonOutputFeature>();
 
-        Assert.That(feature, Is.Not.Null);
-        Assert.That(feature, Is.SameAs(client));
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
     }
 
     #endregion

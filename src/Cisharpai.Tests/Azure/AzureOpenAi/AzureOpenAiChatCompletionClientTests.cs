@@ -29,12 +29,15 @@ public sealed class AzureOpenAiChatCompletionClientTests
             Messages: [new LlmMessage(LlmRole.User, "Hello")],
             Model: "gpt-4"));
 
-        Assert.That(response.Content, Is.EqualTo("Hello there!"));
-        Assert.That(response.Model, Is.EqualTo("gpt-4"));
-        Assert.That(response.PromptTokens, Is.EqualTo(10));
-        Assert.That(response.CompletionTokens, Is.EqualTo(20));
-        Assert.That(response.IsSuccess, Is.True);
-        Assert.That(response.ErrorMessage, Is.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Content, Is.EqualTo("Hello there!"));
+            Assert.That(response.Model, Is.EqualTo("gpt-4"));
+            Assert.That(response.PromptTokens, Is.EqualTo(10));
+            Assert.That(response.CompletionTokens, Is.EqualTo(20));
+            Assert.That(response.IsSuccess, Is.True);
+            Assert.That(response.ErrorMessage, Is.Null);
+        });
     }
 
     [Test]
@@ -61,10 +64,13 @@ public sealed class AzureOpenAiChatCompletionClientTests
             Messages: [new LlmMessage(LlmRole.User, "Hello")],
             Model: "gpt-4"));
 
-        Assert.That(response.IsSuccess, Is.False);
-        Assert.That(response.ErrorMessage, Does.Contain("500"));
-        Assert.That(response.Content, Is.EqualTo(string.Empty));
-        Assert.That(response.Model, Is.EqualTo(string.Empty));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.False);
+            Assert.That(response.ErrorMessage, Does.Contain("500"));
+            Assert.That(response.Content, Is.EqualTo(string.Empty));
+            Assert.That(response.Model, Is.EqualTo(string.Empty));
+        });
     }
 
     private const string AzureResponseJson = """

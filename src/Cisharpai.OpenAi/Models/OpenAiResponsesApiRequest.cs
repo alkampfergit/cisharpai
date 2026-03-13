@@ -14,6 +14,9 @@ public sealed class OpenAiResponsesApiRequest
     public OpenAiReasoningOption? Reasoning { get; set; }
 
     public OpenAiTextOption? Text { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Stream { get; set; }
 }
 
 public sealed class OpenAiReasoningOption

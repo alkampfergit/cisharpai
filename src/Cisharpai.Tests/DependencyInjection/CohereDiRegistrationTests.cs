@@ -27,11 +27,14 @@ public sealed class CohereDiRegistrationTests
         var embeddingClient = provider.GetRequiredService<IEmbeddingClient>();
         var chatClient = provider.GetRequiredService<IChatCompletionClient>();
 
-        Assert.That(embeddingClient, Is.Not.Null);
-        Assert.That(chatClient, Is.Not.Null);
-        Assert.That(embeddingClient, Is.Not.SameAs(chatClient));
-        Assert.That(embeddingClient, Is.InstanceOf<CohereEmbeddingClient>());
-        Assert.That(chatClient, Is.InstanceOf<CohereChatCompletionClient>());
+        Assert.Multiple(() =>
+        {
+            Assert.That(embeddingClient, Is.Not.Null);
+            Assert.That(chatClient, Is.Not.Null);
+            Assert.That(embeddingClient, Is.Not.SameAs(chatClient));
+            Assert.That(embeddingClient, Is.InstanceOf<CohereEmbeddingClient>());
+            Assert.That(chatClient, Is.InstanceOf<CohereChatCompletionClient>());
+        });
     }
 
     [Test]
@@ -48,8 +51,11 @@ public sealed class CohereDiRegistrationTests
 
         var client = provider.GetRequiredService<IEmbeddingClient>();
 
-        Assert.That(client, Is.Not.Null);
-        Assert.That(client, Is.InstanceOf<CohereEmbeddingClient>());
+        Assert.Multiple(() =>
+        {
+            Assert.That(client, Is.Not.Null);
+            Assert.That(client, Is.InstanceOf<CohereEmbeddingClient>());
+        });
     }
 
     [Test]
@@ -66,8 +72,11 @@ public sealed class CohereDiRegistrationTests
 
         var client = provider.GetRequiredService<IChatCompletionClient>();
 
-        Assert.That(client, Is.Not.Null);
-        Assert.That(client, Is.InstanceOf<CohereChatCompletionClient>());
+        Assert.Multiple(() =>
+        {
+            Assert.That(client, Is.Not.Null);
+            Assert.That(client, Is.InstanceOf<CohereChatCompletionClient>());
+        });
     }
 
     [Test]
@@ -92,11 +101,14 @@ public sealed class CohereDiRegistrationTests
         var english = provider.GetRequiredKeyedService<IEmbeddingClient>("english");
         var multilingual = provider.GetRequiredKeyedService<IEmbeddingClient>("multilingual");
 
-        Assert.That(english, Is.Not.Null);
-        Assert.That(multilingual, Is.Not.Null);
-        Assert.That(english, Is.Not.SameAs(multilingual));
-        Assert.That(english, Is.InstanceOf<CohereEmbeddingClient>());
-        Assert.That(multilingual, Is.InstanceOf<CohereEmbeddingClient>());
+        Assert.Multiple(() =>
+        {
+            Assert.That(english, Is.Not.Null);
+            Assert.That(multilingual, Is.Not.Null);
+            Assert.That(english, Is.Not.SameAs(multilingual));
+            Assert.That(english, Is.InstanceOf<CohereEmbeddingClient>());
+            Assert.That(multilingual, Is.InstanceOf<CohereEmbeddingClient>());
+        });
     }
 
     [Test]
@@ -121,9 +133,12 @@ public sealed class CohereDiRegistrationTests
         var fast = provider.GetRequiredKeyedService<IChatCompletionClient>("fast");
         var quality = provider.GetRequiredKeyedService<IChatCompletionClient>("quality");
 
-        Assert.That(fast, Is.Not.Null);
-        Assert.That(quality, Is.Not.Null);
-        Assert.That(fast, Is.Not.SameAs(quality));
+        Assert.Multiple(() =>
+        {
+            Assert.That(fast, Is.Not.Null);
+            Assert.That(quality, Is.Not.Null);
+            Assert.That(fast, Is.Not.SameAs(quality));
+        });
     }
 
     [Test]
@@ -146,8 +161,11 @@ public sealed class CohereDiRegistrationTests
         var defaultClient = provider.GetRequiredService<IEmbeddingClient>();
         var specialClient = provider.GetRequiredKeyedService<IEmbeddingClient>("special");
 
-        Assert.That(defaultClient, Is.Not.Null);
-        Assert.That(specialClient, Is.Not.Null);
-        Assert.That(defaultClient, Is.Not.SameAs(specialClient));
+        Assert.Multiple(() =>
+        {
+            Assert.That(defaultClient, Is.Not.Null);
+            Assert.That(specialClient, Is.Not.Null);
+            Assert.That(defaultClient, Is.Not.SameAs(specialClient));
+        });
     }
 }

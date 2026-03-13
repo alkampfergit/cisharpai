@@ -1,5 +1,5 @@
-using System.Text.Json;
 using Cisharpai.Features;
+using Cisharpai.Helpers;
 using Cisharpai.Models;
 using Cisharpai.OpenAi.Models;
 
@@ -42,14 +42,15 @@ public sealed class OpenAiEmbeddingClient : IEmbeddingClient
             if (request.IncludeRawResponse)
             {
                 var (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<OpenAiEmbeddingRequest, OpenAiEmbeddingResponse>(
-                    EmbeddingsEndpoint, providerRequest, cancellationToken, request.ExtraParameters);
+                    EmbeddingsEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
                 return MapResponse(raw, request.EncodingFormat, rawResponseJson, rawRequestJson);
             }
 
             return MapResponse(
                 await _client.PostAsync<OpenAiEmbeddingRequest, OpenAiEmbeddingResponse>(
-                    EmbeddingsEndpoint, providerRequest, cancellationToken, request.ExtraParameters),
+                    EmbeddingsEndpoint, providerRequest, request.ExtraParameters, cancellationToken),
                 request.EncodingFormat);
+
         }
         catch (LlmHttpRequestException ex)
         {
@@ -67,38 +68,12 @@ public sealed class OpenAiEmbeddingClient : IEmbeddingClient
         string? rawResponseJson = null,
         string? rawRequestJson = null)
     {
-        var orderedData = raw.Data.OrderBy(d => d.Index).ToList();
+        var orderedEmbeddings = raw.Data.OrderBy(d => d.Index)
+            .Select(d => d.Embedding)
+            .ToList();
 
-        var isBase64 = string.Equals(encodingFormat, "base64", StringComparison.OrdinalIgnoreCase);
-
-        IReadOnlyList<float[]> embeddings;
-        IReadOnlyList<string>? base64Embeddings = null;
-
-        if (isBase64)
-        {
-            embeddings = [];
-            base64Embeddings = orderedData
-                .Select(d => d.Embedding.GetString() ?? string.Empty)
-                .ToList();
-        }
-        else
-        {
-            embeddings = orderedData
-                .Select(d => d.Embedding.EnumerateArray().Select(e => e.GetSingle()).ToArray())
-                .ToList();
-        }
-
-        var dimensions = !isBase64 && embeddings.Count > 0
-            ? embeddings[0].Length
-            : (int?)null;
-
-        return new EmbeddingResponse(
-            Embeddings: embeddings,
-            Base64Embeddings: base64Embeddings,
-            Model: raw.Model,
-            TotalTokens: raw.Usage.TotalTokens,
-            Dimensions: dimensions,
-            RawResponseJson: rawResponseJson,
-            RawRequestJson: rawRequestJson);
+        return EmbeddingHelper.MapEmbeddingResponse(
+            orderedEmbeddings, encodingFormat, raw.Model, raw.Usage.TotalTokens,
+            rawResponseJson, rawRequestJson);
     }
 }

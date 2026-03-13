@@ -4,6 +4,7 @@ using Cisharpai.Features;
 using Cisharpai.Features.Embeddings;
 using Cisharpai.Models;
 using Cisharpai.Cohere.Models;
+using Cisharpai;
 
 namespace Cisharpai.Cohere;
 
@@ -54,13 +55,13 @@ public sealed class CohereEmbeddingClient : IEmbeddingClient, IImageEmbeddingFea
             if (request.IncludeRawResponse)
             {
                 var (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<CohereEmbedRequest, CohereEmbedResponse>(
-                    EmbedEndpoint, providerRequest, cancellationToken, request.ExtraParameters);
+                    EmbedEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
                 return MapResponse(raw, rawResponseJson, rawRequestJson);
             }
 
             return MapResponse(
                 await _client.PostAsync<CohereEmbedRequest, CohereEmbedResponse>(
-                    EmbedEndpoint, providerRequest, cancellationToken, request.ExtraParameters));
+                    EmbedEndpoint, providerRequest, request.ExtraParameters, cancellationToken));
         }
         catch (LlmHttpRequestException ex)
         {
@@ -94,7 +95,7 @@ public sealed class CohereEmbeddingClient : IEmbeddingClient, IImageEmbeddingFea
 
             return MapResponse(
                 await _client.PostAsync<CohereEmbedRequest, CohereEmbedResponse>(
-                    EmbedEndpoint, providerRequest, cancellationToken));
+                    EmbedEndpoint, providerRequest, cancellationToken: cancellationToken));
         }
         catch (LlmHttpRequestException ex)
         {
@@ -161,13 +162,13 @@ public sealed class CohereEmbeddingClient : IEmbeddingClient, IImageEmbeddingFea
             {
                 var (raw, rawResponseJson, rawRequestJson) =
                     await _client.PostWithRawAsync<CohereEmbedRequest, CohereEmbedResponse>(
-                        EmbedEndpoint, providerRequest, cancellationToken, extraParameters);
+                        EmbedEndpoint, providerRequest, extraParameters, cancellationToken);
                 return MapResponse(raw, rawResponseJson, rawRequestJson);
             }
 
             return MapResponse(
                 await _client.PostAsync<CohereEmbedRequest, CohereEmbedResponse>(
-                    EmbedEndpoint, providerRequest, cancellationToken, extraParameters));
+                    EmbedEndpoint, providerRequest, extraParameters, cancellationToken));
         }
         catch (LlmHttpRequestException ex)
         {
@@ -196,7 +197,7 @@ public sealed class CohereEmbeddingClient : IEmbeddingClient, IImageEmbeddingFea
     {
         var floatEmbeddings = raw.Embeddings.Float;
 
-        IReadOnlyList<float[]> embeddings = floatEmbeddings is not null
+        List<float[]> embeddings = floatEmbeddings is not null
             ? floatEmbeddings.Select(e => e.ToArray()).ToList()
             : [];
 

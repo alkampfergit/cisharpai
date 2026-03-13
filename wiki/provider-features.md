@@ -13,6 +13,8 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Multimodal Embeddings | `IMultimodalEmbeddingFeature` | Embed mixed text + image inputs in a single request |
 | Grounded Chat (RAG) | `IGroundedChatFeature` | Chat with document grounding and citations |
 | Tool Calling | `IToolCallingFeature` | Function calling / tool use in chat completions |
+| Vision (Image Input) | `LlmMessage.ContentParts` | Send images inline in chat messages for visual understanding |
+| Streaming | `IStreamingChatFeature` | Stream chat completions token-by-token via SSE |
 
 ## Support Matrix
 
@@ -28,6 +30,10 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Responses API (GPT-5) | Yes | -- | -- | -- | -- |
 | Grounded Chat (RAG) | -- | -- | -- | -- | Yes |
 | Tool Calling | Yes | Yes | Yes | Yes | Yes |
+| Vision (Image Input) | Yes | Yes | Yes | Yes | Partial* |
+| Streaming | Yes | Yes | Yes | Yes | Yes |
+
+\* Cohere Vision: image content parts are silently skipped (only text extracted). Cohere chat API does not support visual inputs.
 
 ## Provider Details
 
@@ -44,6 +50,8 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Reasoning Models | o1, o3, o3-mini, o4-mini — uses `max_completion_tokens` |
 | Responses API | GPT-5 models — status and incomplete-reason tracking |
 | Tool Calling | All models; `ToolChoice` supports Auto, None, Required, Specific (function name) |
+| Vision | Send images via `LlmMessage.WithImage()` or `LlmMessage.WithBase64Image()`; images are sent as data URIs (`data:image/{mime};base64,...`) |
+| Streaming | `IStreamingChatFeature`; legacy Chat Completions API and Responses API (GPT-5); `[DONE]` terminates the stream |
 
 ### Azure OpenAI
 
@@ -57,6 +65,8 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Structured Outputs | Via `response_format.json_schema`; refusal extraction supported |
 | Reasoning Models | Detected automatically; uses `max_completion_tokens` instead of `max_tokens` |
 | Tool Calling | All deployments; identical JSON shape to OpenAI (`tools` array, `tool_choice` parameter); all `ToolChoice` variants supported |
+| Vision | Same data URI format as OpenAI; images sent as content parts in messages |
+| Streaming | `IStreamingChatFeature`; supports both legacy and reasoning request formats; `[DONE]` terminates the stream |
 | Authentication | API key (`api-key` header) or Azure AD (Bearer token) |
 
 ### Azure AI Inference
@@ -72,6 +82,8 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Structured Outputs | Via `response_format.json_schema`; availability varies by deployed model |
 | Reasoning Models | o1/o3/o4/gpt-5 detected automatically |
 | Tool Calling | Model-dependent; uses OpenAI-compatible `tools` array and `tool_choice`; all `ToolChoice` variants supported |
+| Vision | Same data URI format as OpenAI; availability depends on deployed model |
+| Streaming | `IStreamingChatFeature`; supports both standard and reasoning request formats; `[DONE]` terminates the stream |
 | Authentication | API key (`api-key` header) or Azure AD (Bearer token) |
 
 ### Anthropic
@@ -84,6 +96,8 @@ This page lists every feature supported by each provider integration in Cisharpa
 | JSON Mode | Implemented via system-message injection; auto-strips markdown fences |
 | Structured Outputs | Via native `output_config.format` parameter; refusal via `stop_reason: "refusal"` |
 | Tool Calling | All Claude models; `ToolChoice` maps Auto->auto, Required->any, Specific->{type:tool,name}, None is omitted |
+| Vision | Images sent as raw base64 (NOT data URIs) via `source.type: "base64"` in content blocks |
+| Streaming | `IStreamingChatFeature`; event-based SSE (no `[DONE]` sentinel); `message_start`/`content_block_delta`/`message_delta` events |
 
 ### Cohere
 
@@ -101,6 +115,8 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Grounded Chat (RAG) | Document grounding via `documents` array, `citation_options` mode (ACCURATE/FAST/ENABLED), citation character offsets |
 | Input Types | search_query, search_document, classification, clustering |
 | Tool Calling | Command models; `ToolChoice` maps to uppercase (AUTO/NONE/REQUIRED); Specific degrades to REQUIRED; `strict_tools` flag when all tools are strict |
+| Vision | Partial: image content parts are silently skipped (only text extracted). Cohere chat does not support images. Use Cohere Embed v4 for image embeddings. |
+| Streaming | `IStreamingChatFeature`; event-based SSE with `content-delta` and `message-end` events; finish_reason uses uppercase (COMPLETE/MAX_TOKENS) |
 
 ## Feature Discovery
 

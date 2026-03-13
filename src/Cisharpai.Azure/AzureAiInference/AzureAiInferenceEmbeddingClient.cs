@@ -59,14 +59,14 @@ public sealed class AzureAiInferenceEmbeddingClient : IEmbeddingClient, IImageEm
                 (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<
                     AzureAiInferenceEmbeddingRequest,
                     AzureAiInferenceEmbeddingResponse>(
-                    uri, providerRequest, cancellationToken, request.ExtraParameters);
+                    uri, providerRequest, request.ExtraParameters, cancellationToken);
             }
             else
             {
                 raw = await _client.PostAsync<
                     AzureAiInferenceEmbeddingRequest,
                     AzureAiInferenceEmbeddingResponse>(
-                    uri, providerRequest, cancellationToken, request.ExtraParameters);
+                    uri, providerRequest, request.ExtraParameters, cancellationToken);
             }
 
             return MapResponse(raw, request.EncodingFormat, rawResponseJson, rawRequestJson);
@@ -105,7 +105,7 @@ public sealed class AzureAiInferenceEmbeddingClient : IEmbeddingClient, IImageEm
             var raw = await _client.PostAsync<
                 AzureAiInferenceImageEmbeddingRequest,
                 AzureAiInferenceEmbeddingResponse>(
-                uri, providerRequest, cancellationToken);
+                uri, providerRequest, cancellationToken: cancellationToken);
 
             return MapResponse(raw, null);
         }

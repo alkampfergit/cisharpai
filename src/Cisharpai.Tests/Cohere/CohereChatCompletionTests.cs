@@ -91,9 +91,12 @@ public sealed class CohereChatCompletionTests
 
         Assert.That(capturedBody, Is.Not.Null);
         var doc = JsonDocument.Parse(capturedBody!);
-        Assert.That(doc.RootElement.GetProperty("model").GetString(), Is.EqualTo("command-a-03-2025"));
-        Assert.That(doc.RootElement.GetProperty("temperature").GetDouble(), Is.EqualTo(0.5));
-        Assert.That(doc.RootElement.GetProperty("max_tokens").GetInt32(), Is.EqualTo(100));
+        Assert.Multiple(() =>
+        {
+            Assert.That(doc.RootElement.GetProperty("model").GetString(), Is.EqualTo("command-a-03-2025"));
+            Assert.That(doc.RootElement.GetProperty("temperature").GetDouble(), Is.EqualTo(0.5));
+            Assert.That(doc.RootElement.GetProperty("max_tokens").GetInt32(), Is.EqualTo(100));
+        });
     }
 
     [Test]
@@ -127,12 +130,15 @@ public sealed class CohereChatCompletionTests
         Assert.That(capturedBody, Is.Not.Null);
         var doc = JsonDocument.Parse(capturedBody!);
         var messages = doc.RootElement.GetProperty("messages");
-        Assert.That(messages.GetArrayLength(), Is.EqualTo(4));
-        Assert.That(messages[0].GetProperty("role").GetString(), Is.EqualTo("system"));
-        Assert.That(messages[0].GetProperty("content").GetString(), Is.EqualTo("Be helpful"));
-        Assert.That(messages[1].GetProperty("role").GetString(), Is.EqualTo("user"));
-        Assert.That(messages[2].GetProperty("role").GetString(), Is.EqualTo("assistant"));
-        Assert.That(messages[3].GetProperty("role").GetString(), Is.EqualTo("user"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(messages.GetArrayLength(), Is.EqualTo(4));
+            Assert.That(messages[0].GetProperty("role").GetString(), Is.EqualTo("system"));
+            Assert.That(messages[0].GetProperty("content").GetString(), Is.EqualTo("Be helpful"));
+            Assert.That(messages[1].GetProperty("role").GetString(), Is.EqualTo("user"));
+            Assert.That(messages[2].GetProperty("role").GetString(), Is.EqualTo("assistant"));
+            Assert.That(messages[3].GetProperty("role").GetString(), Is.EqualTo("user"));
+        });
     }
 
     [Test]
@@ -166,11 +172,14 @@ public sealed class CohereChatCompletionTests
         var messages = doc.RootElement.GetProperty("messages");
 
         // System message should be in messages array (not a separate field)
-        Assert.That(messages[0].GetProperty("role").GetString(), Is.EqualTo("system"));
-        Assert.That(messages[0].GetProperty("content").GetString(), Is.EqualTo("You are a helpful assistant"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(messages[0].GetProperty("role").GetString(), Is.EqualTo("system"));
+            Assert.That(messages[0].GetProperty("content").GetString(), Is.EqualTo("You are a helpful assistant"));
 
-        // No separate "system" field
-        Assert.That(doc.RootElement.TryGetProperty("system", out _), Is.False);
+            // No separate "system" field
+            Assert.That(doc.RootElement.TryGetProperty("system", out _), Is.False);
+        });
     }
 
     [Test]
@@ -197,9 +206,12 @@ public sealed class CohereChatCompletionTests
 
         Assert.That(capturedBody, Is.Not.Null);
         var doc = JsonDocument.Parse(capturedBody!);
-        Assert.That(doc.RootElement.TryGetProperty("temperature", out _), Is.False);
-        Assert.That(doc.RootElement.TryGetProperty("max_tokens", out _), Is.False);
-        Assert.That(doc.RootElement.TryGetProperty("response_format", out _), Is.False);
+        Assert.Multiple(() =>
+        {
+            Assert.That(doc.RootElement.TryGetProperty("temperature", out _), Is.False);
+            Assert.That(doc.RootElement.TryGetProperty("max_tokens", out _), Is.False);
+            Assert.That(doc.RootElement.TryGetProperty("response_format", out _), Is.False);
+        });
     }
 
     [Test]
@@ -225,11 +237,14 @@ public sealed class CohereChatCompletionTests
 
         await client.GetChatCompletionAsync(request);
 
-        Assert.That(capturedBody, Is.Not.Null);
-        // Verify snake_case: max_tokens, not maxTokens
-        Assert.That(capturedBody, Does.Contain("\"max_tokens\""));
-        Assert.That(capturedBody, Does.Not.Contain("\"maxTokens\""));
-        Assert.That(capturedBody, Does.Not.Contain("\"MaxTokens\""));
+        Assert.Multiple(() =>
+        {
+            Assert.That(capturedBody, Is.Not.Null);
+            // Verify snake_case: max_tokens, not maxTokens
+            Assert.That(capturedBody, Does.Contain("\"max_tokens\""));
+            Assert.That(capturedBody, Does.Not.Contain("\"maxTokens\""));
+            Assert.That(capturedBody, Does.Not.Contain("\"MaxTokens\""));
+        });
     }
 
     [Test]
@@ -254,8 +269,11 @@ public sealed class CohereChatCompletionTests
 
         await client.GetChatCompletionAsync(request);
 
-        Assert.That(capturedUri, Is.Not.Null);
-        Assert.That(capturedUri!.ToString(), Does.EndWith("chat"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(capturedUri, Is.Not.Null);
+            Assert.That(capturedUri!.ToString(), Does.EndWith("chat"));
+        });
     }
 
     #endregion
@@ -280,11 +298,14 @@ public sealed class CohereChatCompletionTests
 
         var response = await client.GetChatCompletionAsync(request);
 
-        Assert.That(response.IsSuccess, Is.True);
-        Assert.That(response.Content, Is.EqualTo("Hello! How can I help you?"));
-        Assert.That(response.Model, Is.EqualTo("command-a-03-2025"));
-        Assert.That(response.PromptTokens, Is.EqualTo(215));
-        Assert.That(response.CompletionTokens, Is.EqualTo(12));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.True);
+            Assert.That(response.Content, Is.EqualTo("Hello! How can I help you?"));
+            Assert.That(response.Model, Is.EqualTo("command-a-03-2025"));
+            Assert.That(response.PromptTokens, Is.EqualTo(215));
+            Assert.That(response.CompletionTokens, Is.EqualTo(12));
+        });
     }
 
     [Test]
@@ -351,8 +372,11 @@ public sealed class CohereChatCompletionTests
 
         var response = await client.GetChatCompletionAsync(request);
 
-        Assert.That(response.IsSuccess, Is.False);
-        Assert.That(response.ErrorMessage, Is.Not.Null.And.Not.Empty);
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.False);
+            Assert.That(response.ErrorMessage, Is.Not.Null.And.Not.Empty);
+        });
     }
 
     #endregion
@@ -378,8 +402,11 @@ public sealed class CohereChatCompletionTests
 
         var response = await client.GetChatCompletionAsync(request);
 
-        Assert.That(response.RawResponseJson, Is.Not.Null.And.Not.Empty);
-        Assert.That(response.RawRequestJson, Is.Not.Null.And.Not.Empty);
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.RawResponseJson, Is.Not.Null.And.Not.Empty);
+            Assert.That(response.RawRequestJson, Is.Not.Null.And.Not.Empty);
+        });
     }
 
     [Test]
@@ -401,8 +428,11 @@ public sealed class CohereChatCompletionTests
 
         var response = await client.GetChatCompletionAsync(request);
 
-        Assert.That(response.RawResponseJson, Is.Null);
-        Assert.That(response.RawRequestJson, Is.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.RawResponseJson, Is.Null);
+            Assert.That(response.RawRequestJson, Is.Null);
+        });
     }
 
     #endregion

@@ -77,9 +77,12 @@ public sealed class ToolCallingResponseTests
 
         var response = new ToolCallingResponse(chatCompletion, toolCalls);
 
-        Assert.That(response.ToolCalls, Is.Not.Null);
-        Assert.That(response.ToolCalls!.Count, Is.EqualTo(1));
-        Assert.That(response.ToolCalls[0].FunctionName, Is.EqualTo("get_weather"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.ToolCalls, Is.Not.Null);
+            Assert.That(response.ToolCalls!, Has.Count.EqualTo(1));
+            Assert.That(response.ToolCalls![0].FunctionName, Is.EqualTo("get_weather"));
+        });
     }
 
     [Test]
@@ -87,10 +90,13 @@ public sealed class ToolCallingResponseTests
     {
         var response = ToolCallingResponse.Error("fail", """{"error":"bad"}""");
 
-        Assert.That(response.IsSuccess, Is.False);
-        Assert.That(response.ErrorMessage, Is.EqualTo("fail"));
-        Assert.That(response.ToolCalls, Is.Null);
-        Assert.That(response.ChatCompletion.RawResponseJson, Is.EqualTo("""{"error":"bad"}"""));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.False);
+            Assert.That(response.ErrorMessage, Is.EqualTo("fail"));
+            Assert.That(response.ToolCalls, Is.Null);
+            Assert.That(response.ChatCompletion.RawResponseJson, Is.EqualTo("""{"error":"bad"}"""));
+        });
     }
 
     [Test]

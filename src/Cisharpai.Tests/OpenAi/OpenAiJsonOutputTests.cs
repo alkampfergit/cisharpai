@@ -290,10 +290,13 @@ public sealed class OpenAiJsonOutputTests
         Assert.That(capturedBody, Is.Not.Null);
         var doc = JsonDocument.Parse(capturedBody!);
         var messages = doc.RootElement.GetProperty("messages");
-        Assert.That(messages.GetArrayLength(), Is.EqualTo(2));
-        Assert.That(messages[0].GetProperty("role").GetString(), Is.EqualTo("system"));
-        Assert.That(messages[0].GetProperty("content").GetString(), Is.EqualTo("Respond in JSON."));
-        Assert.That(messages[1].GetProperty("role").GetString(), Is.EqualTo("user"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(messages.GetArrayLength(), Is.EqualTo(2));
+            Assert.That(messages[0].GetProperty("role").GetString(), Is.EqualTo("system"));
+            Assert.That(messages[0].GetProperty("content").GetString(), Is.EqualTo("Respond in JSON."));
+            Assert.That(messages[1].GetProperty("role").GetString(), Is.EqualTo("user"));
+        });
     }
 
     #endregion
@@ -333,10 +336,13 @@ public sealed class OpenAiJsonOutputTests
         Assert.That(responseFormat.GetProperty("type").GetString(), Is.EqualTo("json_schema"));
 
         var jsonSchema = responseFormat.GetProperty("json_schema");
-        Assert.That(jsonSchema.GetProperty("name").GetString(), Is.EqualTo("person"));
-        Assert.That(jsonSchema.GetProperty("strict").GetBoolean(), Is.True);
-        Assert.That(jsonSchema.TryGetProperty("schema", out var schema), Is.True);
-        Assert.That(schema.GetProperty("type").GetString(), Is.EqualTo("object"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(jsonSchema.GetProperty("name").GetString(), Is.EqualTo("person"));
+            Assert.That(jsonSchema.GetProperty("strict").GetBoolean(), Is.True);
+            Assert.That(jsonSchema.TryGetProperty("schema", out var schema), Is.True);
+            Assert.That(schema.GetProperty("type").GetString(), Is.EqualTo("object"));
+        });
     }
 
     [Test]
@@ -372,8 +378,11 @@ public sealed class OpenAiJsonOutputTests
         Assert.That(responseFormat.GetProperty("type").GetString(), Is.EqualTo("json_schema"));
 
         var jsonSchema = responseFormat.GetProperty("json_schema");
-        Assert.That(jsonSchema.GetProperty("name").GetString(), Is.EqualTo("person"));
-        Assert.That(jsonSchema.GetProperty("strict").GetBoolean(), Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(jsonSchema.GetProperty("name").GetString(), Is.EqualTo("person"));
+            Assert.That(jsonSchema.GetProperty("strict").GetBoolean(), Is.True);
+        });
     }
 
     [Test]
@@ -407,11 +416,14 @@ public sealed class OpenAiJsonOutputTests
         var doc = JsonDocument.Parse(capturedBody!);
         var text = doc.RootElement.GetProperty("text");
         var format = text.GetProperty("format");
-        Assert.That(format.GetProperty("type").GetString(), Is.EqualTo("json_schema"));
-        Assert.That(format.GetProperty("name").GetString(), Is.EqualTo("person"));
-        Assert.That(format.GetProperty("strict").GetBoolean(), Is.True);
-        Assert.That(format.TryGetProperty("schema", out var schema), Is.True);
-        Assert.That(schema.GetProperty("type").GetString(), Is.EqualTo("object"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(format.GetProperty("type").GetString(), Is.EqualTo("json_schema"));
+            Assert.That(format.GetProperty("name").GetString(), Is.EqualTo("person"));
+            Assert.That(format.GetProperty("strict").GetBoolean(), Is.True);
+            Assert.That(format.TryGetProperty("schema", out var schema), Is.True);
+            Assert.That(schema.GetProperty("type").GetString(), Is.EqualTo("object"));
+        });
     }
 
     [Test]
@@ -449,10 +461,13 @@ public sealed class OpenAiJsonOutputTests
             .GetProperty("schema");
 
         // Verify it's a JSON object, not a serialized string
-        Assert.That(schema.ValueKind, Is.EqualTo(JsonValueKind.Object));
-        Assert.That(schema.GetProperty("properties").GetProperty("name").GetProperty("type").GetString(), Is.EqualTo("string"));
-        Assert.That(schema.GetProperty("properties").GetProperty("age").GetProperty("type").GetString(), Is.EqualTo("integer"));
-        Assert.That(schema.GetProperty("additionalProperties").GetBoolean(), Is.False);
+        Assert.Multiple(() =>
+        {
+            Assert.That(schema.ValueKind, Is.EqualTo(JsonValueKind.Object));
+            Assert.That(schema.GetProperty("properties").GetProperty("name").GetProperty("type").GetString(), Is.EqualTo("string"));
+            Assert.That(schema.GetProperty("properties").GetProperty("age").GetProperty("type").GetString(), Is.EqualTo("integer"));
+            Assert.That(schema.GetProperty("additionalProperties").GetBoolean(), Is.False);
+        });
     }
 
     [Test]
@@ -554,8 +569,11 @@ public sealed class OpenAiJsonOutputTests
 
         var response = await client.GetChatCompletionWithJsonOutputAsync(request, jsonOptions);
 
-        Assert.That(response.Refusal, Is.EqualTo("I cannot assist with that request."));
-        Assert.That(response.Content, Is.Empty);
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Refusal, Is.EqualTo("I cannot assist with that request."));
+            Assert.That(response.Content, Is.Empty);
+        });
     }
 
     [Test]
@@ -581,8 +599,11 @@ public sealed class OpenAiJsonOutputTests
 
         var response = await client.GetChatCompletionWithJsonOutputAsync(request, jsonOptions);
 
-        Assert.That(response.Refusal, Is.EqualTo("I cannot assist with that request."));
-        Assert.That(response.Content, Is.Empty);
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Refusal, Is.EqualTo("I cannot assist with that request."));
+            Assert.That(response.Content, Is.Empty);
+        });
     }
 
     [Test]
@@ -608,9 +629,12 @@ public sealed class OpenAiJsonOutputTests
 
         var response = await client.GetChatCompletionWithJsonOutputAsync(request, jsonOptions);
 
-        Assert.That(response.Content, Is.EqualTo("{\"name\":\"John\",\"age\":30}"));
-        Assert.That(response.Refusal, Is.Null);
-        Assert.That(response.IsSuccess, Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Content, Is.EqualTo("{\"name\":\"John\",\"age\":30}"));
+            Assert.That(response.Refusal, Is.Null);
+            Assert.That(response.IsSuccess, Is.True);
+        });
     }
 
     #endregion
@@ -641,9 +665,12 @@ public sealed class OpenAiJsonOutputTests
 
         var response = await client.GetChatCompletionWithJsonOutputAsync(request, jsonOptions);
 
-        Assert.That(response.IsSuccess, Is.False);
-        Assert.That(response.ErrorMessage, Does.Contain(invalidJson));
-        Assert.That(response.ErrorMessage, Does.Contain("invalid JSON"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.False);
+            Assert.That(response.ErrorMessage, Does.Contain(invalidJson));
+            Assert.That(response.ErrorMessage, Does.Contain("invalid JSON"));
+        });
     }
 
     #endregion
@@ -658,8 +685,11 @@ public sealed class OpenAiJsonOutputTests
 
         var feature = client.Features.Get<IJsonOutputFeature>();
 
-        Assert.That(feature, Is.Not.Null);
-        Assert.That(feature, Is.SameAs(client));
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
     }
 
     #endregion

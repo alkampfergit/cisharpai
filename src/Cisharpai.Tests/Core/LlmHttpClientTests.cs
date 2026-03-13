@@ -24,8 +24,11 @@ public sealed class LlmHttpClientTests
 
         await client.PostAsync<object, JsonElement>("api/test", new { Name = "test" });
 
-        Assert.That(handler.LastRequest, Is.Not.Null);
-        Assert.That(handler.LastRequest!.Content!.Headers.ContentType!.MediaType, Is.EqualTo("application/json"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(handler.LastRequest, Is.Not.Null);
+            Assert.That(handler.LastRequest!.Content!.Headers.ContentType!.MediaType, Is.EqualTo("application/json"));
+        });
     }
 
     [Test]
@@ -46,8 +49,11 @@ public sealed class LlmHttpClientTests
 
         await client.PostAsync<object, JsonElement>("api/test", new { MyProperty = "hello" });
 
-        Assert.That(capturedBody, Does.Contain("\"myProperty\""));
-        Assert.That(capturedBody, Does.Not.Contain("\"MyProperty\""));
+        Assert.Multiple(() =>
+        {
+            Assert.That(capturedBody, Does.Contain("\"myProperty\""));
+            Assert.That(capturedBody, Does.Not.Contain("\"MyProperty\""));
+        });
     }
 
     [Test]
@@ -70,8 +76,11 @@ public sealed class LlmHttpClientTests
 
         var result = await client.PostAsync<object, TestResponse>("api/test", new { });
 
-        Assert.That(result.Name, Is.EqualTo("result"));
-        Assert.That(result.Count, Is.EqualTo(5));
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Name, Is.EqualTo("result"));
+            Assert.That(result.Count, Is.EqualTo(5));
+        });
     }
 
     [Test]
@@ -108,10 +117,13 @@ public sealed class LlmHttpClientTests
         var ex = Assert.ThrowsAsync<LlmHttpRequestException>(async () =>
             await client.PostAsync<object, JsonElement>("api/test", new { }));
 
-        Assert.That(ex!.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
-        Assert.That(ex.ResponseBody, Is.EqualTo(errorBody));
-        Assert.That(ex.Message, Does.Contain("401"));
-        Assert.That(ex.Message, Does.Contain(errorBody));
+        Assert.Multiple(() =>
+        {
+            Assert.That(ex!.StatusCode, Is.EqualTo(HttpStatusCode.Unauthorized));
+            Assert.That(ex.ResponseBody, Is.EqualTo(errorBody));
+            Assert.That(ex.Message, Does.Contain("401"));
+            Assert.That(ex.Message, Does.Contain(errorBody));
+        });
     }
 
     [Test]
@@ -132,9 +144,12 @@ public sealed class LlmHttpClientTests
         var ex = Assert.ThrowsAsync<LlmHttpRequestException>(async () =>
             await client.PostAsync<object, JsonElement>("api/test", new { }));
 
-        Assert.That(ex!.StatusCode, Is.EqualTo(HttpStatusCode.BadGateway));
-        Assert.That(ex.ResponseBody, Is.EqualTo(""));
-        Assert.That(ex.Message, Does.Contain("502"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(ex!.StatusCode, Is.EqualTo(HttpStatusCode.BadGateway));
+            Assert.That(ex.ResponseBody, Is.EqualTo(""));
+            Assert.That(ex.Message, Does.Contain("502"));
+        });
     }
 
     [Test]
@@ -156,8 +171,11 @@ public sealed class LlmHttpClientTests
             caughtException = ex;
         }
 
-        Assert.That(caughtException, Is.Not.Null);
-        Assert.That(caughtException, Is.InstanceOf<LlmHttpRequestException>());
+        Assert.Multiple(() =>
+        {
+            Assert.That(caughtException, Is.Not.Null);
+            Assert.That(caughtException, Is.InstanceOf<LlmHttpRequestException>());
+        });
     }
 
     [Test]
@@ -197,10 +215,13 @@ public sealed class LlmHttpClientTests
 
         var (result, rawResponseJson, rawRequestJson) = await client.PostWithRawAsync<object, TestResponse>("api/test", new { });
 
-        Assert.That(result.Name, Is.EqualTo("result"));
-        Assert.That(result.Count, Is.EqualTo(5));
-        Assert.That(rawResponseJson, Is.EqualTo(json));
-        Assert.That(rawRequestJson, Is.Not.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Name, Is.EqualTo("result"));
+            Assert.That(result.Count, Is.EqualTo(5));
+            Assert.That(rawResponseJson, Is.EqualTo(json));
+            Assert.That(rawRequestJson, Is.Not.Null);
+        });
     }
 
     [Test]
@@ -234,9 +255,12 @@ public sealed class LlmHttpClientTests
         var ex = Assert.ThrowsAsync<LlmHttpRequestException>(async () =>
             await client.PostAsync<object, JsonElement>("api/test", new { }));
 
-        Assert.That(ex!.StatusCode, Is.EqualTo(HttpStatusCode.InternalServerError));
-        Assert.That(ex.ResponseBody, Does.Contain("Failed to read response body"));
-        Assert.That(ex.ResponseBody, Does.Contain("Simulated read failure"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(ex!.StatusCode, Is.EqualTo(HttpStatusCode.InternalServerError));
+            Assert.That(ex.ResponseBody, Does.Contain("Failed to read response body"));
+            Assert.That(ex.ResponseBody, Does.Contain("Simulated read failure"));
+        });
     }
 
     [Test]
@@ -257,9 +281,12 @@ public sealed class LlmHttpClientTests
         var ex = Assert.ThrowsAsync<LlmHttpRequestException>(async () =>
             await client.PostWithRawAsync<object, JsonElement>("api/test", new { }));
 
-        Assert.That(ex!.StatusCode, Is.EqualTo(HttpStatusCode.BadGateway));
-        Assert.That(ex.ResponseBody, Does.Contain("Failed to read response body"));
-        Assert.That(ex.ResponseBody, Does.Contain("Connection reset"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(ex!.StatusCode, Is.EqualTo(HttpStatusCode.BadGateway));
+            Assert.That(ex.ResponseBody, Does.Contain("Failed to read response body"));
+            Assert.That(ex.ResponseBody, Does.Contain("Connection reset"));
+        });
     }
 
     [Test]
@@ -322,10 +349,13 @@ public sealed class LlmHttpClientTests
 
         await client.PostAsync<object, JsonElement>("api/test", new { Name = "test" }, extraParameters: extra);
 
-        Assert.That(capturedBody, Does.Contain("\"name\""));
-        Assert.That(capturedBody, Does.Contain("\"customParam\":\"value\""));
-        Assert.That(capturedBody, Does.Contain("\"nested\""));
-        Assert.That(capturedBody, Does.Contain("\"key\":123"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(capturedBody, Does.Contain("\"name\""));
+            Assert.That(capturedBody, Does.Contain("\"customParam\":\"value\""));
+            Assert.That(capturedBody, Does.Contain("\"nested\""));
+            Assert.That(capturedBody, Does.Contain("\"key\":123"));
+        });
     }
 
     [Test]
@@ -383,7 +413,7 @@ public sealed class LlmHttpClientTests
         cts.Cancel();
 
         Assert.ThrowsAsync<TaskCanceledException>(async () =>
-            await client.PostAsync<object, JsonElement>("api/test", new { }, cts.Token));
+            await client.PostAsync<object, JsonElement>("api/test", new { }, cancellationToken: cts.Token));
     }
 
     [Test]
@@ -401,7 +431,7 @@ public sealed class LlmHttpClientTests
         cts.Cancel();
 
         Assert.ThrowsAsync<TaskCanceledException>(async () =>
-            await client.PostWithRawAsync<object, JsonElement>("api/test", new { }, cts.Token));
+            await client.PostWithRawAsync<object, JsonElement>("api/test", new { }, cancellationToken: cts.Token));
     }
 
     private sealed class TestResponse

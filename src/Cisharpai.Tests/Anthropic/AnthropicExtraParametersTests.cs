@@ -33,10 +33,13 @@ public sealed class AnthropicExtraParametersTests
         await client.GetChatCompletionAsync(request);
 
         var doc = JsonDocument.Parse(capturedBody!);
-        Assert.That(doc.RootElement.GetProperty("model").GetString(), Is.EqualTo("claude-sonnet-4-20250514"));
-        Assert.That(doc.RootElement.GetProperty("temperature").GetDouble(), Is.EqualTo(0.5));
-        Assert.That(doc.RootElement.GetProperty("top_k").GetInt32(), Is.EqualTo(40));
-        Assert.That(doc.RootElement.GetProperty("stream").GetBoolean(), Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(doc.RootElement.GetProperty("model").GetString(), Is.EqualTo("claude-sonnet-4-20250514"));
+            Assert.That(doc.RootElement.GetProperty("temperature").GetDouble(), Is.EqualTo(0.5));
+            Assert.That(doc.RootElement.GetProperty("top_k").GetInt32(), Is.EqualTo(40));
+            Assert.That(doc.RootElement.GetProperty("stream").GetBoolean(), Is.True);
+        });
     }
 
     [Test]

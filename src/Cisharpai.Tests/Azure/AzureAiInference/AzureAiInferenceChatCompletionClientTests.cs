@@ -32,13 +32,16 @@ public sealed class AzureAiInferenceChatCompletionClientTests
             Messages: [new LlmMessage(LlmRole.User, "Hello")],
             Model: "Phi-3-mini-4k-instruct"));
 
-        Assert.That(response.Content, Is.EqualTo("Hello there!"));
-        Assert.That(response.Model, Is.EqualTo("Phi-3-mini-4k-instruct"));
-        Assert.That(response.PromptTokens, Is.EqualTo(10));
-        Assert.That(response.CompletionTokens, Is.EqualTo(5));
-        Assert.That(response.IsSuccess, Is.True);
-        Assert.That(response.ErrorMessage, Is.Null);
-        Assert.That(response.Status, Is.EqualTo("stop"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Content, Is.EqualTo("Hello there!"));
+            Assert.That(response.Model, Is.EqualTo("Phi-3-mini-4k-instruct"));
+            Assert.That(response.PromptTokens, Is.EqualTo(10));
+            Assert.That(response.CompletionTokens, Is.EqualTo(5));
+            Assert.That(response.IsSuccess, Is.True);
+            Assert.That(response.ErrorMessage, Is.Null);
+            Assert.That(response.Status, Is.EqualTo("stop"));
+        });
     }
 
     [Test]
@@ -67,10 +70,13 @@ public sealed class AzureAiInferenceChatCompletionClientTests
             Messages: [new LlmMessage(LlmRole.User, "Hello")],
             Model: "Phi-3-mini-4k-instruct"));
 
-        Assert.That(response.IsSuccess, Is.False);
-        Assert.That(response.ErrorMessage, Does.Contain("500"));
-        Assert.That(response.Content, Is.EqualTo(string.Empty));
-        Assert.That(response.Model, Is.EqualTo(string.Empty));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.False);
+            Assert.That(response.ErrorMessage, Does.Contain("500"));
+            Assert.That(response.Content, Is.EqualTo(string.Empty));
+            Assert.That(response.Model, Is.EqualTo(string.Empty));
+        });
     }
 
     [Test]
@@ -141,9 +147,12 @@ public sealed class AzureAiInferenceChatCompletionClientTests
         await client.GetChatCompletionAsync(request);
 
         var doc = JsonDocument.Parse(capturedBody!);
-        Assert.That(doc.RootElement.GetProperty("temperature").GetDouble(), Is.EqualTo(0.7));
-        Assert.That(doc.RootElement.GetProperty("top_p").GetDouble(), Is.EqualTo(0.9));
-        Assert.That(doc.RootElement.GetProperty("presence_penalty").GetDouble(), Is.EqualTo(0.5));
+        Assert.Multiple(() =>
+        {
+            Assert.That(doc.RootElement.GetProperty("temperature").GetDouble(), Is.EqualTo(0.7));
+            Assert.That(doc.RootElement.GetProperty("top_p").GetDouble(), Is.EqualTo(0.9));
+            Assert.That(doc.RootElement.GetProperty("presence_penalty").GetDouble(), Is.EqualTo(0.5));
+        });
     }
 
     [Test]
@@ -172,8 +181,11 @@ public sealed class AzureAiInferenceChatCompletionClientTests
             Model: "Phi-3-mini-4k-instruct",
             IncludeRawResponse: true));
 
-        Assert.That(response.RawResponseJson, Is.Not.Null);
-        Assert.That(response.RawRequestJson, Is.Not.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.RawResponseJson, Is.Not.Null);
+            Assert.That(response.RawRequestJson, Is.Not.Null);
+        });
     }
 
     [Test]
@@ -216,8 +228,11 @@ public sealed class AzureAiInferenceChatCompletionClientTests
             Messages: [new LlmMessage(LlmRole.User, "Hello")],
             Model: "Phi-3-mini-4k-instruct"));
 
-        Assert.That(response.Status, Is.EqualTo("length"));
-        Assert.That(response.IncompleteReason, Is.EqualTo("Token limit reached"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Status, Is.EqualTo("length"));
+            Assert.That(response.IncompleteReason, Is.EqualTo("Token limit reached"));
+        });
     }
 
     [TestCase("gpt-5-nano")]
@@ -258,11 +273,14 @@ public sealed class AzureAiInferenceChatCompletionClientTests
         var doc = JsonDocument.Parse(capturedBody!);
         Assert.That(doc.RootElement.TryGetProperty("max_completion_tokens", out var mct), Is.True,
             "Reasoning model request should contain max_completion_tokens");
-        Assert.That(mct.GetInt32(), Is.EqualTo(200));
-        Assert.That(doc.RootElement.TryGetProperty("max_tokens", out _), Is.False,
-            "Reasoning model request should not contain max_tokens");
-        Assert.That(doc.RootElement.TryGetProperty("temperature", out _), Is.False,
-            "Reasoning model request should not contain temperature");
+        Assert.Multiple(() =>
+        {
+            Assert.That(mct.GetInt32(), Is.EqualTo(200));
+            Assert.That(doc.RootElement.TryGetProperty("max_tokens", out _), Is.False,
+                "Reasoning model request should not contain max_tokens");
+            Assert.That(doc.RootElement.TryGetProperty("temperature", out _), Is.False,
+                "Reasoning model request should not contain temperature");
+        });
     }
 
     [Test]
@@ -302,9 +320,12 @@ public sealed class AzureAiInferenceChatCompletionClientTests
         Assert.That(mt.GetInt32(), Is.EqualTo(200));
         Assert.That(doc.RootElement.TryGetProperty("temperature", out var temp), Is.True,
             "Legacy model request should contain temperature");
-        Assert.That(temp.GetDouble(), Is.EqualTo(0.7));
-        Assert.That(doc.RootElement.TryGetProperty("max_completion_tokens", out _), Is.False,
-            "Legacy model request should not contain max_completion_tokens");
+        Assert.Multiple(() =>
+        {
+            Assert.That(temp.GetDouble(), Is.EqualTo(0.7));
+            Assert.That(doc.RootElement.TryGetProperty("max_completion_tokens", out _), Is.False,
+                "Legacy model request should not contain max_completion_tokens");
+        });
     }
 
     [Test]
@@ -341,8 +362,11 @@ public sealed class AzureAiInferenceChatCompletionClientTests
         var doc = JsonDocument.Parse(capturedBody!);
         Assert.That(doc.RootElement.TryGetProperty("max_completion_tokens", out var mct), Is.True,
             "Should detect reasoning model from options.ModelId when request.Model is empty");
-        Assert.That(mct.GetInt32(), Is.EqualTo(150));
-        Assert.That(doc.RootElement.TryGetProperty("max_tokens", out _), Is.False);
+        Assert.Multiple(() =>
+        {
+            Assert.That(mct.GetInt32(), Is.EqualTo(150));
+            Assert.That(doc.RootElement.TryGetProperty("max_tokens", out _), Is.False);
+        });
     }
 
     [Test]

@@ -171,9 +171,12 @@ public sealed class AzureOpenAiJsonOutputTests
         Assert.That(responseFormat.GetProperty("type").GetString(), Is.EqualTo("json_schema"));
 
         var jsonSchema = responseFormat.GetProperty("json_schema");
-        Assert.That(jsonSchema.GetProperty("name").GetString(), Is.EqualTo("person"));
-        Assert.That(jsonSchema.GetProperty("strict").GetBoolean(), Is.True);
-        Assert.That(jsonSchema.GetProperty("schema").GetProperty("type").GetString(), Is.EqualTo("object"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(jsonSchema.GetProperty("name").GetString(), Is.EqualTo("person"));
+            Assert.That(jsonSchema.GetProperty("strict").GetBoolean(), Is.True);
+            Assert.That(jsonSchema.GetProperty("schema").GetProperty("type").GetString(), Is.EqualTo("object"));
+        });
     }
 
     [Test]
@@ -198,8 +201,11 @@ public sealed class AzureOpenAiJsonOutputTests
         Assert.That(responseFormat.GetProperty("type").GetString(), Is.EqualTo("json_schema"));
 
         var jsonSchema = responseFormat.GetProperty("json_schema");
-        Assert.That(jsonSchema.GetProperty("name").GetString(), Is.EqualTo("person"));
-        Assert.That(jsonSchema.GetProperty("strict").GetBoolean(), Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(jsonSchema.GetProperty("name").GetString(), Is.EqualTo("person"));
+            Assert.That(jsonSchema.GetProperty("strict").GetBoolean(), Is.True);
+        });
     }
 
     [Test]
@@ -226,13 +232,19 @@ public sealed class AzureOpenAiJsonOutputTests
             .GetProperty("schema");
 
         // Verify the schema string was parsed into a JSON object, not sent as a raw string
-        Assert.That(schema.ValueKind, Is.EqualTo(JsonValueKind.Object));
-        Assert.That(schema.GetProperty("type").GetString(), Is.EqualTo("object"));
-        Assert.That(schema.GetProperty("properties").GetProperty("name").GetProperty("type").GetString(),
-            Is.EqualTo("string"));
-        Assert.That(schema.GetProperty("properties").GetProperty("age").GetProperty("type").GetString(),
-            Is.EqualTo("integer"));
-        Assert.That(schema.GetProperty("additionalProperties").GetBoolean(), Is.False);
+        Assert.Multiple(() =>
+        {
+            Assert.That(schema.ValueKind, Is.EqualTo(JsonValueKind.Object));
+            Assert.That(schema.GetProperty("type").GetString(), Is.EqualTo("object"));
+            Assert.That(schema.GetProperty("properties").GetProperty("name").GetProperty("type").GetString(),
+                Is.EqualTo("string"));
+        });
+        Assert.Multiple(() =>
+        {
+            Assert.That(schema.GetProperty("properties").GetProperty("age").GetProperty("type").GetString(),
+                Is.EqualTo("integer"));
+            Assert.That(schema.GetProperty("additionalProperties").GetBoolean(), Is.False);
+        });
     }
 
     #endregion
@@ -256,11 +268,14 @@ public sealed class AzureOpenAiJsonOutputTests
 
         var response = await client.GetChatCompletionWithJsonOutputAsync(request, jsonOptions);
 
-        Assert.That(response.Refusal, Is.EqualTo("I cannot assist with that request."));
-        Assert.That(response.Content, Is.EqualTo(string.Empty));
-        Assert.That(response.IsSuccess, Is.True);
-        Assert.That(response.PromptTokens, Is.EqualTo(15));
-        Assert.That(response.CompletionTokens, Is.EqualTo(5));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Refusal, Is.EqualTo("I cannot assist with that request."));
+            Assert.That(response.Content, Is.EqualTo(string.Empty));
+            Assert.That(response.IsSuccess, Is.True);
+            Assert.That(response.PromptTokens, Is.EqualTo(15));
+            Assert.That(response.CompletionTokens, Is.EqualTo(5));
+        });
     }
 
     #endregion
@@ -276,8 +291,11 @@ public sealed class AzureOpenAiJsonOutputTests
 
         var feature = client.Features.Get<IJsonOutputFeature>();
 
-        Assert.That(feature, Is.Not.Null);
-        Assert.That(feature, Is.SameAs(client));
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
     }
 
     #endregion
@@ -299,8 +317,11 @@ public sealed class AzureOpenAiJsonOutputTests
         await client.GetChatCompletionWithJsonOutputAsync(request, jsonOptions);
 
         var requestUri = handler.LastRequest!.RequestUri!.ToString();
-        Assert.That(requestUri, Does.Contain($"openai/deployments/{DeploymentName}/chat/completions"));
-        Assert.That(requestUri, Does.Contain("api-version="));
+        Assert.Multiple(() =>
+        {
+            Assert.That(requestUri, Does.Contain($"openai/deployments/{DeploymentName}/chat/completions"));
+            Assert.That(requestUri, Does.Contain("api-version="));
+        });
     }
 
     [Test]
@@ -318,8 +339,11 @@ public sealed class AzureOpenAiJsonOutputTests
         await client.GetChatCompletionWithJsonOutputAsync(request, jsonOptions);
 
         var requestUri = handler.LastRequest!.RequestUri!.ToString();
-        Assert.That(requestUri, Does.StartWith("https://test.openai.azure.com/"));
-        Assert.That(requestUri, Does.Contain($"openai/deployments/{DeploymentName}/chat/completions"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(requestUri, Does.StartWith("https://test.openai.azure.com/"));
+            Assert.That(requestUri, Does.Contain($"openai/deployments/{DeploymentName}/chat/completions"));
+        });
     }
 
     #endregion

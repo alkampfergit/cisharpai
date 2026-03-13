@@ -33,14 +33,20 @@ public sealed class OpenAiChatCompletionClientTests
 
         Assert.That(capturedBody, Is.Not.Null);
         var doc = JsonDocument.Parse(capturedBody!);
-        Assert.That(doc.RootElement.GetProperty("model").GetString(), Is.EqualTo("gpt-4"));
-        Assert.That(doc.RootElement.GetProperty("temperature").GetDouble(), Is.EqualTo(0.7));
-        Assert.That(doc.RootElement.GetProperty("max_tokens").GetInt32(), Is.EqualTo(100));
+        Assert.Multiple(() =>
+        {
+            Assert.That(doc.RootElement.GetProperty("model").GetString(), Is.EqualTo("gpt-4"));
+            Assert.That(doc.RootElement.GetProperty("temperature").GetDouble(), Is.EqualTo(0.7));
+            Assert.That(doc.RootElement.GetProperty("max_tokens").GetInt32(), Is.EqualTo(100));
+        });
 
         var messages = doc.RootElement.GetProperty("messages");
-        Assert.That(messages.GetArrayLength(), Is.EqualTo(1));
-        Assert.That(messages[0].GetProperty("role").GetString(), Is.EqualTo("user"));
-        Assert.That(messages[0].GetProperty("content").GetString(), Is.EqualTo("Hello"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(messages.GetArrayLength(), Is.EqualTo(1));
+            Assert.That(messages[0].GetProperty("role").GetString(), Is.EqualTo("user"));
+            Assert.That(messages[0].GetProperty("content").GetString(), Is.EqualTo("Hello"));
+        });
     }
 
     [Test]
@@ -61,12 +67,15 @@ public sealed class OpenAiChatCompletionClientTests
 
         var response = await client.GetChatCompletionAsync(request);
 
-        Assert.That(response.Content, Is.EqualTo("Hello there!"));
-        Assert.That(response.Model, Is.EqualTo("gpt-4-0613"));
-        Assert.That(response.PromptTokens, Is.EqualTo(10));
-        Assert.That(response.CompletionTokens, Is.EqualTo(20));
-        Assert.That(response.IsSuccess, Is.True);
-        Assert.That(response.ErrorMessage, Is.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Content, Is.EqualTo("Hello there!"));
+            Assert.That(response.Model, Is.EqualTo("gpt-4-0613"));
+            Assert.That(response.PromptTokens, Is.EqualTo(10));
+            Assert.That(response.CompletionTokens, Is.EqualTo(20));
+            Assert.That(response.IsSuccess, Is.True);
+            Assert.That(response.ErrorMessage, Is.Null);
+        });
     }
 
     [Test]
@@ -110,9 +119,12 @@ public sealed class OpenAiChatCompletionClientTests
             MaxTokens: 200));
 
         var doc = JsonDocument.Parse(capturedBody!);
-        Assert.That(doc.RootElement.GetProperty("max_tokens").GetInt32(), Is.EqualTo(200));
-        Assert.That(doc.RootElement.TryGetProperty("max_completion_tokens", out _), Is.False);
-        Assert.That(handler.LastRequest!.RequestUri!.PathAndQuery, Does.Contain("chat/completions"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(doc.RootElement.GetProperty("max_tokens").GetInt32(), Is.EqualTo(200));
+            Assert.That(doc.RootElement.TryGetProperty("max_completion_tokens", out _), Is.False);
+            Assert.That(handler.LastRequest!.RequestUri!.PathAndQuery, Does.Contain("chat/completions"));
+        });
     }
 
     [Test]
@@ -138,9 +150,12 @@ public sealed class OpenAiChatCompletionClientTests
             MaxTokens: 500));
 
         var doc = JsonDocument.Parse(capturedBody!);
-        Assert.That(doc.RootElement.GetProperty("max_completion_tokens").GetInt32(), Is.EqualTo(500));
-        Assert.That(doc.RootElement.TryGetProperty("max_tokens", out _), Is.False);
-        Assert.That(doc.RootElement.TryGetProperty("temperature", out _), Is.False);
+        Assert.Multiple(() =>
+        {
+            Assert.That(doc.RootElement.GetProperty("max_completion_tokens").GetInt32(), Is.EqualTo(500));
+            Assert.That(doc.RootElement.TryGetProperty("max_tokens", out _), Is.False);
+            Assert.That(doc.RootElement.TryGetProperty("temperature", out _), Is.False);
+        });
     }
 
     [Test]
@@ -178,9 +193,12 @@ public sealed class OpenAiChatCompletionClientTests
             Messages: [new LlmMessage(LlmRole.User, "Hi")],
             Model: "o3"));
 
-        Assert.That(response.Content, Is.EqualTo("Hello there!"));
-        Assert.That(response.PromptTokens, Is.EqualTo(10));
-        Assert.That(response.CompletionTokens, Is.EqualTo(20));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Content, Is.EqualTo("Hello there!"));
+            Assert.That(response.PromptTokens, Is.EqualTo(10));
+            Assert.That(response.CompletionTokens, Is.EqualTo(20));
+        });
     }
 
     [Test]
@@ -199,8 +217,11 @@ public sealed class OpenAiChatCompletionClientTests
             Messages: [new LlmMessage(LlmRole.User, "Hi")],
             Model: "gpt-5"));
 
-        Assert.That(handler.LastRequest!.RequestUri!.PathAndQuery, Does.Contain("responses"));
-        Assert.That(handler.LastRequest.RequestUri.PathAndQuery, Does.Not.Contain("chat/completions"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(handler.LastRequest!.RequestUri!.PathAndQuery, Does.Contain("responses"));
+            Assert.That(handler.LastRequest.RequestUri.PathAndQuery, Does.Not.Contain("chat/completions"));
+        });
     }
 
     [Test]
@@ -225,16 +246,22 @@ public sealed class OpenAiChatCompletionClientTests
             MaxTokens: 1000));
 
         var doc = JsonDocument.Parse(capturedBody!);
-        Assert.That(doc.RootElement.GetProperty("model").GetString(), Is.EqualTo("gpt-5"));
-        Assert.That(doc.RootElement.GetProperty("max_output_tokens").GetInt32(), Is.EqualTo(1000));
-        Assert.That(doc.RootElement.TryGetProperty("max_tokens", out _), Is.False);
+        Assert.Multiple(() =>
+        {
+            Assert.That(doc.RootElement.GetProperty("model").GetString(), Is.EqualTo("gpt-5"));
+            Assert.That(doc.RootElement.GetProperty("max_output_tokens").GetInt32(), Is.EqualTo(1000));
+            Assert.That(doc.RootElement.TryGetProperty("max_tokens", out _), Is.False);
+        });
 
         var input = doc.RootElement.GetProperty("input");
-        Assert.That(input.GetArrayLength(), Is.EqualTo(1));
-        Assert.That(input[0].GetProperty("role").GetString(), Is.EqualTo("user"));
-        Assert.That(input[0].GetProperty("content").GetString(), Is.EqualTo("Hello"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(input.GetArrayLength(), Is.EqualTo(1));
+            Assert.That(input[0].GetProperty("role").GetString(), Is.EqualTo("user"));
+            Assert.That(input[0].GetProperty("content").GetString(), Is.EqualTo("Hello"));
 
-        Assert.That(doc.RootElement.TryGetProperty("messages", out _), Is.False);
+            Assert.That(doc.RootElement.TryGetProperty("messages", out _), Is.False);
+        });
     }
 
     [Test]
@@ -259,8 +286,11 @@ public sealed class OpenAiChatCompletionClientTests
             Model: "gpt-5"));
 
         var doc = JsonDocument.Parse(capturedBody!);
-        Assert.That(doc.RootElement.GetProperty("reasoning").GetProperty("effort").GetString(), Is.EqualTo("medium"));
-        Assert.That(doc.RootElement.GetProperty("text").GetProperty("verbosity").GetString(), Is.EqualTo("high"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(doc.RootElement.GetProperty("reasoning").GetProperty("effort").GetString(), Is.EqualTo("medium"));
+            Assert.That(doc.RootElement.GetProperty("text").GetProperty("verbosity").GetString(), Is.EqualTo("high"));
+        });
     }
 
     [Test]
@@ -284,8 +314,11 @@ public sealed class OpenAiChatCompletionClientTests
             Model: "gpt-5"));
 
         var doc = JsonDocument.Parse(capturedBody!);
-        Assert.That(doc.RootElement.TryGetProperty("reasoning", out _), Is.False);
-        Assert.That(doc.RootElement.TryGetProperty("text", out _), Is.False);
+        Assert.Multiple(() =>
+        {
+            Assert.That(doc.RootElement.TryGetProperty("reasoning", out _), Is.False);
+            Assert.That(doc.RootElement.TryGetProperty("text", out _), Is.False);
+        });
     }
 
     [Test]
@@ -304,10 +337,13 @@ public sealed class OpenAiChatCompletionClientTests
             Messages: [new LlmMessage(LlmRole.User, "Hi")],
             Model: "gpt-5"));
 
-        Assert.That(response.Content, Is.EqualTo("Hello there!"));
-        Assert.That(response.Model, Is.EqualTo("gpt-5-20250801"));
-        Assert.That(response.PromptTokens, Is.EqualTo(10));
-        Assert.That(response.CompletionTokens, Is.EqualTo(20));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Content, Is.EqualTo("Hello there!"));
+            Assert.That(response.Model, Is.EqualTo("gpt-5-20250801"));
+            Assert.That(response.PromptTokens, Is.EqualTo(10));
+            Assert.That(response.CompletionTokens, Is.EqualTo(20));
+        });
     }
 
     [Test]
@@ -327,8 +363,11 @@ public sealed class OpenAiChatCompletionClientTests
             Model: "gpt-4",
             IncludeRawResponse: true));
 
-        Assert.That(response.RawResponseJson, Is.Not.Null);
-        Assert.That(response.RawResponseJson, Does.Contain("gpt-4-0613"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.RawResponseJson, Is.Not.Null);
+            Assert.That(response.RawResponseJson, Does.Contain("gpt-4-0613"));
+        });
     }
 
     [Test]
@@ -367,9 +406,12 @@ public sealed class OpenAiChatCompletionClientTests
             Model: "gpt-5",
             IncludeRawResponse: true));
 
-        Assert.That(response.RawResponseJson, Is.Not.Null);
-        Assert.That(response.RawResponseJson, Does.Contain("resp_abc123"));
-        Assert.That(response.RawResponseJson, Does.Contain("output_text"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.RawResponseJson, Is.Not.Null);
+            Assert.That(response.RawResponseJson, Does.Contain("resp_abc123"));
+            Assert.That(response.RawResponseJson, Does.Contain("output_text"));
+        });
     }
 
     [Test]
@@ -388,10 +430,13 @@ public sealed class OpenAiChatCompletionClientTests
             Messages: [new LlmMessage(LlmRole.User, "Hi")],
             Model: "gpt-5"));
 
-        Assert.That(response.Status, Is.EqualTo("completed"));
-        Assert.That(response.IncompleteReason, Is.Null);
-        Assert.That(response.IsSuccess, Is.True);
-        Assert.That(response.ErrorMessage, Is.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Status, Is.EqualTo("completed"));
+            Assert.That(response.IncompleteReason, Is.Null);
+            Assert.That(response.IsSuccess, Is.True);
+            Assert.That(response.ErrorMessage, Is.Null);
+        });
     }
 
     [Test]
@@ -410,13 +455,16 @@ public sealed class OpenAiChatCompletionClientTests
             Messages: [new LlmMessage(LlmRole.User, "Hi")],
             Model: "gpt-5"));
 
-        Assert.That(response.Status, Is.EqualTo("incomplete"));
-        Assert.That(response.IncompleteReason, Is.EqualTo("max_output_tokens"));
-        Assert.That(response.Content, Is.EqualTo(string.Empty));
-        Assert.That(response.PromptTokens, Is.EqualTo(18));
-        Assert.That(response.CompletionTokens, Is.EqualTo(0));
-        Assert.That(response.IsSuccess, Is.False);
-        Assert.That(response.ErrorMessage, Is.EqualTo("max_output_tokens"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Status, Is.EqualTo("incomplete"));
+            Assert.That(response.IncompleteReason, Is.EqualTo("max_output_tokens"));
+            Assert.That(response.Content, Is.EqualTo(string.Empty));
+            Assert.That(response.PromptTokens, Is.EqualTo(18));
+            Assert.That(response.CompletionTokens, Is.EqualTo(0));
+            Assert.That(response.IsSuccess, Is.False);
+            Assert.That(response.ErrorMessage, Is.EqualTo("max_output_tokens"));
+        });
     }
 
     [Test]
@@ -436,9 +484,12 @@ public sealed class OpenAiChatCompletionClientTests
             Model: "gpt-5",
             IncludeRawResponse: true));
 
-        Assert.That(response.RawResponseJson, Is.Not.Null);
-        Assert.That(response.RawResponseJson, Does.Contain("max_output_tokens"));
-        Assert.That(response.Status, Is.EqualTo("incomplete"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.RawResponseJson, Is.Not.Null);
+            Assert.That(response.RawResponseJson, Does.Contain("max_output_tokens"));
+            Assert.That(response.Status, Is.EqualTo("incomplete"));
+        });
     }
 
     [Test]
@@ -457,8 +508,11 @@ public sealed class OpenAiChatCompletionClientTests
             Messages: [new LlmMessage(LlmRole.User, "Hi")],
             Model: "gpt-4"));
 
-        Assert.That(response.Status, Is.Null);
-        Assert.That(response.IncompleteReason, Is.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Status, Is.Null);
+            Assert.That(response.IncompleteReason, Is.Null);
+        });
     }
 
     private const string OpenAiResponseJson = """
@@ -520,10 +574,13 @@ public sealed class OpenAiChatCompletionClientTests
             Messages: [new LlmMessage(LlmRole.User, "Hi")],
             Model: "gpt-4"));
 
-        Assert.That(response.IsSuccess, Is.False);
-        Assert.That(response.ErrorMessage, Does.Contain("500"));
-        Assert.That(response.Content, Is.EqualTo(string.Empty));
-        Assert.That(response.Model, Is.EqualTo(string.Empty));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.False);
+            Assert.That(response.ErrorMessage, Does.Contain("500"));
+            Assert.That(response.Content, Is.EqualTo(string.Empty));
+            Assert.That(response.Model, Is.EqualTo(string.Empty));
+        });
     }
 
     [Test]
@@ -543,8 +600,11 @@ public sealed class OpenAiChatCompletionClientTests
             Messages: [new LlmMessage(LlmRole.User, "Hi")],
             Model: "gpt-4"));
 
-        Assert.That(response.IsSuccess, Is.False);
-        Assert.That(response.RawResponseJson, Is.EqualTo(errorBody));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.False);
+            Assert.That(response.RawResponseJson, Is.EqualTo(errorBody));
+        });
     }
 
     [Test]
@@ -563,9 +623,12 @@ public sealed class OpenAiChatCompletionClientTests
             Messages: [new LlmMessage(LlmRole.User, "Hi")],
             Model: "gpt-5"));
 
-        Assert.That(response.IsSuccess, Is.False);
-        Assert.That(response.Status, Is.EqualTo("failed"));
-        Assert.That(response.ErrorMessage, Is.EqualTo("Response status: failed"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.False);
+            Assert.That(response.Status, Is.EqualTo("failed"));
+            Assert.That(response.ErrorMessage, Is.EqualTo("Response status: failed"));
+        });
     }
 
     private const string FailedResponsesApiResponseJson = """

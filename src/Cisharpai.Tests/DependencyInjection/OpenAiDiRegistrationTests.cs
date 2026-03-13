@@ -25,11 +25,14 @@ public sealed class OpenAiDiRegistrationTests
         var chatClient = provider.GetRequiredService<IChatCompletionClient>();
         var embeddingClient = provider.GetRequiredService<IEmbeddingClient>();
 
-        Assert.That(chatClient, Is.Not.Null);
-        Assert.That(embeddingClient, Is.Not.Null);
-        Assert.That(chatClient, Is.Not.SameAs(embeddingClient));
-        Assert.That(chatClient, Is.InstanceOf<OpenAiChatCompletionClient>());
-        Assert.That(embeddingClient, Is.InstanceOf<OpenAiEmbeddingClient>());
+        Assert.Multiple(() =>
+        {
+            Assert.That(chatClient, Is.Not.Null);
+            Assert.That(embeddingClient, Is.Not.Null);
+            Assert.That(chatClient, Is.Not.SameAs(embeddingClient));
+            Assert.That(chatClient, Is.InstanceOf<OpenAiChatCompletionClient>());
+            Assert.That(embeddingClient, Is.InstanceOf<OpenAiEmbeddingClient>());
+        });
     }
 
     [Test]
@@ -46,8 +49,11 @@ public sealed class OpenAiDiRegistrationTests
 
         var client = provider.GetRequiredService<IChatCompletionClient>();
 
-        Assert.That(client, Is.Not.Null);
-        Assert.That(client, Is.InstanceOf<OpenAiChatCompletionClient>());
+        Assert.Multiple(() =>
+        {
+            Assert.That(client, Is.Not.Null);
+            Assert.That(client, Is.InstanceOf<OpenAiChatCompletionClient>());
+        });
     }
 
     [Test]
@@ -70,9 +76,12 @@ public sealed class OpenAiDiRegistrationTests
         var fast = provider.GetRequiredKeyedService<IChatCompletionClient>("fast");
         var quality = provider.GetRequiredKeyedService<IChatCompletionClient>("quality");
 
-        Assert.That(fast, Is.Not.Null);
-        Assert.That(quality, Is.Not.Null);
-        Assert.That(fast, Is.Not.SameAs(quality));
-        Assert.That(fast, Is.InstanceOf<OpenAiChatCompletionClient>());
+        Assert.Multiple(() =>
+        {
+            Assert.That(fast, Is.Not.Null);
+            Assert.That(quality, Is.Not.Null);
+            Assert.That(fast, Is.Not.SameAs(quality));
+            Assert.That(fast, Is.InstanceOf<OpenAiChatCompletionClient>());
+        });
     }
 }

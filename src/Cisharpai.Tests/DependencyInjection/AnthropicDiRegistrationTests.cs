@@ -19,8 +19,11 @@ public sealed class AnthropicDiRegistrationTests
 
         var client = provider.GetRequiredService<IChatCompletionClient>();
 
-        Assert.That(client, Is.Not.Null);
-        Assert.That(client, Is.InstanceOf<AnthropicChatCompletionClient>());
+        Assert.Multiple(() =>
+        {
+            Assert.That(client, Is.Not.Null);
+            Assert.That(client, Is.InstanceOf<AnthropicChatCompletionClient>());
+        });
     }
 
     [Test]
@@ -37,7 +40,10 @@ public sealed class AnthropicDiRegistrationTests
 
         var client = provider.GetRequiredKeyedService<IChatCompletionClient>("claude");
 
-        Assert.That(client, Is.Not.Null);
-        Assert.That(client, Is.InstanceOf<AnthropicChatCompletionClient>());
+        Assert.Multiple(() =>
+        {
+            Assert.That(client, Is.Not.Null);
+            Assert.That(client, Is.InstanceOf<AnthropicChatCompletionClient>());
+        });
     }
 }

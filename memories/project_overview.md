@@ -30,6 +30,7 @@ Contains the abstractions and shared logic. This is the only dependency needed f
     *   `Chat/IJsonOutputFeature.cs`: Optional feature for JSON output enforcement on chat completion clients via `GetChatCompletionWithJsonOutputAsync(request, jsonOutputOptions)`. Supports JSON Mode (`json_object`) and Structured Outputs (`json_schema`). Registered on OpenAI, Azure OpenAI, Azure AI Inference, Anthropic, and Cohere clients.
     *   `Chat/IGroundedChatFeature.cs`: Optional feature for grounded chat (RAG) with document citations via `GetGroundedChatCompletionAsync(request, groundedChatOptions)`. Passes documents and returns citations with character offsets. Currently registered on Cohere client only.
     *   `Chat/IToolCallingFeature.cs`: Optional feature for tool calling (function calling) in chat completions via `GetChatCompletionWithToolsAsync(request, toolCallingOptions)`. Registered on OpenAI, Azure OpenAI, Azure AI Inference, Anthropic, and Cohere clients.
+    *   `Chat/IStreamingChatFeature.cs`: Optional feature for streaming chat completions token-by-token via `GetChatCompletionStreamAsync(request)` returning `IAsyncEnumerable<ChatCompletionChunk>`. Registered on all 5 chat clients.
 *   **`Models/`**:
     *   **`ChatCompletionRequest.cs`**: Unified request model (Messages, Model?, Temperature, MaxTokens, IncludeRawResponse, ExtraParameters). `Model` is optional (`string?`, defaults to `null`); when omitted, the provider client falls back to `DefaultModel` from its options. The `ExtraParameters` property (`JsonElement?`) allows passing arbitrary JSON that is deeply merged into the provider-specific request body, enabling use of new model features without DTO changes.
     *   **`ChatCompletionResponse.cs`**: Unified response model (Content, Usage stats, optional Status/IncompleteReason for Responses API, IsSuccess/ErrorMessage for error handling, RawResponseJson/RawRequestJson for debug inspection, optional Refusal for Structured Outputs safety refusals). Provider clients never throw exceptions; errors are returned via `IsSuccess = false` and `ErrorMessage`. Includes a static `Error()` factory method.
@@ -50,15 +51,26 @@ Contains the abstractions and shared logic. This is the only dependency needed f
     *   **`ToolChoice.cs`**: Controls tool selection strategy. Sealed abstract record with hierarchy: `AutoChoice`, `NoneChoice`, `RequiredChoice`, `SpecificChoice(Name)`. Static factories: `Auto`, `None`, `Required`, `Specific(functionName)`.
     *   **`ToolCallingOptions.cs`**: Configuration record for tool calling (Tools as IReadOnlyList<ToolDefinition>, ToolChoice). Includes `Validate()` method.
     *   **`ToolCallingResponse.cs`**: Wraps `ChatCompletionResponse` with optional `ToolCalls` (IReadOnlyList<ToolCall>?). Convenience properties for IsSuccess, Content, ErrorMessage. Static `Error()` factory.
-    *   **`LlmMessage.cs`**: Represents a message in the conversation (Role, Content, optional ToolCallId, optional ToolCalls).
+    *   **`LlmMessage.cs`**: Represents a message in the conversation (Role, Content, optional ToolCallId, optional ToolCalls, optional ContentParts for multimodal messages). Factory methods: `WithImage(text, filePath)` and `WithBase64Image(text, base64Data, mediaType)`.
+    *   **`MessageContentPart.cs`**: Abstract base `MessageContentPart` record and concrete sealed types: `TextContentPart(string Text)`, `ImageFileContentPart(string FilePath)`, `ImageBase64ContentPart(string Base64Data, string MediaType)`. Used in `LlmMessage.ContentParts` for multimodal vision messages.
+    *   **`ChatCompletionChunk.cs`**: Streaming chunk model with `Content`, `FinishReason`, `Model`, `PromptTokens`, `CompletionTokens`, `ToolCallDelta`. `ToolCallDelta` has `Index`, `Id`, `FunctionName`, `ArgumentsDelta` for streaming tool calls.
 *   **`JsonDeepMerge.cs`**: Static utility for deeply merging a JSON override document into a base JSON document. Objects are merged recursively; arrays and scalars are replaced by overrides.
-*   **`LlmHttpClient.cs`**: Internal helper for handling HTTP requests to the providers. Supports optional `extraParameters` (`JsonElement?`) that are deeply merged into the serialized request payload before sending. `PostWithRawAsync` returns both raw response JSON and raw request JSON for debug inspection.
+*   **`ImageDataUriHelper.cs`**: Public static utility for converting image file paths to data URI format (`data:image/{mime};base64,...`). Supports PNG, JPEG, WebP, GIF. Used by OpenAI/Azure providers for vision.
+*   **`LlmHttpClient.cs`**: Internal helper for handling HTTP requests to the providers. Supports optional `extraParameters` (`JsonElement?`) that are deeply merged into the serialized request payload before sending. `PostWithRawAsync` returns both raw response JSON and raw request JSON for debug inspection. `PostStreamAsync<TRequest>` supports SSE streaming (handles `data:` prefix, `[DONE]` termination, ignores `event:` lines, works with both `[DONE]`-terminated and naturally-ending streams).
+*   **`Helpers/`**: Shared public static helper utilities that eliminate code duplication across provider implementations.
+    *   `JsonOutputHelper.cs`: `EnsureJsonKeywordInSystemMessage(messages, options, suffix)` — ensures system message mentions JSON for JsonMode; `StripMarkdownCodeFences(content)` — strips ````json ... ```` fences from output. Used by all 5 chat clients.
+    *   `RoleMapper.cs`: `MapRole(LlmRole)` — maps LlmRole to standard string ("system"/"user"/"assistant"/"tool"). Used by OpenAI, Azure OpenAI, Azure AI Inference, Cohere (not Anthropic, which has different mapping).
+    *   `ContentPartHelper.cs`: `ExtractStringContent(object?)` — extracts string from response content that may be raw string or JsonElement. Used by OpenAI, Azure OpenAI, Azure AI Inference.
+    *   `ToolCallingHelper.cs`: `MapResponseToolCalls<T>(toolCalls, extractor)` — generic tool call response mapping with provider-specific extractor; `MapToolChoice(toolChoice, specificMapper)` — maps ToolChoice to string/object with provider-specific Specific handler; `MapStreamToolCallDelta<T>(toolCalls, extractor)` — maps streaming tool call deltas. Used by OpenAI, Azure OpenAI, Azure AI Inference, Cohere.
+    *   `EmbeddingHelper.cs`: `MapEmbeddingResponse(orderedEmbeddings, encodingFormat, model, totalTokens, ...)` — maps ordered embedding JsonElements to unified EmbeddingResponse with base64/float support. Used by OpenAI and Azure OpenAI embedding clients.
 
 ### Provider Implementations
 Each supported provider has its own project providing concrete implementations of the core interfaces.
 
 *   **`src/Cisharpai.OpenAi/`**: Connector for standard OpenAI API. Supports legacy Chat Completions API (GPT-4, etc.), reasoning models (o1/o3/o4), and the Responses API (GPT-5) with status/incomplete handling.
-    *   `OpenAiChatCompletionClient.cs`: Implements `IChatCompletionClient`, `IJsonOutputFeature`, and `IToolCallingFeature`. Routes to the correct endpoint/format based on model detection. Supports JSON Mode and Structured Outputs across legacy, reasoning, and GPT-5 (Responses API) model paths. Extracts refusal from structured output responses. Supports tool calling with all ToolChoice variants including Specific.
+    *   `OpenAiChatCompletionClient.cs`: Implements `IChatCompletionClient`, `IJsonOutputFeature`, `IToolCallingFeature`, and `IStreamingChatFeature`. Routes to the correct endpoint/format based on model detection. Supports JSON Mode and Structured Outputs across legacy, reasoning, and GPT-5 (Responses API) model paths. Extracts refusal from structured output responses. Supports tool calling with all ToolChoice variants including Specific. Supports vision via `ContentParts` (image_url with data URIs for file paths, base64 data). Streaming uses SSE with `[DONE]` termination; GPT-5 Responses API uses `response.output_text.delta` and `response.completed` events.
+    *   `Models/OpenAiContentPart.cs`: DTOs for vision: `OpenAiContentPart` (base), `OpenAiTextContentPart(text)`, `OpenAiImageContentPart(image_url)`, `OpenAiImageUrl(url)`.
+    *   `Models/OpenAiStreamEvent.cs`: SSE response DTOs for streaming: `OpenAiStreamChunk`, `OpenAiStreamChoice`, `OpenAiStreamDelta`, `OpenAiStreamToolCall`.
     *   `OpenAiEmbeddingClient.cs`: Implements `IEmbeddingClient`.
     *   `OpenAiModels.cs`: Static class with well-known model ID constants. Nested `Chat` class (Gpt4_1, Gpt4_1Mini, Gpt4_1Nano, Gpt4o, Gpt4oMini, Gpt4_5, O3, O3Mini, O3Pro, O4Mini, O1, O1Mini) and `Embedding` class (TextEmbedding3Small, TextEmbedding3Large, TextEmbeddingAda002).
     *   `OpenAiClientOptions.cs`: Configuration with BaseUrl, ApiKey, Organization, ReasoningEffort, TextVerbosity, and `DefaultModel` (optional, used when `ChatCompletionRequest.Model` is null).
@@ -70,14 +82,18 @@ Each supported provider has its own project providing concrete implementations o
         *   `AzureAuthenticationHandler.cs`: DelegatingHandler supporting both API key (`api-key` header) and Azure AD (Bearer token) authentication. Uses scope `https://cognitiveservices.azure.com/.default`.
         *   `AzureErrorMapper.cs`: Static utility for mapping HTTP status codes to user-friendly error messages.
     *   **`AzureOpenAi/`**: Connector for Azure OpenAI Service. Supports both legacy models and reasoning/GPT-5 models (uses `max_completion_tokens` instead of `max_tokens`).
-        *   `AzureOpenAiChatCompletionClient.cs`: Implements `IChatCompletionClient`, `IJsonOutputFeature`, and `IToolCallingFeature` with Azure-specific auth/routing. Detects reasoning models (o1/o3/o4/gpt-5) and uses appropriate request format. Supports JSON Mode and Structured Outputs. Supports tool calling with all ToolChoice variants including Specific. Endpoint: `openai/deployments/{deployment}/chat/completions?api-version=...`.
+        *   `AzureOpenAiChatCompletionClient.cs`: Implements `IChatCompletionClient`, `IJsonOutputFeature`, `IToolCallingFeature`, and `IStreamingChatFeature` with Azure-specific auth/routing. Detects reasoning models (o1/o3/o4/gpt-5) and uses appropriate request format. Supports JSON Mode and Structured Outputs. Supports tool calling with all ToolChoice variants including Specific. Supports vision via `ContentParts` (data URI image_url). Streaming uses SSE with `[DONE]` termination; reasoning models use `max_completion_tokens`. Endpoint: `openai/deployments/{deployment}/chat/completions?api-version=...`.
+        *   `Models/AzureOpenAiContentPart.cs`: DTOs for vision: `AzureOpenAiContentPart`, `AzureOpenAiTextContentPart`, `AzureOpenAiImageContentPart`, `AzureOpenAiImageUrl`.
+        *   `Models/AzureOpenAiStreamEvent.cs`: SSE response DTOs for streaming.
         *   `Models/AzureOpenAiResponseFormat.cs`: DTOs for `response_format` parameter: `AzureOpenAiResponseFormat`, `AzureOpenAiJsonSchemaSpec`.
         *   `Models/AzureOpenAiToolDefinition.cs`: DTOs for tool calling: `AzureOpenAiToolDefinition`, `AzureOpenAiToolFunction`, `AzureOpenAiToolChoiceFunction`, `AzureOpenAiToolChoiceObject`, `AzureOpenAiToolCallFunction`, `AzureOpenAiToolCall`.
         *   `AzureOpenAiEmbeddingClient.cs`: Implements `IEmbeddingClient`. Supports text-embedding-ada-002, text-embedding-3-small, text-embedding-3-large deployments. Endpoint: `openai/deployments/{deployment}/embeddings?api-version=...`.
         *   `AzureOpenAiClientOptions.cs`: Configuration with DeploymentName and `DefaultModel` (optional, used for model-type detection when `ChatCompletionRequest.Model` is null), extends AzureClientOptionsBase. Default API version: `2024-10-21`.
         *   `Models/`: Request/response DTOs for Azure OpenAI API.
     *   **`AzureAiInference/`**: Connector for Azure AI Inference (model-as-a-service). Supports Phi-3, Llama-3, Mistral, and other Azure AI model catalog offerings, including reasoning models (o1/o3/o4/GPT-5). Uses HttpClient directly (not the Azure.AI.Inference SDK).
-        *   `AzureAiInferenceChatCompletionClient.cs`: Implements `IChatCompletionClient`, `IJsonOutputFeature`, and `IToolCallingFeature`. Detects reasoning models (o1/o3/o4/gpt-5) and uses appropriate request format (`max_completion_tokens` instead of `max_tokens`, no `Temperature`). Supports JSON Mode and Structured Outputs. Supports tool calling with all ToolChoice variants including Specific. Endpoint: `models/chat/completions?api-version=...`.
+        *   `AzureAiInferenceChatCompletionClient.cs`: Implements `IChatCompletionClient`, `IJsonOutputFeature`, `IToolCallingFeature`, and `IStreamingChatFeature`. Detects reasoning models (o1/o3/o4/gpt-5) and uses appropriate request format (`max_completion_tokens` instead of `max_tokens`, no `Temperature`). Supports JSON Mode and Structured Outputs. Supports tool calling with all ToolChoice variants including Specific. Supports vision via `ContentParts` (data URI image_url). Streaming uses SSE with `[DONE]` termination. Endpoint: `models/chat/completions?api-version=...`.
+        *   `Models/AzureAiInferenceContentPart.cs`: DTOs for vision: `AzureAiInferenceContentPart`, `AzureAiInferenceTextContentPart`, `AzureAiInferenceImageContentPart`, `AzureAiInferenceImageUrl`.
+        *   `Models/AzureAiInferenceStreamEvent.cs`: SSE response DTOs for streaming.
         *   `Models/AzureAiInferenceResponseFormat.cs`: DTOs for `response_format` parameter: `AzureAiInferenceResponseFormat`, `AzureAiInferenceJsonSchemaSpec`.
         *   `Models/AzureAiInferenceToolDefinition.cs`: DTOs for tool calling: `AzureAiInferenceToolDefinition`, `AzureAiInferenceToolFunction`, `AzureAiInferenceToolChoiceFunction`, `AzureAiInferenceToolChoiceObject`, `AzureAiInferenceToolCallFunction`, `AzureAiInferenceToolCall`.
         *   `AzureAiInferenceEmbeddingClient.cs`: Implements `IEmbeddingClient` and `IImageEmbeddingFeature`. Supports text and image embeddings. Endpoint: `models/embeddings?api-version=...`.
@@ -87,19 +103,22 @@ Each supported provider has its own project providing concrete implementations o
         *   `AzureOpenAiServiceCollectionExtensions.cs`: `AddAzureOpenAiClient()` and `AddAzureOpenAiEmbeddingClient()` for registering Azure OpenAI clients. Keyed overloads available.
         *   `AzureAiInferenceServiceCollectionExtensions.cs`: `AddAzureAiInferenceChatCompletion()` and `AddAzureAiInferenceEmbeddings()` for registering Azure AI Inference clients. Keyed overloads available.
 *   **`src/Cisharpai.Anthropic/`**: Connector for Anthropic (Claude) API. Supports structured outputs via `output_config.format` parameter.
-    *   `AnthropicChatCompletionClient.cs`: Implements `IChatCompletionClient`, `IJsonOutputFeature`, and `IToolCallingFeature`. Supports JSON Mode (via system message injection) and Structured Outputs (`json_schema` via `output_config.format`). Handles refusal via `stop_reason: "refusal"`. Supports tool calling with tool_use/tool_result content blocks.
+    *   `AnthropicChatCompletionClient.cs`: Implements `IChatCompletionClient`, `IJsonOutputFeature`, `IToolCallingFeature`, and `IStreamingChatFeature`. Supports JSON Mode (via system message injection) and Structured Outputs (`json_schema` via `output_config.format`). Handles refusal via `stop_reason: "refusal"`. Supports tool calling with tool_use/tool_result content blocks. Supports vision via `source` content blocks (raw base64 NOT data URIs). Streaming uses event-based SSE (`message_start`, `content_block_delta`, `message_delta`) — no `[DONE]` sentinel.
     *   `AnthropicModels.cs`: Static class with well-known model ID constants. Nested `Chat` class (ClaudeOpus4_5, ClaudeSonnet4_5, ClaudeHaiku4_5, ClaudeSonnet4, ClaudeHaiku4, ClaudeOpus3).
     *   `AnthropicClientOptions.cs`: Configuration with BaseUrl, ApiKey, ApiVersion, and `DefaultModel` (optional, used when `ChatCompletionRequest.Model` is null).
     *   `Models/AnthropicOutputConfig.cs`: DTOs for `output_config.format` parameter: `AnthropicOutputConfig`, `AnthropicOutputFormat`.
     *   `Models/AnthropicToolDefinition.cs`: DTOs for tool calling: `AnthropicToolDefinition` (Name, Description, InputSchema), `AnthropicToolChoice` (Type, Name).
+    *   `Models/AnthropicImageSource.cs`: DTOs for vision: `AnthropicImageSource` (type, media_type, data as raw base64), `AnthropicImageContentBlock`.
+    *   `Models/AnthropicStreamEvent.cs`: SSE event DTOs for streaming: `AnthropicStreamEvent`, `AnthropicMessageStartData`, `AnthropicContentBlockDeltaData`, `AnthropicTextDelta`, `AnthropicMessageDeltaData`, `AnthropicMessageDeltaUsage`.
 *   **`src/Cisharpai.Cohere/`**: Connector for Cohere API. Supports Embed v3/v4 models and Chat v2 API.
-    *   `CohereChatCompletionClient.cs`: Implements `IChatCompletionClient`, `IJsonOutputFeature`, `IGroundedChatFeature`, and `IToolCallingFeature`. Supports JSON Mode and Structured Outputs via `response_format` with `json_object` type and optional `json_schema`. Supports grounded chat (RAG) via `documents` array and `citation_options`. Supports tool calling with uppercase ToolChoice mapping and strict_tools flag. Uses system message injection for JSON Mode. Endpoint: `chat`.
+    *   `CohereChatCompletionClient.cs`: Implements `IChatCompletionClient`, `IJsonOutputFeature`, `IGroundedChatFeature`, `IToolCallingFeature`, and `IStreamingChatFeature`. Supports JSON Mode and Structured Outputs via `response_format` with `json_object` type and optional `json_schema`. Supports grounded chat (RAG) via `documents` array and `citation_options`. Supports tool calling with uppercase ToolChoice mapping and strict_tools flag. Uses system message injection for JSON Mode. Endpoint: `chat`. Vision: image content parts are silently skipped (Cohere chat does not support images); only text content parts are concatenated. Streaming uses `stream: true`; events: `stream-start`, `content-delta`, `message-end` (no `[DONE]`; stream ends naturally).
     *   `CohereEmbeddingClient.cs`: Implements `IEmbeddingClient`, `IImageEmbeddingFeature`, and `IMultimodalEmbeddingFeature`. Supports text embeddings, single image embedding, and Embed v4 multimodal embedding (mixed text+image inputs, Matryoshka output dimensions, batch images). Images are sent as data URIs.
     *   `CohereModels.cs`: Static class with well-known model ID constants. Nested `Chat` class (CommandA, CommandRPlus, CommandR) and `Embedding` class (EmbedV4, EmbedEnglishV3, EmbedMultilingualV3, EmbedEnglishLightV3, EmbedMultilingualLightV3).
     *   `CohereClientOptions.cs`: Configuration with BaseUrl, ApiKey, and `DefaultModel` (optional, used when `ChatCompletionRequest.Model` or `EmbeddingRequest.Model` is null).
     *   `CohereServiceCollectionExtensions.cs`: DI registration with `AddCohereEmbeddingClient()` and `AddCohereChatClient()` methods. Each method owns its options via closure (not registered in DI), enabling independent configuration. Keyed overloads (`AddCohereEmbeddingClient(string key, ...)`) support .NET 8 keyed services for registering multiple clients of the same interface.
-    *   `ImageDataUriHelper.cs`: Internal utility for converting image file paths to data URI format (`data:image/{mime};base64,...`). Supports PNG, JPEG, WebP, GIF.
-    *   `Models/CohereChatRequest.cs`: Request DTOs for Cohere v2 chat API: `CohereChatMessage` (with optional ToolCallId, ToolCalls), `CohereChatRequest` (with `Documents`, `CitationOptions` for RAG, `Tools`, `ToolChoice`, `StrictTools` for tool calling).
+    *   `ImageDataUriHelper.cs`: **Removed** — moved to `src/Cisharpai/` core as public utility (`ImageDataUriHelper.cs`).
+    *   `Models/CohereStreamEvent.cs`: SSE event DTOs for streaming: `CohereStreamEvent`, `CohereStreamStartData`, `CohereContentDeltaData`, `CohereMessageEndData`, `CohereMessageEndUsage`.
+    *   `Models/CohereChatRequest.cs`: Request DTOs for Cohere v2 chat API: `CohereChatMessage` (with optional ToolCallId, ToolCalls), `CohereChatRequest` (with `Documents`, `CitationOptions` for RAG, `Tools`, `ToolChoice`, `StrictTools` for tool calling, `Stream` bool? for streaming).
     *   `Models/CohereChatResponse.cs`: Response DTOs: `CohereChatContentBlock`, `CohereChatResponseMessage` (with optional `Citations` and `ToolCalls`), `CohereChatTokens`, `CohereChatBilledUnits`, `CohereChatUsage`, `CohereChatResponse`.
     *   `Models/CohereToolDefinition.cs`: DTOs for tool calling: `CohereToolDefinition`, `CohereToolFunction`, `CohereToolCallFunction`, `CohereToolCall`.
     *   `Models/CohereChatResponseFormat.cs`: DTO for `response_format` parameter with `json_object` type and optional `json_schema`.
@@ -108,6 +127,16 @@ Each supported provider has its own project providing concrete implementations o
     *   `Models/CohereEmbedInput.cs`: DTOs for Embed v4 `inputs` parameter: `CohereEmbedInput`, `CohereEmbedContentPart`, `CohereImageUrl`.
     *   `Models/CohereEmbedRequest.cs`: Request DTO with `Texts`, `Images`, `Inputs` (v4, mutually exclusive), `InputType`, `EmbeddingTypes`, `OutputDimension` (v4 Matryoshka).
     *   `Models/CohereEmbedResponse.cs`: Response DTO with `CohereEmbeddings`, `CohereBilledUnits` (includes `ImageTokens` for v4), `CohereImageMetadata`.
+
+### Testing Package (`src/Cisharpai.Testing/`)
+Lightweight fake clients for unit testing application code that depends on Cisharpai interfaces. No real HTTP calls are made.
+
+*   **`FakeChatCompletionClient.cs`**: Fake implementation of `IChatCompletionClient`, `IStreamingChatFeature`, `IToolCallingFeature`, `IJsonOutputFeature`, `IGroundedChatFeature`. Supports response queues, defaults, and request capture.
+*   **`FakeEmbeddingClient.cs`**: Fake implementation of `IEmbeddingClient`, `IImageEmbeddingFeature`, `IMultimodalEmbeddingFeature`. Supports response queues, defaults, and request capture.
+*   **`FakeResponses.cs`**: Static factory methods for creating common fake responses (`Chat`, `ChatError`, `ToolCall`, `ToolCalls`, `GroundedChat`, `StreamingChunks`, `Embedding`, `Embeddings`, `EmbeddingError`).
+*   **`FakeChatFeatures.cs`**: `[Flags]` enum controlling which features are registered on the fake chat client.
+*   **`FakeEmbeddingFeatures.cs`**: `[Flags]` enum controlling which features are registered on the fake embedding client.
+*   **`FakeServiceCollectionExtensions.cs`**: DI helpers (`AddFakeChatCompletionClient`, `AddFakeEmbeddingClient`) that register fakes and return the instance for setup/assertions.
 
 ### Console App (`src/Cisharp.Console/`)
 Interactive demo application showcasing all provider integrations through a scenario-based menu.
@@ -128,6 +157,8 @@ Interactive demo application showcasing all provider integrations through a scen
     *   `CohereGroundedChatScenario.cs`: Cohere grounded chat (RAG) with documents and citations demo.
     *   `OpenAiJsonOutputScenario.cs`: OpenAI JSON Mode and Structured Outputs demo.
     *   `ToolCallingScenario.cs`: Multi-provider tool calling demo (OpenAI, Anthropic, Cohere) with full tool-call loop and mock weather data.
+    *   `OpenAiVisionScenario.cs`: OpenAI vision demo — prompts for local image file path, sends to gpt-4o via `LlmMessage.WithImage`.
+    *   `OpenAiStreamingScenario.cs`: OpenAI streaming demo — streams tokens via `IStreamingChatFeature` with typewriter effect.
 
 ### Wiki (`wiki/`)
 Project documentation pages.
@@ -139,8 +170,10 @@ Project documentation pages.
 *   `feature-extensions.md`: Feature Collection Pattern documentation.
 *   `json-output.md`: JSON Mode and Structured Outputs documentation (quick start, provider support matrix, schema guidelines, refusal handling, troubleshooting).
 *   `grounded-chat.md`: Grounded Chat (RAG) documentation (quick start, document formats, citation modes, working with citations, provider support).
-*   `provider-features.md`: Provider Feature Matrix — lists every feature (chat, embeddings, JSON output, image embeddings, multimodal embeddings, grounded chat, tool calling) supported by each provider. Must be updated when features are added or removed.
+*   `provider-features.md`: Provider Feature Matrix — lists every feature (chat, embeddings, JSON output, image embeddings, multimodal embeddings, grounded chat, tool calling, vision, streaming) supported by each provider. Must be updated when features are added or removed.
 *   `tool-calling.md`: Tool Calling (Function Calling) documentation (quick start, multi-turn conversation, ToolChoice options, core models, provider differences, strict mode, error handling).
+*   `vision.md`: Vision documentation (quick start, MessageContentPart types, factory methods, provider support matrix, Anthropic raw base64 note, Cohere skip behavior).
+*   `streaming.md`: Streaming documentation (quick start, ChatCompletionChunk model, content accumulation, cancellation, provider-specific SSE formats, resilience handler for long streams).
 
 ### CI/CD & Build
 
@@ -158,13 +191,18 @@ Project documentation pages.
 *   **`Directory.Packages.props`**: Central package version management.
 *   **`.envsample`**: Template `.env` file listing all required environment variables with placeholder values for all providers.
 
+### Developer Agent Customizations
+Project-scoped Claude agents live in `.claude/agents/`.
+
+*   **`pr-check-fixer.md`**: Custom PR remediation agent that works only on the pull request associated with the current branch. It uses the `pr-expert` skill to iteratively diagnose failing checks, implement fixes, run validation, commit and push changes, and watch remote PR checks until all fixable blockers are resolved.
+
 ### Testing
 *   **`src/Cisharpai.Tests.Common/`**: Shared test utilities referenced by all test projects.
     *   `DotEnvLoader.cs`: Static utility class to load environment variables from a `.env` file. Searches current and parent directories.
     *   `TestEnvironmentVariables.cs`: Constants for environment variable names used in integration tests.
 *   **`src/Cisharpai.Tests/`**: Unit tests.
     *   `Features/FeatureCollectionTests.cs`: Tests for `FeatureCollection` (Get/Set/enumeration/thread-safety).
-    *   `Features/FeatureDiscoveryTests.cs`: Tests verifying feature discovery across all client implementations (including IJsonOutputFeature, IGroundedChatFeature on Cohere, IToolCallingFeature on OpenAI/Azure OpenAI/Azure AI Inference/Anthropic/Cohere).
+    *   `Features/FeatureDiscoveryTests.cs`: Tests verifying feature discovery across all client implementations (including IJsonOutputFeature, IGroundedChatFeature on Cohere, IToolCallingFeature on OpenAI/Azure OpenAI/Azure AI Inference/Anthropic/Cohere, IStreamingChatFeature on all 5 chat clients).
     *   `DependencyInjection/CohereDiRegistrationTests.cs`: Tests that both Cohere chat and embedding clients resolve correctly with independent options.
     *   `DependencyInjection/OpenAiDiRegistrationTests.cs`: Tests that both OpenAI chat and embedding clients resolve correctly with independent options.
     *   `DependencyInjection/AzureOpenAiDiRegistrationTests.cs`: Tests that both Azure OpenAI chat and embedding clients resolve correctly with independent options.
@@ -203,6 +241,21 @@ Project documentation pages.
     *   `OpenAi/OpenAiToolCallingTests.cs`: Tests for OpenAI tool calling request serialization (tools array, all ToolChoice variants, multi-turn), response deserialization (single/multiple tool calls, text response), error handling, feature discovery, strict flag.
     *   `Anthropic/AnthropicToolCallingTests.cs`: Tests for Anthropic tool calling (input_schema, ToolChoice mapping, tool_use/tool_result content blocks, multi-turn, error handling, feature discovery).
     *   `Cohere/CohereToolCallingTests.cs`: Tests for Cohere tool calling (snake_case, uppercase ToolChoice, strict_tools flag, Specific degradation, multi-turn, error handling, feature discovery).
+    *   `OpenAi/OpenAiVisionTests.cs`: Tests for OpenAI vision (base64 data URI format, WithImage file loading, TextContentPart arrays, normal string content, WithBase64Image media type).
+    *   `OpenAi/OpenAiStreamingTests.cs`: Tests for OpenAI streaming (legacy SSE chunks, finish reason, token usage, stream:true in request, Responses API gpt-5 events, feature discovery, model on chunks).
+    *   `Azure/AzureOpenAi/AzureOpenAiVisionTests.cs`: Tests for Azure OpenAI vision (base64 data URI, WithBase64Image, normal string, file path loading).
+    *   `Azure/AzureOpenAi/AzureOpenAiStreamingTests.cs`: Tests for Azure OpenAI streaming (text chunks, finish reason, token usage, stream:true, feature discovery, reasoning model uses max_completion_tokens).
+    *   `Azure/AzureAiInference/AzureAiInferenceVisionTests.cs`: Tests for Azure AI Inference vision (same format as Azure OpenAI).
+    *   `Azure/AzureAiInference/AzureAiInferenceStreamingTests.cs`: Tests for Azure AI Inference streaming (text chunks, finish reason, feature discovery, model from options when request.Model is null).
+    *   `Anthropic/AnthropicVisionTests.cs`: Tests for Anthropic vision (raw base64 NOT data URIs, source format, file path loading with actual bytes, normal string, structure verification).
+    *   `Anthropic/AnthropicStreamingTests.cs`: Tests for Anthropic streaming (event-based SSE, message_start/content_block_delta/message_delta events, no [DONE] sentinel, model from message_start, feature discovery).
+    *   `Cohere/CohereVisionTests.cs`: Tests for Cohere vision skip behavior (mixed text+image, image-only, base64, multiple text parts, normal message, WithImage factory).
+    *   `Cohere/CohereStreamingTests.cs`: Tests for Cohere streaming (content-delta/message-end events, text chunks in order, finish reason, token counts, stream:true in request, feature discovery).
+    *   `Core/HttpClientBuilderExtensionsTests.cs`: Tests for `AddCisharpaiResilienceHandler()` and `AddCisharpaiStreamingResilienceHandler()` extension methods.
+    *   `Testing/FakeChatCompletionClientTests.cs`: Tests for `FakeChatCompletionClient` (queued/default responses, request capture, feature opt-out, reset, streaming, tool calling, JSON output, grounded chat).
+    *   `Testing/FakeEmbeddingClientTests.cs`: Tests for `FakeEmbeddingClient` (queued/default responses, request capture, feature opt-out, image/multimodal embedding).
+    *   `Testing/FakeResponsesTests.cs`: Tests for `FakeResponses` static factories (all response types, custom parameters, error responses).
+    *   `Testing/FakeServiceCollectionExtensionsTests.cs`: Tests for DI registration helpers (resolution, feature discovery, selective features).
 *   **`src/Cisharpai.Integration.Tests/`**: Integration tests verifying connection to real APIs.
     *   `EnvironmentConfigurationTests.cs`: Single test that validates all required environment variables for all providers. If any are missing, it fails with a clear error message showing which variables are missing and provides example `.env` file content to fix it.
     *   `DotEnv.cs`: Helper class that delegates to `DotEnvLoader` and re-exports `TestEnvironmentVariables` constants for backwards compatibility.
@@ -228,6 +281,11 @@ Project documentation pages.
     *   `OpenAi/OpenAiToolCallingIntegrationTests.cs`: Integration tests for OpenAI tool calling (single tool call, ToolChoice.Required, ToolChoice.None, multi-turn loop, feature discovery).
     *   `Anthropic/AnthropicToolCallingIntegrationTests.cs`: Integration tests for Anthropic tool calling (single tool call, ToolChoice.Required, multi-turn loop, feature discovery).
     *   `Cohere/CohereToolCallingIntegrationTests.cs`: Integration tests for Cohere tool calling (single tool call, ToolChoice.Required, multi-turn loop, feature discovery).
+    *   `OpenAi/OpenAiVisionIntegrationTests.cs`: Integration tests for OpenAI vision with gpt-4.1-nano (base64 image input, file path via LlmMessage.WithImage).
+    *   `Anthropic/AnthropicVisionIntegrationTests.cs`: Integration tests for Anthropic vision with claude-haiku-4-5-20251001 (base64 image, file path).
+    *   `OpenAi/OpenAiStreamingIntegrationTests.cs`: Integration tests for OpenAI streaming with gpt-4.1-nano (feature discovery, basic stream, finish reason, content accumulation).
+    *   `Anthropic/AnthropicStreamingIntegrationTests.cs`: Integration tests for Anthropic streaming with claude-haiku-4-5-20251001.
+    *   `Cohere/CohereStreamingIntegrationTests.cs`: Integration tests for Cohere streaming with command-a-03-2025.
 
 # Integration tests
 

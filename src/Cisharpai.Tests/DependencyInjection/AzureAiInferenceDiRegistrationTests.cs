@@ -30,11 +30,14 @@ public sealed class AzureAiInferenceDiRegistrationTests
         var chatClient = provider.GetRequiredService<IChatCompletionClient>();
         var embeddingClient = provider.GetRequiredService<IEmbeddingClient>();
 
-        Assert.That(chatClient, Is.Not.Null);
-        Assert.That(embeddingClient, Is.Not.Null);
-        Assert.That(chatClient, Is.Not.SameAs(embeddingClient));
-        Assert.That(chatClient, Is.InstanceOf<AzureAiInferenceChatCompletionClient>());
-        Assert.That(embeddingClient, Is.InstanceOf<AzureAiInferenceEmbeddingClient>());
+        Assert.Multiple(() =>
+        {
+            Assert.That(chatClient, Is.Not.Null);
+            Assert.That(embeddingClient, Is.Not.Null);
+            Assert.That(chatClient, Is.Not.SameAs(embeddingClient));
+            Assert.That(chatClient, Is.InstanceOf<AzureAiInferenceChatCompletionClient>());
+            Assert.That(embeddingClient, Is.InstanceOf<AzureAiInferenceEmbeddingClient>());
+        });
     }
 
     [Test]
@@ -53,8 +56,11 @@ public sealed class AzureAiInferenceDiRegistrationTests
 
         var client = provider.GetRequiredService<IChatCompletionClient>();
 
-        Assert.That(client, Is.Not.Null);
-        Assert.That(client, Is.InstanceOf<AzureAiInferenceChatCompletionClient>());
+        Assert.Multiple(() =>
+        {
+            Assert.That(client, Is.Not.Null);
+            Assert.That(client, Is.InstanceOf<AzureAiInferenceChatCompletionClient>());
+        });
     }
 
     [Test]
@@ -81,9 +87,12 @@ public sealed class AzureAiInferenceDiRegistrationTests
         var phi = provider.GetRequiredKeyedService<IChatCompletionClient>("phi");
         var llama = provider.GetRequiredKeyedService<IChatCompletionClient>("llama");
 
-        Assert.That(phi, Is.Not.Null);
-        Assert.That(llama, Is.Not.Null);
-        Assert.That(phi, Is.Not.SameAs(llama));
-        Assert.That(phi, Is.InstanceOf<AzureAiInferenceChatCompletionClient>());
+        Assert.Multiple(() =>
+        {
+            Assert.That(phi, Is.Not.Null);
+            Assert.That(llama, Is.Not.Null);
+            Assert.That(phi, Is.Not.SameAs(llama));
+            Assert.That(phi, Is.InstanceOf<AzureAiInferenceChatCompletionClient>());
+        });
     }
 }

@@ -116,13 +116,16 @@ public sealed class AnthropicToolCallingTests
 
         var tool = tools[0];
         // Anthropic uses top-level name/description/input_schema (no function wrapper)
-        Assert.That(tool.GetProperty("name").GetString(), Is.EqualTo("get_weather"));
-        Assert.That(tool.GetProperty("description").GetString(), Is.EqualTo("Get current weather"));
-        Assert.That(tool.GetProperty("input_schema").GetProperty("type").GetString(), Is.EqualTo("object"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(tool.GetProperty("name").GetString(), Is.EqualTo("get_weather"));
+            Assert.That(tool.GetProperty("description").GetString(), Is.EqualTo("Get current weather"));
+            Assert.That(tool.GetProperty("input_schema").GetProperty("type").GetString(), Is.EqualTo("object"));
 
-        // Should NOT have a "function" wrapper or "type":"function"
-        Assert.That(tool.TryGetProperty("type", out _), Is.False);
-        Assert.That(tool.TryGetProperty("function", out _), Is.False);
+            // Should NOT have a "function" wrapper or "type":"function"
+            Assert.That(tool.TryGetProperty("type", out _), Is.False);
+            Assert.That(tool.TryGetProperty("function", out _), Is.False);
+        });
     }
 
     [Test]
@@ -191,8 +194,11 @@ public sealed class AnthropicToolCallingTests
 
         var doc = JsonDocument.Parse(capturedBody!);
         var toolChoice = doc.RootElement.GetProperty("tool_choice");
-        Assert.That(toolChoice.GetProperty("type").GetString(), Is.EqualTo("tool"));
-        Assert.That(toolChoice.GetProperty("name").GetString(), Is.EqualTo("get_weather"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(toolChoice.GetProperty("type").GetString(), Is.EqualTo("tool"));
+            Assert.That(toolChoice.GetProperty("name").GetString(), Is.EqualTo("get_weather"));
+        });
     }
 
     [Test]
@@ -258,15 +264,21 @@ public sealed class AnthropicToolCallingTests
 
         var response = await client.GetChatCompletionWithToolsAsync(CreateRequest(), CreateToolOptions());
 
-        Assert.That(response.IsSuccess, Is.True);
-        Assert.That(response.ToolCalls, Is.Not.Null);
-        Assert.That(response.ToolCalls!.Count, Is.EqualTo(1));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.True);
+            Assert.That(response.ToolCalls, Is.Not.Null);
+            Assert.That(response.ToolCalls!, Has.Count.EqualTo(1));
+        });
 
         var toolCall = response.ToolCalls[0];
-        Assert.That(toolCall.Id, Is.EqualTo("toolu_abc123"));
-        Assert.That(toolCall.FunctionName, Is.EqualTo("get_weather"));
-        // Anthropic args are already JSON objects, not strings
-        Assert.That(toolCall.Arguments.GetProperty("city").GetString(), Is.EqualTo("Paris"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(toolCall.Id, Is.EqualTo("toolu_abc123"));
+            Assert.That(toolCall.FunctionName, Is.EqualTo("get_weather"));
+            // Anthropic args are already JSON objects, not strings
+            Assert.That(toolCall.Arguments.GetProperty("city").GetString(), Is.EqualTo("Paris"));
+        });
     }
 
     [Test]
@@ -283,11 +295,14 @@ public sealed class AnthropicToolCallingTests
 
         var response = await client.GetChatCompletionWithToolsAsync(CreateRequest(), CreateToolOptions());
 
-        Assert.That(response.ToolCalls!.Count, Is.EqualTo(2));
-        Assert.That(response.ToolCalls[0].Id, Is.EqualTo("toolu_1"));
-        Assert.That(response.ToolCalls[1].Id, Is.EqualTo("toolu_2"));
-        // Also has text content
-        Assert.That(response.Content, Is.EqualTo("I'll check the weather for both cities."));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.ToolCalls!, Has.Count.EqualTo(2));
+            Assert.That(response.ToolCalls![0].Id, Is.EqualTo("toolu_1"));
+            Assert.That(response.ToolCalls![1].Id, Is.EqualTo("toolu_2"));
+            // Also has text content
+            Assert.That(response.Content, Is.EqualTo("I'll check the weather for both cities."));
+        });
     }
 
     [Test]
@@ -304,9 +319,12 @@ public sealed class AnthropicToolCallingTests
 
         var response = await client.GetChatCompletionWithToolsAsync(CreateRequest(), CreateToolOptions());
 
-        Assert.That(response.IsSuccess, Is.True);
-        Assert.That(response.ToolCalls, Is.Null);
-        Assert.That(response.Content, Is.EqualTo("The weather in Paris is sunny."));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.True);
+            Assert.That(response.ToolCalls, Is.Null);
+            Assert.That(response.Content, Is.EqualTo("The weather in Paris is sunny."));
+        });
     }
 
     #endregion
@@ -350,9 +368,12 @@ public sealed class AnthropicToolCallingTests
         Assert.That(contentBlocks.GetArrayLength(), Is.EqualTo(1));
 
         var block = contentBlocks[0];
-        Assert.That(block.GetProperty("type").GetString(), Is.EqualTo("tool_result"));
-        Assert.That(block.GetProperty("tool_use_id").GetString(), Is.EqualTo("toolu_1"));
-        Assert.That(block.GetProperty("content").GetString(), Is.EqualTo("Sunny, 22C"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(block.GetProperty("type").GetString(), Is.EqualTo("tool_result"));
+            Assert.That(block.GetProperty("tool_use_id").GetString(), Is.EqualTo("toolu_1"));
+            Assert.That(block.GetProperty("content").GetString(), Is.EqualTo("Sunny, 22C"));
+        });
     }
 
     [Test]
@@ -392,10 +413,13 @@ public sealed class AnthropicToolCallingTests
         Assert.That(contentBlocks.GetArrayLength(), Is.EqualTo(1));
 
         var block = contentBlocks[0];
-        Assert.That(block.GetProperty("type").GetString(), Is.EqualTo("tool_use"));
-        Assert.That(block.GetProperty("id").GetString(), Is.EqualTo("toolu_1"));
-        Assert.That(block.GetProperty("name").GetString(), Is.EqualTo("get_weather"));
-        Assert.That(block.GetProperty("input").GetProperty("city").GetString(), Is.EqualTo("Paris"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(block.GetProperty("type").GetString(), Is.EqualTo("tool_use"));
+            Assert.That(block.GetProperty("id").GetString(), Is.EqualTo("toolu_1"));
+            Assert.That(block.GetProperty("name").GetString(), Is.EqualTo("get_weather"));
+            Assert.That(block.GetProperty("input").GetProperty("city").GetString(), Is.EqualTo("Paris"));
+        });
     }
 
     #endregion
@@ -416,8 +440,11 @@ public sealed class AnthropicToolCallingTests
 
         var response = await client.GetChatCompletionWithToolsAsync(CreateRequest(), CreateToolOptions());
 
-        Assert.That(response.IsSuccess, Is.False);
-        Assert.That(response.ErrorMessage, Is.Not.Null.And.Not.Empty);
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.False);
+            Assert.That(response.ErrorMessage, Is.Not.Null.And.Not.Empty);
+        });
     }
 
     #endregion
@@ -432,8 +459,11 @@ public sealed class AnthropicToolCallingTests
 
         var feature = client.Features.Get<IToolCallingFeature>();
 
-        Assert.That(feature, Is.Not.Null);
-        Assert.That(feature, Is.SameAs(client));
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
     }
 
     #endregion

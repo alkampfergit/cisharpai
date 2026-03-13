@@ -30,11 +30,14 @@ public sealed class AzureOpenAiDiRegistrationTests
         var chatClient = provider.GetRequiredService<IChatCompletionClient>();
         var embeddingClient = provider.GetRequiredService<IEmbeddingClient>();
 
-        Assert.That(chatClient, Is.Not.Null);
-        Assert.That(embeddingClient, Is.Not.Null);
-        Assert.That(chatClient, Is.Not.SameAs(embeddingClient));
-        Assert.That(chatClient, Is.InstanceOf<AzureOpenAiChatCompletionClient>());
-        Assert.That(embeddingClient, Is.InstanceOf<AzureOpenAiEmbeddingClient>());
+        Assert.Multiple(() =>
+        {
+            Assert.That(chatClient, Is.Not.Null);
+            Assert.That(embeddingClient, Is.Not.Null);
+            Assert.That(chatClient, Is.Not.SameAs(embeddingClient));
+            Assert.That(chatClient, Is.InstanceOf<AzureOpenAiChatCompletionClient>());
+            Assert.That(embeddingClient, Is.InstanceOf<AzureOpenAiEmbeddingClient>());
+        });
     }
 
     [Test]
@@ -53,8 +56,11 @@ public sealed class AzureOpenAiDiRegistrationTests
 
         var client = provider.GetRequiredService<IChatCompletionClient>();
 
-        Assert.That(client, Is.Not.Null);
-        Assert.That(client, Is.InstanceOf<AzureOpenAiChatCompletionClient>());
+        Assert.Multiple(() =>
+        {
+            Assert.That(client, Is.Not.Null);
+            Assert.That(client, Is.InstanceOf<AzureOpenAiChatCompletionClient>());
+        });
     }
 
     [Test]
@@ -81,9 +87,12 @@ public sealed class AzureOpenAiDiRegistrationTests
         var primary = provider.GetRequiredKeyedService<IChatCompletionClient>("primary");
         var secondary = provider.GetRequiredKeyedService<IChatCompletionClient>("secondary");
 
-        Assert.That(primary, Is.Not.Null);
-        Assert.That(secondary, Is.Not.Null);
-        Assert.That(primary, Is.Not.SameAs(secondary));
-        Assert.That(primary, Is.InstanceOf<AzureOpenAiChatCompletionClient>());
+        Assert.Multiple(() =>
+        {
+            Assert.That(primary, Is.Not.Null);
+            Assert.That(secondary, Is.Not.Null);
+            Assert.That(primary, Is.Not.SameAs(secondary));
+            Assert.That(primary, Is.InstanceOf<AzureOpenAiChatCompletionClient>());
+        });
     }
 }

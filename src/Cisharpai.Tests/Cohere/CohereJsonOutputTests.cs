@@ -200,8 +200,11 @@ public sealed class CohereJsonOutputTests
         Assert.That(capturedBody, Is.Not.Null);
         var doc = JsonDocument.Parse(capturedBody!);
         var messages = doc.RootElement.GetProperty("messages");
-        Assert.That(messages[0].GetProperty("role").GetString(), Is.EqualTo("system"));
-        Assert.That(messages[0].GetProperty("content").GetString(), Is.EqualTo("Respond with raw JSON only, no markdown formatting."));
+        Assert.Multiple(() =>
+        {
+            Assert.That(messages[0].GetProperty("role").GetString(), Is.EqualTo("system"));
+            Assert.That(messages[0].GetProperty("content").GetString(), Is.EqualTo("Respond with raw JSON only, no markdown formatting."));
+        });
     }
 
     #endregion
@@ -238,8 +241,11 @@ public sealed class CohereJsonOutputTests
         Assert.That(capturedBody, Is.Not.Null);
         var doc = JsonDocument.Parse(capturedBody!);
         var responseFormat = doc.RootElement.GetProperty("response_format");
-        Assert.That(responseFormat.GetProperty("type").GetString(), Is.EqualTo("json_object"));
-        Assert.That(responseFormat.TryGetProperty("json_schema", out _), Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(responseFormat.GetProperty("type").GetString(), Is.EqualTo("json_object"));
+            Assert.That(responseFormat.TryGetProperty("json_schema", out _), Is.True);
+        });
     }
 
     [Test]
@@ -276,10 +282,13 @@ public sealed class CohereJsonOutputTests
             .GetProperty("json_schema");
 
         // Verify it's a JSON object, not a serialized string
-        Assert.That(schema.ValueKind, Is.EqualTo(JsonValueKind.Object));
-        Assert.That(schema.GetProperty("properties").GetProperty("name").GetProperty("type").GetString(), Is.EqualTo("string"));
-        Assert.That(schema.GetProperty("properties").GetProperty("age").GetProperty("type").GetString(), Is.EqualTo("integer"));
-        Assert.That(schema.GetProperty("additionalProperties").GetBoolean(), Is.False);
+        Assert.Multiple(() =>
+        {
+            Assert.That(schema.ValueKind, Is.EqualTo(JsonValueKind.Object));
+            Assert.That(schema.GetProperty("properties").GetProperty("name").GetProperty("type").GetString(), Is.EqualTo("string"));
+            Assert.That(schema.GetProperty("properties").GetProperty("age").GetProperty("type").GetString(), Is.EqualTo("integer"));
+            Assert.That(schema.GetProperty("additionalProperties").GetBoolean(), Is.False);
+        });
     }
 
     [Test]
@@ -313,8 +322,11 @@ public sealed class CohereJsonOutputTests
         var doc = JsonDocument.Parse(capturedBody!);
         var messages = doc.RootElement.GetProperty("messages");
         // Only the user message should be present
-        Assert.That(messages.GetArrayLength(), Is.EqualTo(1));
-        Assert.That(messages[0].GetProperty("role").GetString(), Is.EqualTo("user"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(messages.GetArrayLength(), Is.EqualTo(1));
+            Assert.That(messages[0].GetProperty("role").GetString(), Is.EqualTo("user"));
+        });
     }
 
     #endregion
@@ -399,8 +411,11 @@ public sealed class CohereJsonOutputTests
 
         var feature = client.Features.Get<IJsonOutputFeature>();
 
-        Assert.That(feature, Is.Not.Null);
-        Assert.That(feature, Is.SameAs(client));
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
     }
 
     #endregion

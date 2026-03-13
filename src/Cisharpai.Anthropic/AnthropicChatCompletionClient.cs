@@ -1,13 +1,22 @@
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Cisharpai.Features;
 using Cisharpai.Features.Chat;
+using Cisharpai.Helpers;
 using Cisharpai.Models;
 using Cisharpai.Anthropic.Models;
 
 namespace Cisharpai.Anthropic;
 
-public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature
+public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature, IStreamingChatFeature
 {
+    private const string MessagesEndpoint = "messages";
+
+    private static readonly JsonSerializerOptions StreamJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     private readonly LlmHttpClient _client;
     private readonly AnthropicClientOptions _options;
 
@@ -21,6 +30,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         var features = new FeatureCollection();
         features.Set<IJsonOutputFeature>(this);
         features.Set<IToolCallingFeature>(this);
+        features.Set<IStreamingChatFeature>(this);
         Features = features;
     }
 
@@ -32,7 +42,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
 
         try
         {
-            var providerRequest = BuildRequest(request);
+            var providerRequest = await BuildRequestAsync(request, cancellationToken);
 
             return await ExecuteAsync(providerRequest, request, cancellationToken);
         }
@@ -57,10 +67,11 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         {
             jsonOutputOptions.Validate();
 
-            var messages = EnsureJsonKeywordInSystemMessage(request.Messages, jsonOutputOptions);
+            var messages = JsonOutputHelper.EnsureJsonKeywordInSystemMessage(
+                request.Messages, jsonOutputOptions, "Respond with raw JSON only, no markdown formatting.");
             var updatedRequest = request with { Messages = messages };
 
-            var providerRequest = BuildRequest(updatedRequest);
+            var providerRequest = await BuildRequestAsync(updatedRequest, cancellationToken);
             providerRequest.OutputConfig = BuildOutputConfig(jsonOutputOptions);
 
             var response = await ExecuteAsync(providerRequest, request, cancellationToken);
@@ -69,7 +80,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
             // message injection, but Claude often wraps output in markdown code fences.
             // Strip them so callers always receive raw JSON.
             if (jsonOutputOptions.Mode == JsonOutputMode.JsonMode && response.IsSuccess)
-                response = response with { Content = StripMarkdownCodeFences(response.Content) };
+                response = response with { Content = JsonOutputHelper.StripMarkdownCodeFences(response.Content) };
 
             return response;
         }
@@ -94,7 +105,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         {
             toolOptions.Validate();
 
-            var providerRequest = BuildRequest(request);
+            var providerRequest = await BuildRequestAsync(request, cancellationToken);
             providerRequest.Tools = MapToolDefinitions(toolOptions.Tools);
             providerRequest.ToolChoice = MapToolChoice(toolOptions.ToolChoice);
 
@@ -105,12 +116,12 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
             if (request.IncludeRawResponse)
             {
                 (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<AnthropicChatRequest, AnthropicChatResponse>(
-                    "messages", providerRequest, cancellationToken, request.ExtraParameters);
+                    MessagesEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
             }
             else
             {
                 raw = await _client.PostAsync<AnthropicChatRequest, AnthropicChatResponse>(
-                    "messages", providerRequest, cancellationToken, request.ExtraParameters);
+                    MessagesEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
             }
 
             return MapToolCallingResponse(raw, rawResponseJson, rawRequestJson);
@@ -122,6 +133,63 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         catch (Exception ex)
         {
             return ToolCallingResponse.Error(ex.Message);
+        }
+    }
+
+    public async IAsyncEnumerable<ChatCompletionChunk> GetChatCompletionStreamAsync(
+        ChatCompletionRequest request,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        request = request with { Model = ResolveModel(request.Model) };
+
+        var providerRequest = await BuildRequestAsync(request, cancellationToken);
+        providerRequest.Stream = true;
+
+        string? model = null;
+        int? inputTokens = null;
+
+        await foreach (var json in _client.PostStreamAsync(MessagesEndpoint, providerRequest, request.ExtraParameters, cancellationToken))
+        {
+            AnthropicStreamEvent? evt;
+            try
+            {
+                evt = JsonSerializer.Deserialize<AnthropicStreamEvent>(json, StreamJsonOptions);
+            }
+            catch
+            {
+                continue;
+            }
+
+            if (evt is null) continue;
+
+            switch (evt.Type)
+            {
+                case "message_start":
+                    model = evt.Message?.Model;
+                    inputTokens = evt.Message?.Usage?.InputTokens;
+                    break;
+
+                case "content_block_delta":
+                    if (evt.Delta?.Type == "text_delta")
+                    {
+                        yield return new ChatCompletionChunk(
+                            Content: evt.Delta.Text ?? string.Empty,
+                            Model: model);
+                    }
+                    break;
+
+                case "message_delta":
+                    // Contains stop_reason and output_tokens
+                    yield return new ChatCompletionChunk(
+                        Content: string.Empty,
+                        FinishReason: evt.Delta?.StopReason,
+                        Model: model,
+                        PromptTokens: inputTokens,
+                        CompletionTokens: evt.Usage?.OutputTokens);
+                    break;
+
+                // Ignore: ping, content_block_start, content_block_stop, message_stop
+            }
         }
     }
 
@@ -139,7 +207,9 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
     /// </summary>
     public const int DefaultMaxTokens = 8192;
 
-    private AnthropicChatRequest BuildRequest(ChatCompletionRequest request)
+    private static async Task<AnthropicChatRequest> BuildRequestAsync(
+        ChatCompletionRequest request,
+        CancellationToken cancellationToken)
     {
         var systemMessage = request.Messages
             .FirstOrDefault(m => m.Role == LlmRole.System)?.Content;
@@ -150,7 +220,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
             Temperature = request.Temperature,
             MaxTokens = request.MaxTokens ?? DefaultMaxTokens,
             System = systemMessage,
-            Messages = MapMessages(request.Messages)
+            Messages = await MapMessagesAsync(request.Messages, cancellationToken)
         };
     }
 
@@ -166,12 +236,12 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         if (request.IncludeRawResponse)
         {
             (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<AnthropicChatRequest, AnthropicChatResponse>(
-                "messages", providerRequest, cancellationToken, request.ExtraParameters);
+                MessagesEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
         }
         else
         {
             raw = await _client.PostAsync<AnthropicChatRequest, AnthropicChatResponse>(
-                "messages", providerRequest, cancellationToken, request.ExtraParameters);
+                MessagesEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
         }
 
         var content = string.Join("", raw.Content
@@ -219,7 +289,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         return new ToolCallingResponse(chatCompletion, toolCalls);
     }
 
-    private static IReadOnlyList<ToolCall>? MapResponseToolCalls(List<AnthropicContentBlock> contentBlocks)
+    private static List<ToolCall>? MapResponseToolCalls(List<AnthropicContentBlock> contentBlocks)
     {
         var toolUseBlocks = contentBlocks
             .Where(c => c.Type == "tool_use" && c.Id is not null && c.Name is not null && c.Input.HasValue)
@@ -281,56 +351,9 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         };
     }
 
-    private static IReadOnlyList<LlmMessage> EnsureJsonKeywordInSystemMessage(
+    private static async Task<List<AnthropicMessage>> MapMessagesAsync(
         IReadOnlyList<LlmMessage> messages,
-        JsonOutputOptions options)
-    {
-        if (options.Mode != JsonOutputMode.JsonMode)
-            return messages;
-
-        var systemMessage = messages.FirstOrDefault(m => m.Role == LlmRole.System);
-
-        if (systemMessage is not null &&
-            systemMessage.Content.Contains("JSON", StringComparison.OrdinalIgnoreCase))
-            return messages;
-
-        var result = new List<LlmMessage>(messages);
-
-        if (systemMessage is not null)
-        {
-            var index = result.IndexOf(systemMessage);
-            result[index] = new LlmMessage(LlmRole.System, systemMessage.Content + " Respond with raw JSON only, no markdown formatting.");
-        }
-        else
-        {
-            result.Insert(0, new LlmMessage(LlmRole.System, "Respond with raw JSON only, no markdown formatting."));
-        }
-
-        return result;
-    }
-
-    internal static string StripMarkdownCodeFences(string content)
-    {
-        var trimmed = content.Trim();
-        if (!trimmed.StartsWith("```", StringComparison.Ordinal))
-            return content;
-
-        // Remove opening fence (```json, ```JSON, or just ```)
-        var firstNewline = trimmed.IndexOf('\n');
-        if (firstNewline < 0)
-            return content;
-
-        trimmed = trimmed[(firstNewline + 1)..];
-
-        // Remove closing fence
-        var lastFence = trimmed.LastIndexOf("```", StringComparison.Ordinal);
-        if (lastFence >= 0)
-            trimmed = trimmed[..lastFence];
-
-        return trimmed.Trim();
-    }
-
-    private static List<AnthropicMessage> MapMessages(IReadOnlyList<LlmMessage> messages)
+        CancellationToken ct)
     {
         var result = new List<AnthropicMessage>();
 
@@ -339,57 +362,28 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
             if (m.Role == LlmRole.System)
                 continue; // System messages are handled via the top-level system field
 
-            // Tool result messages: convert to user role with tool_result content blocks
             if (m.Role == LlmRole.Tool && m.ToolCallId is not null)
             {
-                result.Add(new AnthropicMessage
-                {
-                    Role = "user",
-                    Content = new List<AnthropicContentBlock>
-                    {
-                        new()
-                        {
-                            Type = "tool_result",
-                            ToolUseId = m.ToolCallId,
-                            Content = m.Content
-                        }
-                    }
-                });
+                result.Add(MapToolResultMessage(m));
                 continue;
             }
 
-            // Assistant message with tool calls: serialize as tool_use content blocks
-            if (m.Role == LlmRole.Assistant && m.ToolCalls is not null && m.ToolCalls.Count > 0)
+            if (m.Role == LlmRole.Assistant && m.ToolCalls is { Count: > 0 })
             {
-                var blocks = new List<AnthropicContentBlock>();
+                result.Add(MapAssistantToolCallMessage(m));
+                continue;
+            }
 
-                // If there's text content, add it as a text block
-                if (!string.IsNullOrEmpty(m.Content))
-                {
-                    blocks.Add(new AnthropicContentBlock { Type = "text", Text = m.Content });
-                }
-
-                // Add tool_use blocks
-                foreach (var tc in m.ToolCalls)
-                {
-                    blocks.Add(new AnthropicContentBlock
-                    {
-                        Type = "tool_use",
-                        Id = tc.Id,
-                        Name = tc.FunctionName,
-                        Input = tc.Arguments
-                    });
-                }
-
+            if (m.ContentParts is { Count: > 0 })
+            {
                 result.Add(new AnthropicMessage
                 {
-                    Role = "assistant",
-                    Content = blocks
+                    Role = MapRole(m.Role),
+                    Content = await MapContentPartsAsync(m.ContentParts, ct)
                 });
                 continue;
             }
 
-            // Normal messages
             result.Add(new AnthropicMessage
             {
                 Role = MapRole(m.Role),
@@ -398,6 +392,88 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         }
 
         return result;
+    }
+
+    private static AnthropicMessage MapToolResultMessage(LlmMessage m)
+    {
+        return new AnthropicMessage
+        {
+            Role = "user",
+            Content = new List<AnthropicContentBlock>
+            {
+                new()
+                {
+                    Type = "tool_result",
+                    ToolUseId = m.ToolCallId,
+                    Content = m.Content
+                }
+            }
+        };
+    }
+
+    private static AnthropicMessage MapAssistantToolCallMessage(LlmMessage m)
+    {
+        var blocks = new List<AnthropicContentBlock>();
+
+        if (!string.IsNullOrEmpty(m.Content))
+            blocks.Add(new AnthropicContentBlock { Type = "text", Text = m.Content });
+
+        foreach (var tc in m.ToolCalls!)
+        {
+            blocks.Add(new AnthropicContentBlock
+            {
+                Type = "tool_use",
+                Id = tc.Id,
+                Name = tc.FunctionName,
+                Input = tc.Arguments
+            });
+        }
+
+        return new AnthropicMessage
+        {
+            Role = "assistant",
+            Content = blocks
+        };
+    }
+
+    private static async Task<List<AnthropicContentBlock>> MapContentPartsAsync(
+        IReadOnlyList<MessageContentPart> contentParts,
+        CancellationToken ct)
+    {
+        var blocks = new List<AnthropicContentBlock>();
+        foreach (var part in contentParts)
+        {
+            switch (part)
+            {
+                case TextContentPart text:
+                    blocks.Add(new AnthropicContentBlock { Type = "text", Text = text.Text });
+                    break;
+                case ImageFileContentPart file:
+                    var bytes = await File.ReadAllBytesAsync(file.FilePath, ct);
+                    blocks.Add(new AnthropicContentBlock
+                    {
+                        Type = "image",
+                        Source = new AnthropicImageSource
+                        {
+                            MediaType = ImageDataUriHelper.GetMimeType(file.FilePath),
+                            Data = Convert.ToBase64String(bytes)
+                        }
+                    });
+                    break;
+                case ImageBase64ContentPart base64:
+                    blocks.Add(new AnthropicContentBlock
+                    {
+                        Type = "image",
+                        Source = new AnthropicImageSource
+                        {
+                            MediaType = base64.MediaType,
+                            Data = base64.Base64Data
+                        }
+                    });
+                    break;
+            }
+        }
+        return blocks;
     }
 
     private static string MapRole(LlmRole role) => role switch

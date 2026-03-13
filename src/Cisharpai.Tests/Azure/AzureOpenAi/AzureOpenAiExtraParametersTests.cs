@@ -40,9 +40,12 @@ public sealed class AzureOpenAiExtraParametersTests
         await client.GetChatCompletionAsync(request);
 
         var doc = JsonDocument.Parse(capturedBody!);
-        Assert.That(doc.RootElement.GetProperty("temperature").GetDouble(), Is.EqualTo(0.7));
-        Assert.That(doc.RootElement.GetProperty("top_p").GetDouble(), Is.EqualTo(0.9));
-        Assert.That(doc.RootElement.GetProperty("presence_penalty").GetDouble(), Is.EqualTo(0.5));
+        Assert.Multiple(() =>
+        {
+            Assert.That(doc.RootElement.GetProperty("temperature").GetDouble(), Is.EqualTo(0.7));
+            Assert.That(doc.RootElement.GetProperty("top_p").GetDouble(), Is.EqualTo(0.9));
+            Assert.That(doc.RootElement.GetProperty("presence_penalty").GetDouble(), Is.EqualTo(0.5));
+        });
     }
 
     [Test]
@@ -78,8 +81,11 @@ public sealed class AzureOpenAiExtraParametersTests
         await client.GetChatCompletionAsync(request);
 
         var doc = JsonDocument.Parse(capturedBody!);
-        Assert.That(doc.RootElement.GetProperty("max_completion_tokens").GetInt32(), Is.EqualTo(1000));
-        Assert.That(doc.RootElement.GetProperty("reasoning_effort").GetString(), Is.EqualTo("high"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(doc.RootElement.GetProperty("max_completion_tokens").GetInt32(), Is.EqualTo(1000));
+            Assert.That(doc.RootElement.GetProperty("reasoning_effort").GetString(), Is.EqualTo("high"));
+        });
     }
 
     [Test]

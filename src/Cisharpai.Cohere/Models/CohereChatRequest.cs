@@ -20,4 +20,5 @@ public sealed class CohereChatRequest
     public List<CohereToolDefinition>? Tools { get; set; }
     public string? ToolChoice { get; set; }
     public bool? StrictTools { get; set; }
+    public bool? Stream { get; set; }
 }

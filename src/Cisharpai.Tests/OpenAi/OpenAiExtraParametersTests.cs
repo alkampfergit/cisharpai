@@ -33,10 +33,13 @@ public sealed class OpenAiExtraParametersTests
         await client.GetChatCompletionAsync(request);
 
         var doc = JsonDocument.Parse(capturedBody!);
-        Assert.That(doc.RootElement.GetProperty("model").GetString(), Is.EqualTo("gpt-4"));
-        Assert.That(doc.RootElement.GetProperty("temperature").GetDouble(), Is.EqualTo(0.7));
-        Assert.That(doc.RootElement.GetProperty("top_p").GetDouble(), Is.EqualTo(0.9));
-        Assert.That(doc.RootElement.GetProperty("stream").GetBoolean(), Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(doc.RootElement.GetProperty("model").GetString(), Is.EqualTo("gpt-4"));
+            Assert.That(doc.RootElement.GetProperty("temperature").GetDouble(), Is.EqualTo(0.7));
+            Assert.That(doc.RootElement.GetProperty("top_p").GetDouble(), Is.EqualTo(0.9));
+            Assert.That(doc.RootElement.GetProperty("stream").GetBoolean(), Is.True);
+        });
     }
 
     [Test]
@@ -94,8 +97,11 @@ public sealed class OpenAiExtraParametersTests
 
         var doc = JsonDocument.Parse(capturedBody!);
         var reasoning = doc.RootElement.GetProperty("reasoning");
-        Assert.That(reasoning.GetProperty("effort").GetString(), Is.EqualTo("medium"));
-        Assert.That(reasoning.GetProperty("summary").GetString(), Is.EqualTo("auto"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(reasoning.GetProperty("effort").GetString(), Is.EqualTo("medium"));
+            Assert.That(reasoning.GetProperty("summary").GetString(), Is.EqualTo("auto"));
+        });
     }
 
     [Test]
@@ -124,8 +130,11 @@ public sealed class OpenAiExtraParametersTests
         await client.GetChatCompletionAsync(request);
 
         var doc = JsonDocument.Parse(capturedBody!);
-        Assert.That(doc.RootElement.GetProperty("reasoning_effort").GetString(), Is.EqualTo("high"));
-        Assert.That(doc.RootElement.GetProperty("max_completion_tokens").GetInt32(), Is.EqualTo(500));
+        Assert.Multiple(() =>
+        {
+            Assert.That(doc.RootElement.GetProperty("reasoning_effort").GetString(), Is.EqualTo("high"));
+            Assert.That(doc.RootElement.GetProperty("max_completion_tokens").GetInt32(), Is.EqualTo(500));
+        });
     }
 
     [Test]
@@ -152,9 +161,12 @@ public sealed class OpenAiExtraParametersTests
         await client.GetChatCompletionAsync(request);
 
         var doc = JsonDocument.Parse(capturedBody!);
-        Assert.That(doc.RootElement.GetProperty("model").GetString(), Is.EqualTo("gpt-4"));
-        Assert.That(doc.RootElement.GetProperty("temperature").GetDouble(), Is.EqualTo(0.5));
-        Assert.That(doc.RootElement.TryGetProperty("top_p", out _), Is.False);
+        Assert.Multiple(() =>
+        {
+            Assert.That(doc.RootElement.GetProperty("model").GetString(), Is.EqualTo("gpt-4"));
+            Assert.That(doc.RootElement.GetProperty("temperature").GetDouble(), Is.EqualTo(0.5));
+            Assert.That(doc.RootElement.TryGetProperty("top_p", out _), Is.False);
+        });
     }
 
     [Test]
@@ -180,8 +192,11 @@ public sealed class OpenAiExtraParametersTests
 
         Assert.That(response.RawRequestJson, Is.Not.Null);
         var doc = JsonDocument.Parse(response.RawRequestJson!);
-        Assert.That(doc.RootElement.GetProperty("top_p").GetDouble(), Is.EqualTo(0.9));
-        Assert.That(doc.RootElement.GetProperty("model").GetString(), Is.EqualTo("gpt-4"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(doc.RootElement.GetProperty("top_p").GetDouble(), Is.EqualTo(0.9));
+            Assert.That(doc.RootElement.GetProperty("model").GetString(), Is.EqualTo("gpt-4"));
+        });
     }
 
     [Test]
@@ -203,8 +218,11 @@ public sealed class OpenAiExtraParametersTests
 
         var response = await client.GetChatCompletionAsync(request);
 
-        Assert.That(response.RawRequestJson, Is.Not.Null);
-        Assert.That(response.RawResponseJson, Is.Not.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.RawRequestJson, Is.Not.Null);
+            Assert.That(response.RawResponseJson, Is.Not.Null);
+        });
     }
 
     private const string OpenAiResponseJson = """

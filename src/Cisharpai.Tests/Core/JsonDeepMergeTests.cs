@@ -4,6 +4,7 @@ namespace Cisharpai.Tests.Core;
 
 public sealed class JsonDeepMergeTests
 {
+    private static readonly string[] ExpectedPropertyOrder = ["a", "b", "c"];
     [Test]
     public void Merge_AddsNewTopLevelProperty()
     {
@@ -13,9 +14,12 @@ public sealed class JsonDeepMergeTests
         var result = JsonDeepMerge.Merge(baseJson, overrides);
         var doc = JsonDocument.Parse(result);
 
-        Assert.That(doc.RootElement.GetProperty("model").GetString(), Is.EqualTo("gpt-4"));
-        Assert.That(doc.RootElement.GetProperty("temperature").GetDouble(), Is.EqualTo(0.7));
-        Assert.That(doc.RootElement.GetProperty("top_p").GetDouble(), Is.EqualTo(0.9));
+        Assert.Multiple(() =>
+        {
+            Assert.That(doc.RootElement.GetProperty("model").GetString(), Is.EqualTo("gpt-4"));
+            Assert.That(doc.RootElement.GetProperty("temperature").GetDouble(), Is.EqualTo(0.7));
+            Assert.That(doc.RootElement.GetProperty("top_p").GetDouble(), Is.EqualTo(0.9));
+        });
     }
 
     [Test]
@@ -40,8 +44,11 @@ public sealed class JsonDeepMergeTests
         var doc = JsonDocument.Parse(result);
 
         var reasoning = doc.RootElement.GetProperty("reasoning");
-        Assert.That(reasoning.GetProperty("effort").GetString(), Is.EqualTo("high"));
-        Assert.That(reasoning.GetProperty("summary").GetString(), Is.EqualTo("auto"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(reasoning.GetProperty("effort").GetString(), Is.EqualTo("high"));
+            Assert.That(reasoning.GetProperty("summary").GetString(), Is.EqualTo("auto"));
+        });
     }
 
     [Test]
@@ -78,8 +85,11 @@ public sealed class JsonDeepMergeTests
         var doc = JsonDocument.Parse(result);
 
         var tools = doc.RootElement.GetProperty("tools");
-        Assert.That(tools.GetArrayLength(), Is.EqualTo(1));
-        Assert.That(tools[0].GetString(), Is.EqualTo("browse"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(tools.GetArrayLength(), Is.EqualTo(1));
+            Assert.That(tools[0].GetString(), Is.EqualTo("browse"));
+        });
     }
 
     [Test]
@@ -103,8 +113,11 @@ public sealed class JsonDeepMergeTests
         var result = JsonDeepMerge.Merge(baseJson, overrides);
         var doc = JsonDocument.Parse(result);
 
-        Assert.That(doc.RootElement.GetProperty("model").GetString(), Is.EqualTo("gpt-4"));
-        Assert.That(doc.RootElement.GetProperty("temperature").GetDouble(), Is.EqualTo(0.7));
+        Assert.Multiple(() =>
+        {
+            Assert.That(doc.RootElement.GetProperty("model").GetString(), Is.EqualTo("gpt-4"));
+            Assert.That(doc.RootElement.GetProperty("temperature").GetDouble(), Is.EqualTo(0.7));
+        });
     }
 
     [Test]
@@ -128,10 +141,13 @@ public sealed class JsonDeepMergeTests
         var result = JsonDeepMerge.Merge(baseJson, overrides);
         var doc = JsonDocument.Parse(result);
 
-        Assert.That(doc.RootElement.GetProperty("model").GetString(), Is.EqualTo("gpt-4"));
-        Assert.That(doc.RootElement.GetProperty("temperature").GetDouble(), Is.EqualTo(0.5));
-        Assert.That(doc.RootElement.GetProperty("top_p").GetDouble(), Is.EqualTo(0.9));
-        Assert.That(doc.RootElement.GetProperty("stream").GetBoolean(), Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(doc.RootElement.GetProperty("model").GetString(), Is.EqualTo("gpt-4"));
+            Assert.That(doc.RootElement.GetProperty("temperature").GetDouble(), Is.EqualTo(0.5));
+            Assert.That(doc.RootElement.GetProperty("top_p").GetDouble(), Is.EqualTo(0.9));
+            Assert.That(doc.RootElement.GetProperty("stream").GetBoolean(), Is.True);
+        });
     }
 
     [Test]
@@ -144,9 +160,12 @@ public sealed class JsonDeepMergeTests
         var doc = JsonDocument.Parse(result);
 
         var b = doc.RootElement.GetProperty("a").GetProperty("b");
-        Assert.That(b.GetProperty("c").GetString(), Is.EqualTo("overridden"));
-        Assert.That(b.GetProperty("d").GetInt32(), Is.EqualTo(1));
-        Assert.That(b.GetProperty("e").GetInt32(), Is.EqualTo(2));
+        Assert.Multiple(() =>
+        {
+            Assert.That(b.GetProperty("c").GetString(), Is.EqualTo("overridden"));
+            Assert.That(b.GetProperty("d").GetInt32(), Is.EqualTo(1));
+            Assert.That(b.GetProperty("e").GetInt32(), Is.EqualTo(2));
+        });
     }
 
     [Test]
@@ -183,7 +202,7 @@ public sealed class JsonDeepMergeTests
         var doc = JsonDocument.Parse(result);
 
         var props = doc.RootElement.EnumerateObject().Select(p => p.Name).ToList();
-        Assert.That(props, Is.EqualTo(new[] { "a", "b", "c" }));
+        Assert.That(props, Is.EqualTo(ExpectedPropertyOrder));
     }
 
     [Test]
@@ -226,11 +245,14 @@ public sealed class JsonDeepMergeTests
         var result = JsonDeepMerge.Merge(baseJson, overrides);
         var doc = JsonDocument.Parse(result);
 
-        Assert.That(doc.RootElement.GetProperty("model").GetString(), Is.EqualTo("gpt-5"));
-        Assert.That(doc.RootElement.GetProperty("max_output_tokens").GetInt32(), Is.EqualTo(1000));
-        Assert.That(doc.RootElement.GetProperty("text").GetProperty("verbosity").GetString(), Is.EqualTo("high"));
-        Assert.That(doc.RootElement.GetProperty("reasoning").GetProperty("effort").GetString(), Is.EqualTo("low"));
-        Assert.That(doc.RootElement.GetProperty("reasoning").GetProperty("summary").GetString(), Is.EqualTo("auto"));
+        Assert.Multiple(() =>
+        {
+            Assert.That(doc.RootElement.GetProperty("model").GetString(), Is.EqualTo("gpt-5"));
+            Assert.That(doc.RootElement.GetProperty("max_output_tokens").GetInt32(), Is.EqualTo(1000));
+            Assert.That(doc.RootElement.GetProperty("text").GetProperty("verbosity").GetString(), Is.EqualTo("high"));
+            Assert.That(doc.RootElement.GetProperty("reasoning").GetProperty("effort").GetString(), Is.EqualTo("low"));
+            Assert.That(doc.RootElement.GetProperty("reasoning").GetProperty("summary").GetString(), Is.EqualTo("auto"));
+        });
 
         var input = doc.RootElement.GetProperty("input");
         Assert.That(input.GetArrayLength(), Is.EqualTo(1));
@@ -246,8 +268,11 @@ public sealed class JsonDeepMergeTests
         var doc = JsonDocument.Parse(result);
 
         var config = doc.RootElement.GetProperty("config");
-        Assert.That(config.GetProperty("timeout").GetInt32(), Is.EqualTo(30));
-        Assert.That(config.GetProperty("retries").GetInt32(), Is.EqualTo(3));
+        Assert.Multiple(() =>
+        {
+            Assert.That(config.GetProperty("timeout").GetInt32(), Is.EqualTo(30));
+            Assert.That(config.GetProperty("retries").GetInt32(), Is.EqualTo(3));
+        });
     }
 
     [Test]
