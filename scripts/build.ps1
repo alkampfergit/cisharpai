@@ -1,6 +1,7 @@
 param(
     [string] $nugetApiKey = "",
     [bool]   $nugetPublish = $false,
+    [string] $buildCounter = "",
     [switch] $skiptest
 )
 
@@ -52,6 +53,14 @@ $assemblyVer = $version.AssemblySemVer
 $assemblyFileVersion = $version.AssemblySemFileVer
 $nugetPackageVersion = $version.SemVer
 $assemblyInformationalVersion = $version.InformationalVersion
+
+# Append build counter to prerelease versions to ensure uniqueness per CI run.
+# Stable versions (no prerelease label) are left unchanged.
+if (-not [string]::IsNullOrEmpty($buildCounter) -and $nugetPackageVersion -match '-') {
+    $nugetPackageVersion = "$nugetPackageVersion.$buildCounter"
+    $assemblyInformationalVersion = "$assemblyInformationalVersion.build.$buildCounter"
+    Write-Host "Build counter appended: $buildCounter"
+}
 
 Write-Host ""
 Write-Host "assemblyVer                    = $assemblyVer"
