@@ -45,7 +45,7 @@ jobs:
 
       - name: Run build script
         shell: pwsh
-        run: ./scripts/build.ps1
+        run: ./scripts/build.ps1 -buildCounter "${{ github.run_number }}"
 
       - name: Run integration tests
         continue-on-error: true
