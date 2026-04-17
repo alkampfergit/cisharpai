@@ -2,7 +2,8 @@ param(
     [string] $nugetApiKey = "",
     [bool]   $nugetPublish = $false,
     [string] $buildCounter = "",
-    [switch] $skiptest
+    [switch] $skiptest,
+    [switch] $runIntegrationTests
 )
 
 # Halt on any error
@@ -113,6 +114,31 @@ if (-not $skiptest) {
         }
 
         Write-Host "Tests completed for framework: $tfm"
+    }
+
+    if ($runIntegrationTests) {
+        Write-Host "`n`n*******************RUNNING INTEGRATION TESTS*******************"
+        $integrationProj = "$rootDirectory/src/Cisharpai.Integration.Tests/Cisharpai.Integration.Tests.csproj"
+        $integrationTfm = "net10.0"
+        $resultsDir = "$testResultsDir/$integrationTfm"
+        New-Item -ItemType Directory -Force -Path $resultsDir | Out-Null
+
+        $projName = [System.IO.Path]::GetFileNameWithoutExtension($integrationProj)
+        Write-Host "Running integration tests for project: $projName ($integrationTfm)"
+
+        dotnet test $integrationProj `
+            --configuration Release `
+            --no-build `
+            -f $integrationTfm `
+            --logger "trx;LogFilePrefix=$projName-$integrationTfm" `
+            --results-directory $resultsDir
+
+        if ($LASTEXITCODE -ne 0) { throw "Integration tests failed for $projName ($integrationTfm)." }
+
+        Write-Host "Integration tests completed."
+    }
+    else {
+        Write-Host "`nSkipping integration tests (pass -runIntegrationTests to enable)"
     }
 }
 else {

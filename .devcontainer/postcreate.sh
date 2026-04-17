@@ -25,6 +25,14 @@ bash .devcontainer/setup-git-aliases.sh
 echo "Installing Claude Code CLI..."
 curl -fsSL https://claude.ai/install.sh | bash || true
 
+# Install CLI tools distributed via npm
+if command -v npm >/dev/null 2>&1; then
+    echo "Installing OpenAI Codex..."
+    npm install -g @openai/codex || true
+else
+    echo "npm not available, skipping npm-based CLI installs."
+fi
+
 # Install beads
 echo "Installing beads..."
 curl -fsSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash || true
@@ -69,6 +77,8 @@ fi
 if command -v tokensave >/dev/null 2>&1; then
     echo "  Configuring tokensave for Claude Code..."
     tokensave install --agent claude || true
+    echo "  Configuring tokensave for Codex CLI..."
+    tokensave install --agent codex || true
     tokensave enable-upload-counter || true
     echo "  Indexing repository..."
     tokensave sync || true
@@ -119,6 +129,8 @@ if [ -n "$BREW_BIN" ]; then
     if command -v rtk >/dev/null 2>&1; then
         echo "Configuring rtk for Claude Code..."
         rtk init --global --auto-patch || true
+        echo "Configuring rtk for Codex CLI..."
+        rtk init --global --codex --auto-patch || true
     else
         echo "rtk install failed or is unavailable, skipping configuration."
     fi
