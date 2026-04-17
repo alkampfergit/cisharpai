@@ -137,3 +137,60 @@ if [ -n "$BREW_BIN" ]; then
 else
     echo "Homebrew install did not expose brew on a known path, skipping rtk."
 fi
+
+# ─────────────────────────────────────────────────────────────
+# gstack prerequisites and install
+# ─────────────────────────────────────────────────────────────
+# gstack (https://github.com/garrytan/gstack) is a set of Claude Code skills
+# that ship a Playwright-backed browser. It requires:
+#   1. bun runtime (to build and run the browse binary)
+#   2. Playwright Chromium system libs (so the downloaded browser can launch)
+#   3. The gstack repo cloned under ~/.claude/skills/gstack with ./setup run
+
+# 1. Install bun
+export BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
+if ! command -v bun >/dev/null 2>&1 && [ ! -x "$BUN_INSTALL/bin/bun" ]; then
+    echo "Installing bun..."
+    BUN_TMPFILE=$(mktemp)
+    if curl -fsSL "https://bun.sh/install" -o "$BUN_TMPFILE"; then
+        BUN_VERSION="1.3.10" bash "$BUN_TMPFILE" || true
+        rm -f "$BUN_TMPFILE"
+    else
+        echo "  bun installer download failed, skipping."
+        rm -f "$BUN_TMPFILE"
+    fi
+else
+    echo "bun already installed, skipping."
+fi
+
+# Ensure bun is on PATH for this script and future shells
+if [ -x "$BUN_INSTALL/bin/bun" ]; then
+    export PATH="$BUN_INSTALL/bin:$PATH"
+    BUN_PATH_LINE='export PATH="$HOME/.bun/bin:$PATH"'
+    append_if_missing "$BUN_PATH_LINE" "$HOME/.bashrc"
+    append_if_missing "$BUN_PATH_LINE" "$HOME/.zshrc"
+fi
+
+# 2. Install Playwright Chromium system libraries (required to launch the
+#    Chromium that gstack's browse binary downloads).
+if command -v bun >/dev/null 2>&1; then
+    echo "Installing Playwright Chromium system deps..."
+    sudo -E env "PATH=$PATH" bunx --bun playwright install-deps chromium || true
+fi
+
+# 3. Clone gstack and run its setup (idempotent: skip if already installed)
+GSTACK_DIR="$HOME/.claude/skills/gstack"
+if [ -d "$GSTACK_DIR/.git" ]; then
+    echo "gstack already cloned at $GSTACK_DIR, skipping clone."
+else
+    echo "Cloning gstack..."
+    mkdir -p "$HOME/.claude/skills"
+    git clone --single-branch --depth 1 https://github.com/garrytan/gstack.git "$GSTACK_DIR" || true
+fi
+
+if [ -x "$GSTACK_DIR/setup" ] && command -v bun >/dev/null 2>&1; then
+    echo "Running gstack setup..."
+    (cd "$GSTACK_DIR" && ./setup) || echo "gstack setup failed, continuing anyway."
+else
+    echo "gstack setup script or bun unavailable, skipping gstack setup."
+fi
