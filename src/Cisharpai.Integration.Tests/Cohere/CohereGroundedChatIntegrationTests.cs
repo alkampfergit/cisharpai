@@ -67,7 +67,8 @@ public sealed class CohereGroundedChatIntegrationTests
             Temperature: 0,
             MaxTokens: 500);
 
-        var options = new GroundedChatOptions(Documents: documents);
+        // command-a-03-2025 only supports Fast/Off citation modes.
+        var options = new GroundedChatOptions(Documents: documents, CitationMode: CitationMode.Fast);
 
         var response = await groundedFeature.GetGroundedChatCompletionAsync(request, options);
 
@@ -100,7 +101,8 @@ public sealed class CohereGroundedChatIntegrationTests
             Temperature: 0,
             MaxTokens: 500);
 
-        var options = new GroundedChatOptions(Documents: documents);
+        // command-a-03-2025 only supports Fast/Off citation modes.
+        var options = new GroundedChatOptions(Documents: documents, CitationMode: CitationMode.Fast);
 
         var response = await groundedFeature.GetGroundedChatCompletionAsync(request, options);
 
@@ -133,9 +135,10 @@ public sealed class CohereGroundedChatIntegrationTests
             Temperature: 0,
             MaxTokens: 500);
 
+        // command-a-03-2025 only supports Fast/Off citation modes; Fast still returns offsets.
         var options = new GroundedChatOptions(
             Documents: documents,
-            CitationMode: CitationMode.Accurate);
+            CitationMode: CitationMode.Fast);
 
         var response = await groundedFeature.GetGroundedChatCompletionAsync(request, options);
 
