@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.Tests.Core;
 
@@ -257,6 +258,47 @@ public sealed class LlmHttpClientStreamTests
         {
             Assert.That(results, Has.Count.GreaterThanOrEqualTo(1));
             Assert.That(ex, Is.Not.Null);
+        });
+    }
+
+    [Test]
+    public async Task PostStreamAsync_LogsEachChunk_WithStructuredProperties()
+    {
+        var logger = new TestLogger<LlmHttpClient>();
+        const string sseContent = """
+            data: {"content":"Hello"}
+
+            data: {"content":" world"}
+
+            data: [DONE]
+            """;
+
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(CreateSseResponse(sseContent)));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://test.com/") };
+        var client = new LlmHttpClient(httpClient, logger: logger);
+
+        var results = new List<string>();
+        await foreach (var chunk in client.PostStreamAsync<object>("api/test", new { Name = "test" }))
+        {
+            results.Add(chunk);
+        }
+
+        Assert.That(results, Has.Count.EqualTo(2));
+        Assert.That(logger.Entries, Has.Count.EqualTo(5));
+
+        var startLog = logger.Entries[0];
+        var firstChunkLog = logger.Entries[2];
+        var completionLog = logger.Entries[4];
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(startLog.Properties["RequestUri"], Is.EqualTo("https://test.com/api/test"));
+            Assert.That(firstChunkLog.Properties["ChunkIndex"], Is.EqualTo(1));
+            Assert.That(firstChunkLog.Properties["ResponseChunk"], Is.EqualTo("{\"content\":\"Hello\"}"));
+            Assert.That(completionLog.Properties["ChunkCount"], Is.EqualTo(2));
+            Assert.That(completionLog.Properties["CompletionKind"], Is.EqualTo("done"));
         });
     }
 }

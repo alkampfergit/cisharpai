@@ -1,5 +1,6 @@
 using Cisharpai;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.OpenAi;
 
@@ -24,7 +25,8 @@ public static class OpenAiServiceCollectionExtensions
         services.AddTransient(sp =>
             new OpenAiChatCompletionClient(
                 sp.GetRequiredService<IHttpClientFactory>().CreateClient(typeof(OpenAiChatCompletionClient).Name),
-                options));
+                options,
+                sp.GetService<ILoggerFactory>()));
 
         services.AddSingleton<IChatCompletionClient>(sp =>
             sp.GetRequiredService<OpenAiChatCompletionClient>());
@@ -51,7 +53,8 @@ public static class OpenAiServiceCollectionExtensions
         services.AddTransient(sp =>
             new OpenAiEmbeddingClient(
                 sp.GetRequiredService<IHttpClientFactory>().CreateClient(typeof(OpenAiEmbeddingClient).Name),
-                options));
+                options,
+                sp.GetService<ILoggerFactory>()));
 
         services.AddSingleton<IEmbeddingClient>(sp =>
             sp.GetRequiredService<OpenAiEmbeddingClient>());
@@ -81,7 +84,8 @@ public static class OpenAiServiceCollectionExtensions
         services.AddKeyedTransient<OpenAiChatCompletionClient>(key, (sp, _) =>
             new OpenAiChatCompletionClient(
                 sp.GetRequiredService<IHttpClientFactory>().CreateClient(clientName),
-                options));
+                options,
+                sp.GetService<ILoggerFactory>()));
 
         services.AddKeyedSingleton<IChatCompletionClient>(key, (sp, k) =>
             sp.GetRequiredKeyedService<OpenAiChatCompletionClient>(k));
@@ -111,7 +115,8 @@ public static class OpenAiServiceCollectionExtensions
         services.AddKeyedTransient<OpenAiEmbeddingClient>(key, (sp, _) =>
             new OpenAiEmbeddingClient(
                 sp.GetRequiredService<IHttpClientFactory>().CreateClient(clientName),
-                options));
+                options,
+                sp.GetService<ILoggerFactory>()));
 
         services.AddKeyedSingleton<IEmbeddingClient>(key, (sp, k) =>
             sp.GetRequiredKeyedService<OpenAiEmbeddingClient>(k));

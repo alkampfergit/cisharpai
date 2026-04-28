@@ -2,6 +2,7 @@ using Cisharpai.Features;
 using Cisharpai.Helpers;
 using Cisharpai.Models;
 using Cisharpai.OpenAi.Models;
+using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.OpenAi;
 
@@ -14,9 +15,9 @@ public sealed class OpenAiEmbeddingClient : IEmbeddingClient
 
     public IFeatureCollection Features { get; } = new FeatureCollection();
 
-    public OpenAiEmbeddingClient(HttpClient httpClient, OpenAiClientOptions options)
+    public OpenAiEmbeddingClient(HttpClient httpClient, OpenAiClientOptions options, ILoggerFactory? loggerFactory = null)
     {
-        _client = new LlmHttpClient(httpClient);
+        _client = new LlmHttpClient(httpClient, logger: loggerFactory?.CreateLogger<LlmHttpClient>());
         _options = options;
     }
 

@@ -2,6 +2,7 @@ using Azure.Core;
 using Cisharpai.Azure.AzureAiInference;
 using Cisharpai.Azure.Common;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.Azure;
 
@@ -35,7 +36,8 @@ public static class AzureAiInferenceServiceCollectionExtensions
         services.AddTransient(sp =>
             new AzureAiInferenceChatCompletionClient(
                 sp.GetRequiredService<IHttpClientFactory>().CreateClient(typeof(AzureAiInferenceChatCompletionClient).Name),
-                options));
+                options,
+                sp.GetService<ILoggerFactory>()));
 
         services.AddSingleton<IChatCompletionClient>(sp =>
             sp.GetRequiredService<AzureAiInferenceChatCompletionClient>());
@@ -71,7 +73,8 @@ public static class AzureAiInferenceServiceCollectionExtensions
         services.AddTransient(sp =>
             new AzureAiInferenceEmbeddingClient(
                 sp.GetRequiredService<IHttpClientFactory>().CreateClient(typeof(AzureAiInferenceEmbeddingClient).Name),
-                options));
+                options,
+                sp.GetService<ILoggerFactory>()));
 
         services.AddSingleton<IEmbeddingClient>(sp =>
             sp.GetRequiredService<AzureAiInferenceEmbeddingClient>());
@@ -103,7 +106,8 @@ public static class AzureAiInferenceServiceCollectionExtensions
         services.AddKeyedTransient<AzureAiInferenceChatCompletionClient>(key, (sp, _) =>
             new AzureAiInferenceChatCompletionClient(
                 sp.GetRequiredService<IHttpClientFactory>().CreateClient(clientName),
-                options));
+                options,
+                sp.GetService<ILoggerFactory>()));
 
         services.AddKeyedSingleton<IChatCompletionClient>(key, (sp, k) =>
             sp.GetRequiredKeyedService<AzureAiInferenceChatCompletionClient>(k));
@@ -135,7 +139,8 @@ public static class AzureAiInferenceServiceCollectionExtensions
         services.AddKeyedTransient<AzureAiInferenceEmbeddingClient>(key, (sp, _) =>
             new AzureAiInferenceEmbeddingClient(
                 sp.GetRequiredService<IHttpClientFactory>().CreateClient(clientName),
-                options));
+                options,
+                sp.GetService<ILoggerFactory>()));
 
         services.AddKeyedSingleton<IEmbeddingClient>(key, (sp, k) =>
             sp.GetRequiredKeyedService<AzureAiInferenceEmbeddingClient>(k));

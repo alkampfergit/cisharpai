@@ -3,6 +3,7 @@ using Cisharpai.Features;
 using Cisharpai.Features.Embeddings;
 using Cisharpai.Models;
 using Cisharpai.Azure.AzureAiInference.Models;
+using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.Azure.AzureAiInference;
 
@@ -19,9 +20,10 @@ public sealed class AzureAiInferenceEmbeddingClient : IEmbeddingClient, IImageEm
 
     public AzureAiInferenceEmbeddingClient(
         HttpClient httpClient,
-        AzureAiInferenceClientOptions options)
+        AzureAiInferenceClientOptions options,
+        ILoggerFactory? loggerFactory = null)
     {
-        _client = new LlmHttpClient(httpClient);
+        _client = new LlmHttpClient(httpClient, logger: loggerFactory?.CreateLogger<LlmHttpClient>());
         _options = options;
 
         var features = new FeatureCollection();

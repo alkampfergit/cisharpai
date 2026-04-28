@@ -62,6 +62,7 @@ Start here:
 ## Samples
 
 - Interactive console demo: [src/Cisharp.Console/](src/Cisharp.Console/) -- covers all providers and features
+- Logging: every HTTP call emits structured `ILogger` entries (EventIds 1000–1005). Wire any sink via `ILoggerFactory` -- see [wiki/logging.md](wiki/logging.md).
 
 ## Building Locally
 

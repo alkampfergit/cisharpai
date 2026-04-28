@@ -1,5 +1,6 @@
 using Cisharpai;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.Cohere;
 
@@ -24,7 +25,8 @@ public static class CohereServiceCollectionExtensions
         services.AddTransient(sp =>
             new CohereEmbeddingClient(
                 sp.GetRequiredService<IHttpClientFactory>().CreateClient(typeof(CohereEmbeddingClient).Name),
-                options));
+                options,
+                sp.GetService<ILoggerFactory>()));
 
         services.AddSingleton<IEmbeddingClient>(sp =>
             sp.GetRequiredService<CohereEmbeddingClient>());
@@ -51,7 +53,8 @@ public static class CohereServiceCollectionExtensions
         services.AddTransient(sp =>
             new CohereChatCompletionClient(
                 sp.GetRequiredService<IHttpClientFactory>().CreateClient(typeof(CohereChatCompletionClient).Name),
-                options));
+                options,
+                sp.GetService<ILoggerFactory>()));
 
         services.AddSingleton<IChatCompletionClient>(sp =>
             sp.GetRequiredService<CohereChatCompletionClient>());
@@ -81,7 +84,8 @@ public static class CohereServiceCollectionExtensions
         services.AddKeyedTransient<CohereEmbeddingClient>(key, (sp, _) =>
             new CohereEmbeddingClient(
                 sp.GetRequiredService<IHttpClientFactory>().CreateClient(clientName),
-                options));
+                options,
+                sp.GetService<ILoggerFactory>()));
 
         services.AddKeyedSingleton<IEmbeddingClient>(key, (sp, k) =>
             sp.GetRequiredKeyedService<CohereEmbeddingClient>(k));
@@ -111,7 +115,8 @@ public static class CohereServiceCollectionExtensions
         services.AddKeyedTransient<CohereChatCompletionClient>(key, (sp, _) =>
             new CohereChatCompletionClient(
                 sp.GetRequiredService<IHttpClientFactory>().CreateClient(clientName),
-                options));
+                options,
+                sp.GetService<ILoggerFactory>()));
 
         services.AddKeyedSingleton<IChatCompletionClient>(key, (sp, k) =>
             sp.GetRequiredKeyedService<CohereChatCompletionClient>(k));

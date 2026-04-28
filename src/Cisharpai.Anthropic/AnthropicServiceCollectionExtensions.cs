@@ -1,5 +1,6 @@
 using Cisharpai;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.Anthropic;
 
@@ -23,7 +24,8 @@ public static class AnthropicServiceCollectionExtensions
         services.AddTransient(sp =>
             new AnthropicChatCompletionClient(
                 sp.GetRequiredService<IHttpClientFactory>().CreateClient(typeof(AnthropicChatCompletionClient).Name),
-                options));
+                options,
+                sp.GetService<ILoggerFactory>()));
 
         services.AddSingleton<IChatCompletionClient>(sp =>
             sp.GetRequiredService<AnthropicChatCompletionClient>());
@@ -52,7 +54,8 @@ public static class AnthropicServiceCollectionExtensions
         services.AddKeyedTransient<AnthropicChatCompletionClient>(key, (sp, _) =>
             new AnthropicChatCompletionClient(
                 sp.GetRequiredService<IHttpClientFactory>().CreateClient(clientName),
-                options));
+                options,
+                sp.GetService<ILoggerFactory>()));
 
         services.AddKeyedSingleton<IChatCompletionClient>(key, (sp, k) =>
             sp.GetRequiredKeyedService<AnthropicChatCompletionClient>(k));

@@ -2,6 +2,7 @@ using Azure.Core;
 using Cisharpai.Azure.AzureOpenAi;
 using Cisharpai.Azure.Common;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.Azure;
 
@@ -35,7 +36,8 @@ public static class AzureOpenAiServiceCollectionExtensions
         services.AddTransient(sp =>
             new AzureOpenAiChatCompletionClient(
                 sp.GetRequiredService<IHttpClientFactory>().CreateClient(typeof(AzureOpenAiChatCompletionClient).Name),
-                options));
+                options,
+                sp.GetService<ILoggerFactory>()));
 
         services.AddSingleton<IChatCompletionClient>(sp =>
             sp.GetRequiredService<AzureOpenAiChatCompletionClient>());
@@ -71,7 +73,8 @@ public static class AzureOpenAiServiceCollectionExtensions
         services.AddTransient(sp =>
             new AzureOpenAiEmbeddingClient(
                 sp.GetRequiredService<IHttpClientFactory>().CreateClient(typeof(AzureOpenAiEmbeddingClient).Name),
-                options));
+                options,
+                sp.GetService<ILoggerFactory>()));
 
         services.AddSingleton<IEmbeddingClient>(sp =>
             sp.GetRequiredService<AzureOpenAiEmbeddingClient>());
@@ -103,7 +106,8 @@ public static class AzureOpenAiServiceCollectionExtensions
         services.AddKeyedTransient<AzureOpenAiChatCompletionClient>(key, (sp, _) =>
             new AzureOpenAiChatCompletionClient(
                 sp.GetRequiredService<IHttpClientFactory>().CreateClient(clientName),
-                options));
+                options,
+                sp.GetService<ILoggerFactory>()));
 
         services.AddKeyedSingleton<IChatCompletionClient>(key, (sp, k) =>
             sp.GetRequiredKeyedService<AzureOpenAiChatCompletionClient>(k));
@@ -135,7 +139,8 @@ public static class AzureOpenAiServiceCollectionExtensions
         services.AddKeyedTransient<AzureOpenAiEmbeddingClient>(key, (sp, _) =>
             new AzureOpenAiEmbeddingClient(
                 sp.GetRequiredService<IHttpClientFactory>().CreateClient(clientName),
-                options));
+                options,
+                sp.GetService<ILoggerFactory>()));
 
         services.AddKeyedSingleton<IEmbeddingClient>(key, (sp, k) =>
             sp.GetRequiredKeyedService<AzureOpenAiEmbeddingClient>(k));

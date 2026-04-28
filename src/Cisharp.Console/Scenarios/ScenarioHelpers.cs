@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Cisharp.Console.Scenarios;
 
@@ -7,7 +8,14 @@ internal static class ScenarioHelpers
     public static ServiceCollection CreateServiceCollection()
     {
         var services = new ServiceCollection();
-        services.AddLogging();
+        services.AddLogging(builder =>
+        {
+            builder.AddSimpleConsole(options =>
+            {
+                options.SingleLine = true;
+                options.TimestampFormat = "HH:mm:ss ";
+            });
+        });
         return services;
     }
 

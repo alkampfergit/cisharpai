@@ -56,7 +56,8 @@ Contains the abstractions and shared logic. This is the only dependency needed f
     *   **`ChatCompletionChunk.cs`**: Streaming chunk model with `Content`, `FinishReason`, `Model`, `PromptTokens`, `CompletionTokens`, `ToolCallDelta`. `ToolCallDelta` has `Index`, `Id`, `FunctionName`, `ArgumentsDelta` for streaming tool calls.
 *   **`JsonDeepMerge.cs`**: Static utility for deeply merging a JSON override document into a base JSON document. Objects are merged recursively; arrays and scalars are replaced by overrides.
 *   **`ImageDataUriHelper.cs`**: Public static utility for converting image file paths to data URI format (`data:image/{mime};base64,...`). Supports PNG, JPEG, WebP, GIF. Used by OpenAI/Azure providers for vision.
-*   **`LlmHttpClient.cs`**: Internal helper for handling HTTP requests to the providers. Supports optional `extraParameters` (`JsonElement?`) that are deeply merged into the serialized request payload before sending. `PostWithRawAsync` returns both raw response JSON and raw request JSON for debug inspection. `PostStreamAsync<TRequest>` supports SSE streaming (handles `data:` prefix, `[DONE]` termination, ignores `event:` lines, works with both `[DONE]`-terminated and naturally-ending streams).
+*   **`LlmHttpClient.cs`**: Internal helper for handling HTTP requests to the providers. Supports optional `extraParameters` (`JsonElement?`) that are deeply merged into the serialized request payload before sending. `PostWithRawAsync` returns both raw response JSON and raw request JSON for debug inspection. `PostStreamAsync<TRequest>` supports SSE streaming (handles `data:` prefix, `[DONE]` termination, ignores `event:` lines, works with both `[DONE]`-terminated and naturally-ending streams). Accepts an optional `ILogger<LlmHttpClient>` (defaults to `NullLogger`) and emits structured logs via cached `LoggerMessage.Define` delegates with EventIds 1000–1005 (`RequestStarted`, `RequestCompleted`, `RequestFailed`, `StreamStarted`, `StreamChunkReceived` at Debug, `StreamCompleted`); request URIs are resolved against `HttpClient.BaseAddress` for clean structured fields. Each call is also wrapped in a `System.Diagnostics.Activity` started from `CisharpaiTelemetry.ActivitySource` when a listener is registered (zero cost otherwise) — span name is `"{method} {path}"`, kind `Client`, with OTel HTTP semantic-convention tags (`http.request.method`, `url.full`, `server.address`, `http.response.status_code`). Streaming spans add `cisharpai.stream`, `cisharpai.stream.chunks`, `cisharpai.stream.completion_kind` (`done` / `end_of_stream` / `incomplete`). Status is set to `Ok` on success and `Error` on non-2xx or thrown exceptions. All provider clients accept an optional `ILoggerFactory` and forward it; their DI extensions (`AddOpenAi*`, `AddAnthropic*`, `AddCohere*`, `AddAzure*`, including keyed overloads) inject `sp.GetService<ILoggerFactory>()` automatically.
+*   **`CisharpaiTelemetry.cs`**: Exposes `public const string ActivitySourceName = "Cisharpai"` and the internal `ActivitySource` instance. Consumers pass the constant to `OpenTelemetry`'s `AddSource(...)`, to a plain `ActivityListener.ShouldListenTo` callback, or simply ignore it — log entries still pick up `TraceId`/`SpanId` from any ambient `Activity.Current` when `ActivityTrackingOptions` is enabled on logging.
 *   **`Helpers/`**: Shared public static helper utilities that eliminate code duplication across provider implementations.
     *   `JsonOutputHelper.cs`: `EnsureJsonKeywordInSystemMessage(messages, options, suffix)` — ensures system message mentions JSON for JsonMode; `StripMarkdownCodeFences(content)` — strips ````json ... ```` fences from output. Used by all 5 chat clients.
     *   `RoleMapper.cs`: `MapRole(LlmRole)` — maps LlmRole to standard string ("system"/"user"/"assistant"/"tool"). Used by OpenAI, Azure OpenAI, Azure AI Inference, Cohere (not Anthropic, which has different mapping).
@@ -146,7 +147,7 @@ Interactive demo application showcasing all provider integrations through a scen
 *   **`Scenarios/`**: Each scenario demonstrates a specific provider/capability:
     *   `IScenario.cs`: Interface for runnable scenarios.
     *   `ScenarioRegistry.cs`: Dynamic discovery and registration of all scenarios.
-    *   `ScenarioHelpers.cs`: Shared helpers for scenario output formatting.
+    *   `ScenarioHelpers.cs`: Builds a `ServiceCollection` with `AddLogging` + `AddSimpleConsole` so that the structured `ILogger` output emitted by every provider client is visible at the console; also exposes `RequireEnv` and `GetEnv`. No telemetry exporters or OTel packages are referenced — consumers who want OpenTelemetry wire it themselves through `ILoggerFactory`.
     *   `OpenAiChatScenario.cs`: OpenAI chat completion demo.
     *   `OpenAiEmbeddingScenario.cs`: OpenAI embedding demo.
     *   `AnthropicChatScenario.cs`: Anthropic (Claude) chat completion demo.
@@ -174,6 +175,7 @@ Project documentation pages.
 *   `tool-calling.md`: Tool Calling (Function Calling) documentation (quick start, multi-turn conversation, ToolChoice options, core models, provider differences, strict mode, error handling).
 *   `vision.md`: Vision documentation (quick start, MessageContentPart types, factory methods, provider support matrix, Anthropic raw base64 note, Cohere skip behavior).
 *   `streaming.md`: Streaming documentation (quick start, ChatCompletionChunk model, content accumulation, cancellation, provider-specific SSE formats, resilience handler for long streams).
+*   `logging.md`: Structured logging guide — EventIds 1000–1005 emitted by `LlmHttpClient`, the structured property set, how to wire `ILoggerFactory` (console, Serilog, OpenTelemetry), and ambient `Activity` correlation.
 
 ### CI/CD & Build
 
@@ -200,6 +202,7 @@ Project-scoped Claude agents live in `.claude/agents/`.
 *   **`src/Cisharpai.Tests.Common/`**: Shared test utilities referenced by all test projects.
     *   `DotEnvLoader.cs`: Static utility class to load environment variables from a `.env` file. Searches current and parent directories.
     *   `TestEnvironmentVariables.cs`: Constants for environment variable names used in integration tests.
+    *   Vision integration tests (OpenAI, Anthropic) now embed a small valid PNG inline as base64 instead of generating one at runtime; the previous `PngGenerator` helper has been removed.
 *   **`src/Cisharpai.Tests/`**: Unit tests.
     *   `Features/FeatureCollectionTests.cs`: Tests for `FeatureCollection` (Get/Set/enumeration/thread-safety).
     *   `Features/FeatureDiscoveryTests.cs`: Tests verifying feature discovery across all client implementations (including IJsonOutputFeature, IGroundedChatFeature on Cohere, IToolCallingFeature on OpenAI/Azure OpenAI/Azure AI Inference/Anthropic/Cohere, IStreamingChatFeature on all 5 chat clients).
@@ -252,6 +255,10 @@ Project-scoped Claude agents live in `.claude/agents/`.
     *   `Cohere/CohereVisionTests.cs`: Tests for Cohere vision skip behavior (mixed text+image, image-only, base64, multiple text parts, normal message, WithImage factory).
     *   `Cohere/CohereStreamingTests.cs`: Tests for Cohere streaming (content-delta/message-end events, text chunks in order, finish reason, token counts, stream:true in request, feature discovery).
     *   `Core/HttpClientBuilderExtensionsTests.cs`: Tests for `AddCisharpaiResilienceHandler()` and `AddCisharpaiStreamingResilienceHandler()` extension methods.
+    *   `Core/LlmHttpClientTests.cs`: Tests for `LlmHttpClient` request/response handling, including structured-logging assertions (success path emits `RequestStarted`/`RequestCompleted` with `HttpMethod`/`RequestUri`/`RequestBody`/`StatusCode`/`ResponseBody` properties; failure path emits `RequestFailed` at Warning).
+    *   `Core/LlmHttpClientStreamTests.cs`: Tests for `PostStreamAsync` SSE handling, including a structured-logging assertion that verifies `StreamStarted`, per-chunk `StreamChunkReceived`, and `StreamCompleted` (with `done` vs `end_of_stream` `CompletionKind`).
+    *   `Core/LlmHttpClientActivityTests.cs`: Tests asserting `Cisharpai` activity emission via `ActivityListener` — `ActivitySourceName` constant, no-listener no-cost path, success span with `Ok` status and HTTP tags, failure span with `Error` status, and streaming spans with `cisharpai.stream.chunks`/`completion_kind` (`done` and `end_of_stream`).
+    *   `TestLogger.cs`: Internal `ILogger<T>` test double that captures structured `KeyValuePair<string, object?>` properties from each log entry for assertion.
     *   `Testing/FakeChatCompletionClientTests.cs`: Tests for `FakeChatCompletionClient` (queued/default responses, request capture, feature opt-out, reset, streaming, tool calling, JSON output, grounded chat).
     *   `Testing/FakeEmbeddingClientTests.cs`: Tests for `FakeEmbeddingClient` (queued/default responses, request capture, feature opt-out, image/multimodal embedding).
     *   `Testing/FakeResponsesTests.cs`: Tests for `FakeResponses` static factories (all response types, custom parameters, error responses).

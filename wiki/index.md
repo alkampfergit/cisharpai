@@ -49,6 +49,10 @@ Cisharpai is a unified .NET client library that provides shared interfaces for i
 
 - [Testing with Cisharpai](testing.md) -- fake clients, response factories, DI helpers, and testing patterns
 
+### Operations
+
+- [Logging](logging.md) -- structured ILogger output emitted by every HTTP call
+
 ### Reference
 
 - [Provider Feature Matrix](provider-features.md) -- complete feature support table

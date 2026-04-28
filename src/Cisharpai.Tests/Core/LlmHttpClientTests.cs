@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http;
 using System.Reflection;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.Tests.Core;
 
@@ -432,6 +433,67 @@ public sealed class LlmHttpClientTests
 
         Assert.ThrowsAsync<TaskCanceledException>(async () =>
             await client.PostWithRawAsync<object, JsonElement>("api/test", new { }, cancellationToken: cts.Token));
+    }
+
+    [Test]
+    public async Task PostAsync_LogsStructuredRequestAndResponse()
+    {
+        var logger = new TestLogger<LlmHttpClient>();
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("{\"value\":42}", System.Text.Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://test.com/") };
+        var client = new LlmHttpClient(httpClient, logger: logger);
+
+        await client.PostAsync<object, JsonElement>("api/test", new { Name = "test" });
+
+        Assert.That(logger.Entries, Has.Count.EqualTo(2));
+
+        var requestLog = logger.Entries[0];
+        var responseLog = logger.Entries[1];
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(requestLog.LogLevel, Is.EqualTo(LogLevel.Information));
+            Assert.That(requestLog.Properties["HttpMethod"], Is.EqualTo("POST"));
+            Assert.That(requestLog.Properties["RequestUri"], Is.EqualTo("https://test.com/api/test"));
+            Assert.That(requestLog.Properties["RequestBody"], Is.EqualTo("{\"name\":\"test\"}"));
+            Assert.That(responseLog.LogLevel, Is.EqualTo(LogLevel.Information));
+            Assert.That(responseLog.Properties["StatusCode"], Is.EqualTo(200));
+            Assert.That(responseLog.Properties["ResponseBody"], Is.EqualTo("{\"value\":42}"));
+            Assert.That(responseLog.Properties["RequestUri"], Is.EqualTo("https://test.com/api/test"));
+        });
+    }
+
+    [Test]
+    public void PostAsync_LogsStructuredFailure()
+    {
+        var logger = new TestLogger<LlmHttpClient>();
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.BadRequest)
+            {
+                Content = new StringContent("{\"error\":\"bad request\"}", System.Text.Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://test.com/") };
+        var client = new LlmHttpClient(httpClient, logger: logger);
+
+        Assert.ThrowsAsync<LlmHttpRequestException>(async () =>
+            await client.PostAsync<object, JsonElement>("api/test", new { Name = "test" }));
+
+        Assert.That(logger.Entries, Has.Count.EqualTo(2));
+
+        var failureLog = logger.Entries[1];
+        Assert.Multiple(() =>
+        {
+            Assert.That(failureLog.LogLevel, Is.EqualTo(LogLevel.Warning));
+            Assert.That(failureLog.Properties["StatusCode"], Is.EqualTo(400));
+            Assert.That(failureLog.Properties["ResponseBody"], Is.EqualTo("{\"error\":\"bad request\"}"));
+            Assert.That(failureLog.Properties["RequestUri"], Is.EqualTo("https://test.com/api/test"));
+        });
     }
 
     private sealed class TestResponse

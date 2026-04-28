@@ -16,7 +16,7 @@ public sealed class AzureOpenAiChatScenario : IScenario
     public async Task RunAsync(CancellationToken cancellationToken = default)
     {
         var endpoint = ScenarioHelpers.RequireEnv(DotEnv.AzureOpenAiEndpoint);
-        var deployment = ScenarioHelpers.RequireEnv(DotEnv.AzureOpenAiDeployment);
+        var deployment = ScenarioHelpers.RequireEnv(DotEnv.AzureOpenAiDeployments);
         var apiKey = ScenarioHelpers.RequireEnv(DotEnv.AzureOpenAiApiKey);
         var apiVersion = ScenarioHelpers.GetEnv(DotEnv.AzureOpenAiApiVersion);
 

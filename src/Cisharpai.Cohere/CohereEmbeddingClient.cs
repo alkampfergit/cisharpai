@@ -5,6 +5,7 @@ using Cisharpai.Features.Embeddings;
 using Cisharpai.Models;
 using Cisharpai.Cohere.Models;
 using Cisharpai;
+using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.Cohere;
 
@@ -17,13 +18,13 @@ public sealed class CohereEmbeddingClient : IEmbeddingClient, IImageEmbeddingFea
 
     public IFeatureCollection Features { get; }
 
-    public CohereEmbeddingClient(HttpClient httpClient, CohereClientOptions options)
+    public CohereEmbeddingClient(HttpClient httpClient, CohereClientOptions options, ILoggerFactory? loggerFactory = null)
     {
         _client = new LlmHttpClient(httpClient, new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-        });
+        }, loggerFactory?.CreateLogger<LlmHttpClient>());
         _options = options;
 
         var features = new FeatureCollection();

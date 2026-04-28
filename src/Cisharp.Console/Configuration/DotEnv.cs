@@ -10,9 +10,9 @@ public static class DotEnv
     public const string AnthropicBaseUrl = "ANTHROPIC_BASE_URL";
     public const string AnthropicApiVersion = "ANTHROPIC_API_VERSION";
 
-    public const string AzureOpenAiEndpoint = "AZURE_OPENAI_ENDPOINT";
-    public const string AzureOpenAiDeployment = "AZURE_OPENAI_DEPLOYMENT";
-    public const string AzureOpenAiApiKey = "AZURE_OPENAI_API_KEY";
+    public const string AzureOpenAiEndpoint = "AZURE_OPENAI_TEST_ENDPOINT";
+    public const string AzureOpenAiDeployments = "AZURE_OPENAI_TEST_DEPLOYMENTS";
+    public const string AzureOpenAiApiKey = "AZURE_OPENAI_TEST_API_KEY";
     public const string AzureOpenAiApiVersion = "AZURE_OPENAI_API_VERSION";
 
     public const string CohereApiKey = "COHERE_API_KEY";

@@ -5,6 +5,7 @@ using Cisharpai.Features.Chat;
 using Cisharpai.Helpers;
 using Cisharpai.Models;
 using Cisharpai.Anthropic.Models;
+using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.Anthropic;
 
@@ -22,9 +23,9 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
 
     public IFeatureCollection Features { get; }
 
-    public AnthropicChatCompletionClient(HttpClient httpClient, AnthropicClientOptions options)
+    public AnthropicChatCompletionClient(HttpClient httpClient, AnthropicClientOptions options, ILoggerFactory? loggerFactory = null)
     {
-        _client = new LlmHttpClient(httpClient);
+        _client = new LlmHttpClient(httpClient, logger: loggerFactory?.CreateLogger<LlmHttpClient>());
         _options = options;
 
         var features = new FeatureCollection();

@@ -5,6 +5,7 @@ using Cisharpai.Features.Chat;
 using Cisharpai.Helpers;
 using Cisharpai.Models;
 using Cisharpai.Azure.AzureOpenAi.Models;
+using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.Azure.AzureOpenAi;
 
@@ -26,9 +27,10 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
 
     public AzureOpenAiChatCompletionClient(
         HttpClient httpClient,
-        AzureOpenAiClientOptions options)
+        AzureOpenAiClientOptions options,
+        ILoggerFactory? loggerFactory = null)
     {
-        _client = new LlmHttpClient(httpClient);
+        _client = new LlmHttpClient(httpClient, logger: loggerFactory?.CreateLogger<LlmHttpClient>());
         _options = options;
 
         var features = new FeatureCollection();

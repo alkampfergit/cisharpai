@@ -2,6 +2,7 @@ using Cisharpai.Features;
 using Cisharpai.Helpers;
 using Cisharpai.Models;
 using Cisharpai.Azure.AzureOpenAi.Models;
+using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.Azure.AzureOpenAi;
 
@@ -18,9 +19,10 @@ public sealed class AzureOpenAiEmbeddingClient : IEmbeddingClient
 
     public AzureOpenAiEmbeddingClient(
         HttpClient httpClient,
-        AzureOpenAiClientOptions options)
+        AzureOpenAiClientOptions options,
+        ILoggerFactory? loggerFactory = null)
     {
-        _client = new LlmHttpClient(httpClient);
+        _client = new LlmHttpClient(httpClient, logger: loggerFactory?.CreateLogger<LlmHttpClient>());
         _options = options;
     }
 
