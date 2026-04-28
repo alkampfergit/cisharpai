@@ -1,14 +1,14 @@
 using Cisharpai.Models;
 using Cisharpai.OpenAi;
+using Cisharpai.Tests.Common;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Cisharpai.Integration.Tests.OpenAi;
 
 public sealed class OpenAiVisionIntegrationTests
 {
-    // Minimal 64x64 solid red PNG (generated programmatically, not a checked-in binary)
-    // This is a tiny but valid PNG with a red 4x4 image in RGBA format
-    private static readonly byte[] RedPngBytes = CreateMinimalRedPng();
+    // OpenAI rejects tiny images, so keep this generated fixture large enough for provider validation.
+    private static readonly byte[] RedPngBytes = PngGenerator.CreateSolidColorPng(16, 16, 255, 0, 0);
 
     [OneTimeSetUp]
     public void LoadEnvironment()
@@ -86,16 +86,5 @@ public sealed class OpenAiVisionIntegrationTests
             if (File.Exists(tempPath))
                 File.Delete(tempPath);
         }
-    }
-
-    /// <summary>
-    /// Creates a minimal valid PNG: a 4x4 solid red image.
-    /// </summary>
-    private static byte[] CreateMinimalRedPng()
-    {
-        // This is a pre-computed minimal valid PNG (4x4 red image)
-        // Generated from Python: img = Image.new('RGB', (4,4), color=(255,0,0)); img.save(...)
-        return Convert.FromBase64String(
-            "iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAADklEQVQI12P4z8BQDwAEgAF/QualIQAAAABJRU5ErkJggg==");
     }
 }

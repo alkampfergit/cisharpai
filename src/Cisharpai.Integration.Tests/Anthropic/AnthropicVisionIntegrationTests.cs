@@ -1,14 +1,14 @@
 using Cisharpai.Models;
 using Cisharpai.Anthropic;
+using Cisharpai.Tests.Common;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Cisharpai.Integration.Tests.Anthropic;
 
 public sealed class AnthropicVisionIntegrationTests
 {
-    // Minimal valid PNG: a 4x4 solid red image
-    private static readonly byte[] RedPngBytes = Convert.FromBase64String(
-        "iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAADklEQVQI12P4z8BQDwAEgAF/QualIQAAAABJRU5ErkJggg==");
+    // Anthropic rejects tiny images, so keep this generated fixture large enough for provider validation.
+    private static readonly byte[] RedPngBytes = PngGenerator.CreateSolidColorPng(16, 16, 255, 0, 0);
 
     [OneTimeSetUp]
     public void LoadEnvironment()
