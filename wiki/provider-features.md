@@ -32,8 +32,11 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Tool Calling | Yes | Yes | Yes | Yes | Yes |
 | Vision (Image Input) | Yes | Yes | Yes | Yes | Partial* |
 | Streaming | Yes | Yes | Yes | Yes | Yes |
+| Logging & Tracing | Yes | Yes | Yes | Yes | Yes |
 
 \* Cohere Vision: image content parts are silently skipped (only text extracted). Cohere chat API does not support visual inputs.
+
+**Logging & Tracing:** every provider client routes through `LlmHttpClient`, which emits structured `ILogger` entries (EventIds 1000–1005) and `System.Diagnostics.Activity` spans from the `Cisharpai` source (constant: `Cisharpai.CisharpaiTelemetry.ActivitySourceName`). See [Logging](logging.md) for the property/tag set and subscription options.
 
 ## Provider Details
 

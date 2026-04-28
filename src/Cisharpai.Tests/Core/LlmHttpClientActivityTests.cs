@@ -175,4 +175,76 @@ public sealed class LlmHttpClientActivityTests
         Assert.That(spans[0].GetTagItem("cisharpai.stream.chunks"), Is.EqualTo(1));
         Assert.That(spans[0].Status, Is.EqualTo(ActivityStatusCode.Ok));
     }
+
+    [Test]
+    public async Task PostStreamAsync_Caller_Breaks_Early_Sets_Error_Status_With_Incomplete_Kind()
+    {
+        var spans = new List<Activity>();
+        using var listener = CreateListener(spans);
+
+        // Three chunks plus [DONE]; the consumer will break after the first.
+        const string sseContent = """
+            data: {"content":"a"}
+
+            data: {"content":"b"}
+
+            data: {"content":"c"}
+
+            data: [DONE]
+            """;
+        var bytes = Encoding.UTF8.GetBytes(sseContent);
+
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StreamContent(new MemoryStream(bytes))
+            }));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://test.com/") };
+        var client = new LlmHttpClient(httpClient);
+
+        await foreach (var _ in client.PostStreamAsync<object>("api/stream", new { Name = "x" }))
+        {
+            break; // consumer abandons the stream
+        }
+
+        Assert.That(spans, Has.Count.EqualTo(1));
+        Assert.Multiple(() =>
+        {
+            Assert.That(spans[0].GetTagItem("cisharpai.stream.completion_kind"), Is.EqualTo("incomplete"));
+            Assert.That(spans[0].Status, Is.EqualTo(ActivityStatusCode.Error));
+            Assert.That(spans[0].GetTagItem("cisharpai.stream.chunks"), Is.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public void PostStreamAsync_Failure_Response_Emits_Error_Span()
+    {
+        var spans = new List<Activity>();
+        using var listener = CreateListener(spans);
+
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.Unauthorized)
+            {
+                Content = new StringContent("{\"error\":\"unauthorized\"}", Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://test.com/") };
+        var client = new LlmHttpClient(httpClient);
+
+        Assert.ThrowsAsync<LlmHttpRequestException>(async () =>
+        {
+            await foreach (var _ in client.PostStreamAsync<object>("api/stream", new { Name = "x" }))
+            {
+            }
+        });
+
+        Assert.That(spans, Has.Count.EqualTo(1));
+        Assert.Multiple(() =>
+        {
+            Assert.That(spans[0].Status, Is.EqualTo(ActivityStatusCode.Error));
+            Assert.That(spans[0].GetTagItem("http.response.status_code"), Is.EqualTo(401));
+            Assert.That(spans[0].GetTagItem("cisharpai.stream.completion_kind"), Is.EqualTo("incomplete"));
+        });
+    }
 }

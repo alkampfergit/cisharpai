@@ -279,8 +279,12 @@ public sealed class LlmHttpClient
             {
                 activity.SetTag("cisharpai.stream.chunks", chunkCount);
                 activity.SetTag("cisharpai.stream.completion_kind", completionKind);
-                if (activity.Status == ActivityStatusCode.Unset && completionKind != "incomplete")
-                    activity.SetStatus(ActivityStatusCode.Ok);
+                if (activity.Status == ActivityStatusCode.Unset)
+                {
+                    activity.SetStatus(completionKind == "incomplete"
+                        ? ActivityStatusCode.Error
+                        : ActivityStatusCode.Ok);
+                }
             }
             response?.Dispose();
         }
