@@ -115,8 +115,11 @@ public sealed class AzureOpenAiChatCompletionIntegrationTests
         Assert.That(response.IsSuccess, Is.False, response.RawResponseJson);
         if (response.Status is "length")
         {
-            Assert.That(response.IncompleteReason, Is.EqualTo("length"), response.RawResponseJson);
-            Assert.That(response.ErrorMessage, Does.Contain("finish_reason"));
+            Assert.Multiple(() =>
+            {
+                Assert.That(response.IncompleteReason, Is.EqualTo("length"), response.RawResponseJson);
+                Assert.That(response.ErrorMessage, Does.Contain("finish_reason"));
+            });
         }
         else
         {
@@ -130,10 +133,13 @@ public sealed class AzureOpenAiChatCompletionIntegrationTests
         var endpoint = Environment.GetEnvironmentVariable(DotEnv.AzureOpenAiTestEndpoint);
         var apiKey = Environment.GetEnvironmentVariable(DotEnv.AzureOpenAiTestApiKey);
 
-        Assert.That(endpoint, Is.Not.Null.And.Not.Empty,
-            $"Environment variable {DotEnv.AzureOpenAiTestEndpoint} must be set.");
-        Assert.That(apiKey, Is.Not.Null.And.Not.Empty,
-            $"Environment variable {DotEnv.AzureOpenAiTestApiKey} must be set.");
+        Assert.Multiple(() =>
+        {
+            Assert.That(endpoint, Is.Not.Null.And.Not.Empty,
+                $"Environment variable {DotEnv.AzureOpenAiTestEndpoint} must be set.");
+            Assert.That(apiKey, Is.Not.Null.And.Not.Empty,
+                $"Environment variable {DotEnv.AzureOpenAiTestApiKey} must be set.");
+        });
 
         var services = new ServiceCollection();
         services.AddHttpClient();
@@ -158,11 +164,14 @@ public sealed class AzureOpenAiChatCompletionIntegrationTests
 
         var response = await client.GetChatCompletionAsync(request);
 
-        Assert.That(response, Is.Not.Null);
-        Assert.That(response.IsSuccess, Is.True, $"Request failed: {response.ErrorMessage}\nRaw: {response.RawResponseJson}");
-        Assert.That(response.Content, Is.Not.Null.And.Not.Empty);
-        Assert.That(response.PromptTokens, Is.GreaterThan(0));
-        Assert.That(response.CompletionTokens, Is.GreaterThan(0));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response, Is.Not.Null);
+            Assert.That(response.IsSuccess, Is.True, $"Request failed: {response.ErrorMessage}\nRaw: {response.RawResponseJson}");
+            Assert.That(response.Content, Is.Not.Null.And.Not.Empty);
+            Assert.That(response.PromptTokens, Is.GreaterThan(0));
+            Assert.That(response.CompletionTokens, Is.GreaterThan(0));
+        });
     }
 
     [TestCaseSource(nameof(Deployments))]
@@ -174,10 +183,13 @@ public sealed class AzureOpenAiChatCompletionIntegrationTests
         var endpoint = Environment.GetEnvironmentVariable(DotEnv.AzureOpenAiTestEndpoint);
         var apiKey = Environment.GetEnvironmentVariable(DotEnv.AzureOpenAiTestApiKey);
 
-        Assert.That(endpoint, Is.Not.Null.And.Not.Empty,
-            $"Environment variable {DotEnv.AzureOpenAiTestEndpoint} must be set.");
-        Assert.That(apiKey, Is.Not.Null.And.Not.Empty,
-            $"Environment variable {DotEnv.AzureOpenAiTestApiKey} must be set.");
+        Assert.Multiple(() =>
+        {
+            Assert.That(endpoint, Is.Not.Null.And.Not.Empty,
+                $"Environment variable {DotEnv.AzureOpenAiTestEndpoint} must be set.");
+            Assert.That(apiKey, Is.Not.Null.And.Not.Empty,
+                $"Environment variable {DotEnv.AzureOpenAiTestApiKey} must be set.");
+        });
 
         var services = new ServiceCollection();
         services.AddLogging();
@@ -200,11 +212,14 @@ public sealed class AzureOpenAiChatCompletionIntegrationTests
 
         var response = await client.GetChatCompletionAsync(request);
 
-        Assert.That(response, Is.Not.Null);
-        Assert.That(response.IsSuccess, Is.True, response.RawResponseJson ?? response.ErrorMessage);
-        Assert.That(response.Content, Is.Not.Null.And.Not.Empty);
-        Assert.That(response.PromptTokens, Is.GreaterThan(0));
-        Assert.That(response.CompletionTokens, Is.GreaterThan(0));
-        Assert.That(response.RawRequestJson, Does.Contain(@"""reasoning_effort"":""low"""));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response, Is.Not.Null);
+            Assert.That(response.IsSuccess, Is.True, response.RawResponseJson ?? response.ErrorMessage);
+            Assert.That(response.Content, Is.Not.Null.And.Not.Empty);
+            Assert.That(response.PromptTokens, Is.GreaterThan(0));
+            Assert.That(response.CompletionTokens, Is.GreaterThan(0));
+            Assert.That(response.RawRequestJson, Does.Contain(@"""reasoning_effort"":""low"""));
+        });
     }
 }
