@@ -1,62 +1,125 @@
-# OpenAI quickstart
+# OpenAI Provider
 
-This guide shows how to call OpenAI using Cisharpai.
+**Package:** `Cisharpai.OpenAi`
 
-## Prerequisites
-
-- An OpenAI API key
-- A model name (for example: gpt-4.1-nano, gpt-5, o1-mini)
-
-## 1) Register the OpenAI client
+## Setup
 
 ```csharp
-using Cisharpai;
-using Cisharpai.OpenAi;
-using Microsoft.Extensions.DependencyInjection;
-
-var services = new ServiceCollection();
 services.AddOpenAiClient(options =>
 {
-    options.ApiKey = "YOUR_API_KEY";
-    // Optional:
-    // options.BaseUrl = "https://api.openai.com/v1/";
-    // options.Organization = "org_...";
+    options.ApiKey = "sk-...";
+    options.BaseUrl = "https://api.openai.com/v1";  // default; override for proxies
+    options.Organization = "org-...";                // optional
+    options.DefaultModel = "gpt-4.1";               // optional fallback
+    options.ReasoningEffort = ReasoningEffort.High;  // for o-series models
+    options.TextVerbosity = TextVerbosity.Concise;   // for Responses API (GPT-5)
 });
-
-var provider = services.BuildServiceProvider();
-var client = provider.GetRequiredService<IChatCompletionClient>();
 ```
 
-## 2) Send a request
+## Available Models
+
+Use the typed constants from `OpenAiModels` to avoid typos:
+
+| Constant | Model ID |
+|----------|----------|
+| `OpenAiModels.Chat.Gpt4_1` | `gpt-4.1` |
+| `OpenAiModels.Chat.Gpt4_1Mini` | `gpt-4.1-mini` |
+| `OpenAiModels.Chat.Gpt4_1Nano` | `gpt-4.1-nano` |
+| `OpenAiModels.Chat.O3` | `o3` |
+| `OpenAiModels.Chat.O3Mini` | `o3-mini` |
+| `OpenAiModels.Chat.O4Mini` | `o4-mini` |
+| `OpenAiModels.Chat.Gpt5` | `gpt-5` |
+| `OpenAiModels.Embedding.TextEmbedding3Small` | `text-embedding-3-small` |
+| `OpenAiModels.Embedding.TextEmbedding3Large` | `text-embedding-3-large` |
+
+## Supported Features
+
+| Feature | Interface |
+|---------|-----------|
+| Chat completions | `IChatCompletionClient` |
+| Text embeddings | `IEmbeddingClient` |
+| JSON Mode & Structured Outputs | `IJsonOutputFeature` |
+| Tool / function calling | `IToolCallingFeature` |
+| Streaming | `IStreamingChatFeature` |
+| Vision (image input) | `LlmMessage.WithImage()` |
+
+## Automatic API Routing
+
+The client selects the correct OpenAI API surface automatically based on the model name:
+
+| Model Pattern | API Used | Notes |
+|---------------|----------|-------|
+| `gpt-5*` | Responses API | Uses `text.format` for JSON, `response.completed` for stream end |
+| `o1*`, `o3*`, `o4*` | Chat Completions — reasoning mode | Uses `max_completion_tokens`, sends `reasoning_effort` |
+| Everything else | Chat Completions — standard | Legacy and current GPT-4 models |
+
+You do not need to configure routing manually.
+
+## Reasoning Models (o-series)
+
+Set `ReasoningEffort` globally in options — it is sent only for reasoning model requests:
 
 ```csharp
-using Cisharpai.Models;
+services.AddOpenAiClient(o =>
+{
+    o.ApiKey = "sk-...";
+    o.ReasoningEffort = ReasoningEffort.High; // Low, Medium, High
+});
 
 var request = new ChatCompletionRequest(
-    Messages: [new LlmMessage(LlmRole.User, "Write a short haiku about winter.")],
-    Model: "gpt-4.1-nano",
-    Temperature: 0.2,
-    MaxTokens: 200,
-    IncludeRawResponse: false);
-
-var response = await client.GetChatCompletionAsync(request);
-Console.WriteLine(response.Content);
+    Messages: [new LlmMessage(LlmRole.User, "Solve this step by step: ...")],
+    Model: OpenAiModels.Chat.O4Mini);
 ```
 
-## Model routing notes
+## Responses API (GPT-5)
 
-The OpenAI implementation routes to different API shapes based on the model name:
+GPT-5 routes automatically to the Responses API. Configure response verbosity:
 
-- gpt-5 models use the Responses API.
-- o1/o3/o4 models use reasoning mode.
-- All other models use the legacy Chat Completions API.
+```csharp
+services.AddOpenAiClient(o =>
+{
+    o.ApiKey = "sk-...";
+    o.TextVerbosity = TextVerbosity.Concise; // Concise, Default, Verbose
+});
+```
 
-Optional settings for GPT-5 Responses API can be configured on `OpenAiClientOptions`:
+Streaming for GPT-5 uses `response.completed` as the termination event instead of `[DONE]`. This is handled internally — your streaming code is identical across models.
 
-- `ReasoningEffort`
-- `TextVerbosity`
+## Text Embeddings
 
-## Troubleshooting
+```csharp
+var embedClient = provider.GetRequiredService<IEmbeddingClient>();
 
-- If you need the raw JSON, set `IncludeRawResponse: true` and read `RawResponseJson` on the response.
-- For a working example, see [src/Cisharp.Console/Scenarios/OpenAiChatScenario.cs](../src/Cisharp.Console/Scenarios/OpenAiChatScenario.cs).
+var response = await embedClient.GetEmbeddingsAsync(new EmbeddingRequest(
+    Input: ["Hello world", "Another sentence"],
+    Model: OpenAiModels.Embedding.TextEmbedding3Small,
+    Dimensions: 256));  // optional dimension reduction
+
+if (response.IsSuccess)
+    foreach (var vector in response.Embeddings)
+        Console.WriteLine($"Dimensions: {vector.Length}");
+```
+
+## Debugging
+
+Set `IncludeRawResponse: true` to inspect the exact request and response JSON:
+
+```csharp
+var request = new ChatCompletionRequest(
+    Messages: [new LlmMessage(LlmRole.User, "Hello")],
+    Model: OpenAiModels.Chat.Gpt4_1Nano,
+    IncludeRawResponse: true);
+
+var response = await client.GetChatCompletionAsync(request);
+Console.WriteLine(response.RawRequestJson);
+Console.WriteLine(response.RawResponseJson);
+```
+
+## See Also
+
+- [Getting Started](getting-started.md) — general setup and DI registration
+- [Provider Feature Matrix](provider-features.md) — full capability comparison
+- [Streaming](streaming.md) — `IStreamingChatFeature`
+- [Tool Calling](tool-calling.md) — `IToolCallingFeature`
+- [JSON Output](json-output.md) — `IJsonOutputFeature`
+- [Vision](vision.md) — image inputs

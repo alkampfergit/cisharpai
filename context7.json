@@ -1,0 +1,81 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "projectTitle": "Cisharpai",
+  "description": "A unified .NET client library providing a common HttpClient-based interface for multiple LLM providers (OpenAI, Azure OpenAI, Azure AI Inference, Anthropic, Cohere).",
+  "folders": ["llm"],
+  "excludeFolders": [
+    "src",
+    "artifacts",
+    ".github",
+    ".claude",
+    "memories",
+    "scripts"
+  ],
+  "excludeFiles": ["RELEASE_NOTES.md", "AGENTS.md", "CLAUDE.md"],
+  "rules": [
+    "SETUP — Register providers with the DI extension methods: AddOpenAiClient(), AddAnthropicClient(), AddCohereClient(), AddAzureOpenAiClient(), AddAzureAiInferenceClient(). Never instantiate provider clients directly.",
+
+    "SETUP — For multi-tenant or runtime-credential scenarios where API keys are not known at startup, use the static Create() factory on each client class together with IHttpMessageHandlerFactory from a named HttpClient registered at startup (services.AddHttpClient('cisharpai')).",
+
+    "SETUP — Use keyed DI (AddAzureOpenAiClient('primary', ...) / GetRequiredKeyedService<IChatCompletionClient>('primary')) when registering multiple instances of the same provider type.",
+
+    "FEATURES — All optional capabilities (streaming, tool calling, JSON output, grounded chat, image embedding) are discovered at runtime via client.Features.Get<T>(). Always null-check the result before use — a null means that provider or configuration does not support the feature.",
+
+    "FEATURES — The full feature matrix: IJsonOutputFeature and IToolCallingFeature and IStreamingChatFeature are available on all 5 chat providers. IGroundedChatFeature is Cohere only. IImageEmbeddingFeature is Azure AI Inference and Cohere. IMultimodalEmbeddingFeature is Cohere only.",
+
+    "ERROR HANDLING — Never wrap client calls in try/catch for API-level failures. Check response.IsSuccess and read response.ErrorMessage instead. Exceptions are only thrown for network and configuration errors, not for 4xx/5xx API responses.",
+
+    "ERROR HANDLING — Streaming errors throw LlmHttpRequestException before any chunks are yielded. Wrap the await foreach in try/catch LlmHttpRequestException, not in a general Exception handler.",
+
+    "MODELS — Use the typed model constants (OpenAiModels.Chat.Gpt4_1, AnthropicModels.Chat.ClaudeSonnet4_5, CohereModels.Chat.CommandA, etc.) instead of raw strings to avoid typos and to stay current with provider naming.",
+
+    "MODELS — OpenAI model routing is automatic based on model name prefix: gpt-5* routes to the Responses API, o1*/o3*/o4* use reasoning mode with reasoning_effort, everything else uses Chat Completions. Do not try to override the routing manually.",
+
+    "MODELS — For OpenAI o-series reasoning models, set ReasoningEffort (Low/Medium/High) in AddOpenAiClient() options, not in the request.",
+
+    "STREAMING — Call services.AddCisharpaiStreamingResilienceHandler() for long-running streams to avoid the default HTTP timeout cutting the connection mid-stream.",
+
+    "STREAMING — Token usage is only present on the final chunk. Accumulate PromptTokens and CompletionTokens conditionally: if (chunk.PromptTokens.HasValue) promptTokens = chunk.PromptTokens.",
+
+    "TOOL CALLING — For multi-turn tool calling, add the assistant turn as a new LlmMessage(LlmRole.Assistant, response.Content, ToolCalls: response.ToolCalls) and each result as LlmMessage(LlmRole.Tool, result, ToolCallId: call.Id). The ToolCallId must match the Id from the ToolCall.",
+
+    "TOOL CALLING — ToolChoice.Specific('name') degrades to REQUIRED on Cohere because Cohere does not support named tool selection. Do not rely on specific-tool forcing with Cohere.",
+
+    "JSON OUTPUT — When using JsonOutputMode.JsonMode on OpenAI-compatible providers, include the word 'JSON' in the system message or the model may not produce valid JSON.",
+
+    "JSON OUTPUT — Structured Output schemas must have the root type as 'object', all fields listed in 'required', 'additionalProperties: false', no more than 5 nesting levels, and at most ~100 total properties.",
+
+    "JSON OUTPUT — Always check response.Refusal before deserializing structured output. If Refusal is not null the model declined to produce JSON and response.Content may be empty or unsafe to deserialize.",
+
+    "VISION — Use LlmMessage.WithImage(prompt, filePath) or LlmMessage.WithBase64Image(prompt, base64, mediaType) for all image inputs. These factory methods handle provider-specific format differences (data URIs for OpenAI/Azure, raw base64 source objects for Anthropic) automatically.",
+
+    "VISION — Cohere silently drops image content parts and sends only the text. Do not send vision requests to Cohere expecting image understanding — use Cohere embeddings for image processing instead.",
+
+    "EMBEDDINGS — Always set InputType on EmbeddingRequest when using Cohere v3 models (embed-english-v3.0, embed-multilingual-v3.0): use 'search_query' for queries, 'search_document' for indexed content, 'classification', or 'clustering'.",
+
+    "EMBEDDINGS — For Cohere image embeddings, supply data URIs (data:image/png;base64,...), not raw base64. Images must be at least 64x64 pixels. The fields images, inputs, and texts are mutually exclusive in one request.",
+
+    "GROUNDED CHAT — IGroundedChatFeature and grounded chat are Cohere-only. Do not attempt to use it with other providers. It is also mutually exclusive with JSON output on Cohere.",
+
+    "GROUNDED CHAT — Keep DocumentChunk content to ~300-400 words per chunk. Prefer structured key-value Data over plain Text when field names (title, snippet) can be meaningful to the model.",
+
+    "AZURE — Azure OpenAI requires both Endpoint (the resource URL) and DeploymentName. Prefer Azure AD authentication via TokenCredential (DefaultAzureCredential) over API key for production deployments.",
+
+    "AZURE — Azure AI Inference feature support (vision, tool calling, JSON schema) depends entirely on the deployed model, not the library. Check model documentation before assuming a feature is available.",
+
+    "EXTRA PARAMETERS — Use ExtraParameters on ChatCompletionRequest or EmbeddingRequest to deep-merge arbitrary JSON into the outbound request body for provider-specific fields not yet surfaced in the unified API.",
+
+    "DEBUGGING — Set IncludeRawResponse = true on the request to populate RawRequestJson and RawResponseJson on the response. Use this to diagnose unexpected provider behaviour before opening issues.",
+
+    "TESTING — Use Cisharpai.Testing (FakeChatCompletionClient, FakeEmbeddingClient, FakeResponses) for unit tests. Do not mock IChatCompletionClient directly. Enqueue ordered responses with EnqueueResponse() and set a DefaultResponse for all subsequent calls.",
+
+    "TESTING — Construct ChatCompletionRequest and LlmMessage as positional records with named arguments. Do not use object initializer syntax and do not pass raw role strings — use LlmRole.User, LlmRole.Assistant, LlmRole.Tool.",
+
+    "TESTING — Use FakeChatFeatures flags (Streaming, ToolCalling, JsonOutput, GroundedChat, All, None) to control which features the fake exposes, so your tests can verify feature-detection paths."
+  ],
+  "previousVersions": [
+    { "tag": "0.1.0" },
+    { "tag": "0.2.0" },
+    { "tag": "0.2.1" }
+  ]
+}
