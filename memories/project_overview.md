@@ -35,8 +35,8 @@ The only dependency needed by consuming applications.
 ## Providers
 
 ### `src/Cisharpai.OpenAi/`
-- `OpenAiChatCompletionClient` — Implements chat + JSON output + tool calling + streaming. Routes by model: legacy (GPT-4), reasoning (o1/o3/o4), Responses API (GPT-5). Vision via data URI `image_url`.
-- `OpenAiEmbeddingClient` — Text embeddings.
+- `OpenAiChatCompletionClient` — Implements chat + JSON output + tool calling + streaming. Routes by model: legacy (GPT-4), reasoning (o1/o3/o4), Responses API (GPT-5). Vision via data URI `image_url`. Static `Create(IHttpMessageHandlerFactory, options, ...)` for runtime construction.
+- `OpenAiEmbeddingClient` — Text embeddings. Static `Create(IHttpMessageHandlerFactory, options, ...)` for runtime construction.
 - `OpenAiModels` — Constants: `Chat.Gpt4_1`, `Chat.O3`, `Chat.O4Mini`, `Embedding.TextEmbedding3Small`, etc.
 - `OpenAiClientOptions` — BaseUrl, ApiKey, Organization, ReasoningEffort, TextVerbosity, DefaultModel.
 
@@ -44,18 +44,18 @@ The only dependency needed by consuming applications.
 Consolidated package for all Azure AI services. Uses HttpClient directly (no SDK deps except Azure.Identity).
 
 - **`Common/`** — `AzureClientOptionsBase`, `AzureAuthenticationHandler` (API key + Azure AD), `AzureErrorMapper`.
-- **`AzureOpenAi/`** — `AzureOpenAiChatCompletionClient` (chat + JSON + tools + streaming), `AzureOpenAiEmbeddingClient`. Endpoint: `openai/deployments/{deployment}/...`. Options: `DeploymentName`, `DefaultModel`.
-- **`AzureAiInference/`** — `AzureAiInferenceChatCompletionClient` (chat + JSON + tools + streaming), `AzureAiInferenceEmbeddingClient` (+ `IImageEmbeddingFeature`). Endpoint: `models/...`. Options: `ModelId`.
+- **`AzureOpenAi/`** — `AzureOpenAiChatCompletionClient` (chat + JSON + tools + streaming), `AzureOpenAiEmbeddingClient`. Endpoint: `openai/deployments/{deployment}/...`. Options: `DeploymentName`, `DefaultModel`. Both have static `Create(IHttpMessageHandlerFactory, options, TokenCredential?, ...)`.
+- **`AzureAiInference/`** — `AzureAiInferenceChatCompletionClient` (chat + JSON + tools + streaming), `AzureAiInferenceEmbeddingClient` (+ `IImageEmbeddingFeature`). Endpoint: `models/...`. Options: `ModelId`. Both have static `Create(IHttpMessageHandlerFactory, options, TokenCredential?, ...)`.
 - **`Extensions/`** — DI registration with keyed service overloads.
 
 ### `src/Cisharpai.Anthropic/`
-- `AnthropicChatCompletionClient` — Chat + JSON output (via `output_config.format`) + tool calling (`tool_use`/`tool_result` blocks) + streaming (event-based SSE). Vision uses raw base64 (NOT data URIs).
+- `AnthropicChatCompletionClient` — Chat + JSON output (via `output_config.format`) + tool calling (`tool_use`/`tool_result` blocks) + streaming (event-based SSE). Vision uses raw base64 (NOT data URIs). Static `Create(IHttpMessageHandlerFactory, options, ...)` for runtime construction.
 - `AnthropicModels` — Constants: `Chat.ClaudeOpus4_5`, `Chat.ClaudeSonnet4_5`, `Chat.ClaudeHaiku4_5`, etc.
 - `AnthropicClientOptions` — BaseUrl, ApiKey, ApiVersion, DefaultModel.
 
 ### `src/Cisharpai.Cohere/`
-- `CohereChatCompletionClient` — Chat + JSON + grounded chat (RAG) + tool calling + streaming. Vision: image parts silently skipped.
-- `CohereEmbeddingClient` — Text + image + multimodal (Embed v4) embeddings. Images sent as data URIs.
+- `CohereChatCompletionClient` — Chat + JSON + grounded chat (RAG) + tool calling + streaming. Vision: image parts silently skipped. Static `Create(IHttpMessageHandlerFactory, options, ...)` for runtime construction.
+- `CohereEmbeddingClient` — Text + image + multimodal (Embed v4) embeddings. Images sent as data URIs. Static `Create(IHttpMessageHandlerFactory, options, ...)` for runtime construction.
 - `CohereModels` — Constants: `Chat.CommandA`, `Embedding.EmbedV4`, etc.
 - `CohereClientOptions` — BaseUrl, ApiKey, DefaultModel.
 - `CohereServiceCollectionExtensions` — DI with keyed overloads.

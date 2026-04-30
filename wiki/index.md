@@ -35,6 +35,7 @@ Cisharpai is a unified .NET client library that provides shared interfaces for i
 
 - [Getting Started](getting-started.md) -- setup and basic usage
 - [OpenAI Quickstart](openai.md) -- OpenAI-specific guide
+- [Runtime Configuration](runtime-configuration.md) -- create clients dynamically at request time (multi-tenant, runtime API keys)
 
 ### Feature Guides
 
