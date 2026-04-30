@@ -22,6 +22,7 @@ A unified .NET client library providing a common HttpClient-based interface for 
 - Single test project multitargets .NET 8.0 and .NET 10.
 - Write tests for every functionality you add. Do not consider task finished if tests are not green.
 - If you need to mock, use NSubstitute.
+- Keep [RELEASE_NOTES.md](RELEASE_NOTES.md) up to date with one line for each new user-facing feature.
 - After modifying code, update [project_overview.md](memories/project_overview.md) if needed.
 
 ## Project Structure
@@ -73,6 +74,7 @@ When modifying core features (new feature interface, new provider, new model sup
 3. Update `memories/project_overview.md` — reflect structural changes
 4. Update `Cisharpai.Testing` — add queues/defaults/capture for any new feature interface on fake clients
 5. Update `scripts/build.ps1` `$packProjects` if a new publishable project is added
+6. Update `RELEASE_NOTES.md` — add one line for each new user-facing feature
 
 ## Environment Variable Maintenance
 
