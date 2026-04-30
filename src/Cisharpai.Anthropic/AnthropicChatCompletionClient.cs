@@ -5,6 +5,7 @@ using Cisharpai.Features.Chat;
 using Cisharpai.Helpers;
 using Cisharpai.Models;
 using Cisharpai.Anthropic.Models;
+using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.Anthropic;
@@ -33,6 +34,20 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         features.Set<IToolCallingFeature>(this);
         features.Set<IStreamingChatFeature>(this);
         Features = features;
+    }
+
+    public static AnthropicChatCompletionClient Create(
+        IHttpMessageHandlerFactory handlerFactory,
+        AnthropicClientOptions options,
+        string handlerName = "cisharpai",
+        ILoggerFactory? loggerFactory = null)
+    {
+        var http = new HttpClient(new AnthropicAuthenticationHandler(options) { InnerHandler = handlerFactory.CreateHandler(handlerName) })
+        {
+            BaseAddress = new Uri(options.BaseUrl),
+            Timeout = TimeSpan.FromMinutes(2)
+        };
+        return new AnthropicChatCompletionClient(http, options, loggerFactory);
     }
 
     public async Task<ChatCompletionResponse> GetChatCompletionAsync(

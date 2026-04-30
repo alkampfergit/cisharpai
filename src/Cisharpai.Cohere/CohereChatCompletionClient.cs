@@ -6,6 +6,7 @@ using Cisharpai.Features.Chat;
 using Cisharpai.Helpers;
 using Cisharpai.Models;
 using Cisharpai.Cohere.Models;
+using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.Cohere;
@@ -38,6 +39,20 @@ public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOut
         features.Set<IToolCallingFeature>(this);
         features.Set<IStreamingChatFeature>(this);
         Features = features;
+    }
+
+    public static CohereChatCompletionClient Create(
+        IHttpMessageHandlerFactory handlerFactory,
+        CohereClientOptions options,
+        string handlerName = "cisharpai",
+        ILoggerFactory? loggerFactory = null)
+    {
+        var http = new HttpClient(new CohereAuthenticationHandler(options) { InnerHandler = handlerFactory.CreateHandler(handlerName) })
+        {
+            BaseAddress = new Uri(options.BaseUrl),
+            Timeout = TimeSpan.FromMinutes(2)
+        };
+        return new CohereChatCompletionClient(http, options, loggerFactory);
     }
 
     public async Task<ChatCompletionResponse> GetChatCompletionAsync(

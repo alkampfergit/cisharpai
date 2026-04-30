@@ -5,6 +5,7 @@ using Cisharpai.Features.Embeddings;
 using Cisharpai.Models;
 using Cisharpai.Cohere.Models;
 using Cisharpai;
+using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.Cohere;
@@ -31,6 +32,20 @@ public sealed class CohereEmbeddingClient : IEmbeddingClient, IImageEmbeddingFea
         features.Set<IImageEmbeddingFeature>(this);
         features.Set<IMultimodalEmbeddingFeature>(this);
         Features = features;
+    }
+
+    public static CohereEmbeddingClient Create(
+        IHttpMessageHandlerFactory handlerFactory,
+        CohereClientOptions options,
+        string handlerName = "cisharpai",
+        ILoggerFactory? loggerFactory = null)
+    {
+        var http = new HttpClient(new CohereAuthenticationHandler(options) { InnerHandler = handlerFactory.CreateHandler(handlerName) })
+        {
+            BaseAddress = new Uri(options.BaseUrl),
+            Timeout = TimeSpan.FromMinutes(2)
+        };
+        return new CohereEmbeddingClient(http, options, loggerFactory);
     }
 
     public async Task<EmbeddingResponse> GetEmbeddingsAsync(
