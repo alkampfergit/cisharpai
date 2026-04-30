@@ -73,7 +73,7 @@ public sealed class AzureOpenAiChatCompletionIntegrationTests
     }
 
     [TestCaseSource(nameof(Deployments))]
-    public async Task GetChatCompletionAsync_VeryLowMaxTokens_ReturnsTruncatedResponse(string deployment)
+    public async Task GetChatCompletionAsync_VeryLowMaxTokens_ReturnsFailureForLengthTruncation(string deployment)
     {
         var endpoint = Environment.GetEnvironmentVariable(DotEnv.AzureOpenAiTestEndpoint);
         var apiKey = Environment.GetEnvironmentVariable(DotEnv.AzureOpenAiTestApiKey);
@@ -99,16 +99,21 @@ public sealed class AzureOpenAiChatCompletionIntegrationTests
             Messages: [new LlmMessage(LlmRole.User, "Write a very long and detailed essay about the history of computing")],
             Model: deployment,
             Temperature: 0,
-            MaxTokens: 16,
+            MaxTokens: 1,
             IncludeRawResponse: true);
 
         var response = await client.GetChatCompletionAsync(request);
 
         Assert.That(response, Is.Not.Null);
-        Assert.That(response.IsSuccess, Is.True, $"Request failed: {response.ErrorMessage}");
-        // Reasoning models (gpt-5, o-series) may return empty content when
-        // max_completion_tokens is very low because all tokens are used for reasoning.
-        Assert.That(response.Content, Is.Not.Null);
-        Assert.That(response.PromptTokens, Is.GreaterThan(0));
+        Assert.That(response.IsSuccess, Is.False, response.RawResponseJson);
+        if (response.Status is "length")
+        {
+            Assert.That(response.IncompleteReason, Is.EqualTo("length"), response.RawResponseJson);
+            Assert.That(response.ErrorMessage, Does.Contain("finish_reason"));
+        }
+        else
+        {
+            Assert.That(response.ErrorMessage, Does.Contain("max_tokens").Or.Contain("output limit"));
+        }
     }
 }

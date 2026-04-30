@@ -4,4 +4,5 @@ This file is included in the NuGet packages. Keep a single line for each user-fa
 
 ## Unreleased
 
+- Azure OpenAI chat completions now return `IsSuccess=false` with `IncompleteReason="length"` when the provider reports `finish_reason: "length"`.
 - Initial release notes file added to the NuGet package contents.
