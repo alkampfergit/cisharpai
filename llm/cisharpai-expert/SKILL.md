@@ -78,6 +78,27 @@ else
     Console.WriteLine($"Error: {response.ErrorMessage}");
 ```
 
+## Runtime Client Creation (no DI required)
+
+When API keys or endpoints are not known at startup (multi-tenant apps, user-provided credentials), use the static `Create` factory method on each client. Register a single pooled handler once; create client instances on demand.
+
+```csharp
+// Program.cs — once at startup (connection pool only, no auth)
+services.AddHttpClient("cisharpai");
+
+// At request time — inject IHttpMessageHandlerFactory
+var client = OpenAiChatCompletionClient.Create(
+    handlerFactory,
+    new OpenAiClientOptions { ApiKey = runtimeKey, DefaultModel = "gpt-4o" },
+    loggerFactory: loggerFactory);
+```
+
+All 9 clients support `Create`. Azure providers add an optional `TokenCredential` parameter for Azure AD auth. See [references/runtime-configuration.md](references/runtime-configuration.md) for all signatures and a multi-provider dispatch example.
+
+**Key notes:**
+- Client instances are cheap; TCP connections are pooled in the handler.
+- `Create` bypasses DI resilience handlers — add `services.AddHttpClient("cisharpai").AddCisharpaiResilienceHandler()` at startup if needed.
+
 ## Core Interfaces
 
 ### IChatCompletionClient
@@ -165,6 +186,7 @@ See the reference files for detailed information:
 - [references/grounded-chat.md](references/grounded-chat.md) — RAG with citations (Cohere)
 - [references/testing.md](references/testing.md) — Fake clients, response queues, DI
 - [references/provider-features.md](references/provider-features.md) — Complete feature support matrix
+- [references/runtime-configuration.md](references/runtime-configuration.md) — Dynamic client creation at runtime (multi-tenant, runtime API keys)
 
 ## Error Handling Pattern
 
