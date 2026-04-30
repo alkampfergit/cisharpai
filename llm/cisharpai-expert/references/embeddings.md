@@ -4,12 +4,10 @@
 
 ```csharp
 var client = provider.GetRequiredService<IEmbeddingClient>();
-var response = await client.GetEmbeddingsAsync(new EmbeddingRequest
-{
-    Input = ["Hello world", "Another text"],
-    Model = "text-embedding-3-small",
-    Dimensions = 256  // optional dimension reduction
-});
+var response = await client.GetEmbeddingsAsync(new EmbeddingRequest(
+    Input: ["Hello world", "Another text"],
+    Model: "text-embedding-3-small",
+    Dimensions: 256)); // optional dimension reduction
 
 if (response.IsSuccess)
 {
@@ -25,28 +23,24 @@ Available on: Azure AI Inference, Cohere
 ```csharp
 var imageFeature = client.Features.Get<IImageEmbeddingFeature>();
 var response = await imageFeature.GetImageEmbeddingAsync(
-    new ImageEmbeddingRequest { ImagePath = "photo.png" });
+    imagePath: "photo.png",
+    model: "embed-v4.0");
 ```
 
 ## Multimodal Embeddings (Cohere Embed v4)
 
 ```csharp
 var multiFeature = client.Features.Get<IMultimodalEmbeddingFeature>();
-var response = await multiFeature.GetMultimodalEmbeddingAsync(
-    new MultimodalEmbeddingRequest
-    {
-        Inputs =
+var response = await multiFeature.GetMultimodalEmbeddingsAsync(
+    inputs:
+    [
+        new MultimodalEmbeddingInput(
         [
-            new MultimodalEmbeddingInput
-            {
-                ContentParts =
-                [
-                    new TextEmbeddingContent("A cat"),
-                    new ImageEmbeddingContent("cat.png")
-                ]
-            }
-        ]
-    });
+            new TextEmbeddingContent("A cat"),
+            new ImageEmbeddingContent("cat.png")
+        ])
+    ],
+    model: "embed-v4.0");
 ```
 
 ## Provider-Specific Notes

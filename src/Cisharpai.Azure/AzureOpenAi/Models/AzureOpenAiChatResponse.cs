@@ -14,6 +14,9 @@ public sealed class AzureOpenAiUsage
 public sealed class AzureOpenAiChatChoice
 {
     public AzureOpenAiChatMessage Message { get; set; } = new();
+
+    [JsonPropertyName("finish_reason")]
+    public string? FinishReason { get; set; }
 }
 
 public sealed class AzureOpenAiChatResponse

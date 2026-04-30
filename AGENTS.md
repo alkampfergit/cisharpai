@@ -22,6 +22,7 @@ A unified .NET client library providing a common HttpClient-based interface for 
 - Single test project multitargets .NET 8.0 and .NET 10.
 - Write tests for every functionality you add. Do not consider task finished if tests are not green.
 - If you need to mock, use NSubstitute.
+- Keep the wiki up to date after you generate new features.
 - Keep [RELEASE_NOTES.md](RELEASE_NOTES.md) up to date with one line for each new user-facing feature.
 - After modifying code, update [project_overview.md](memories/project_overview.md) if needed.
 

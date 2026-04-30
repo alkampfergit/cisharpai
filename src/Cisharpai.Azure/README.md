@@ -6,7 +6,7 @@ Azure AI provider for the [Cisharpai](https://www.nuget.org/packages/Cisharpai) 
 
 ### Azure OpenAI
 - Chat completions with all Azure OpenAI deployments
-- Reasoning models (o1, o3, o4, GPT-5) with automatic `max_completion_tokens` handling
+- Reasoning models (o1, o3, o4, GPT-5) with automatic `max_completion_tokens` handling and optional `ReasoningEffort`
 - Text embeddings (ada-002, text-embedding-3-small/large)
 - JSON Mode and Structured Outputs
 - Tool calling / function calling
@@ -37,6 +37,8 @@ services.AddAzureOpenAiClient(options =>
     options.Endpoint = "https://myresource.openai.azure.com";
     options.ApiKey = "YOUR_API_KEY";
     options.DeploymentName = "gpt-4o";
+    // Optional for o1/o3/o4/gpt-5 deployments:
+    // options.ReasoningEffort = "low";
 });
 
 var provider = services.BuildServiceProvider();
@@ -46,6 +48,8 @@ var response = await client.GetChatCompletionAsync(
     new ChatCompletionRequest(
         Messages: [new LlmMessage(LlmRole.User, "Hello!")]));
 ```
+
+`ReasoningEffort` is sent only for reasoning deployments. For provider parameters that are not typed yet, or to override a typed value per request, use `ChatCompletionRequest.ExtraParameters`; it deep-merges into the final JSON request.
 
 ## Quick Start — Azure AI Inference
 

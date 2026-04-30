@@ -13,7 +13,7 @@ public sealed class AzureOpenAiExtraParametersTests
         string? capturedBody = null;
         var handler = new MockHttpMessageHandler(async (request, _) =>
         {
-            capturedBody = await request.Content!.ReadAsStringAsync();
+            capturedBody = await request.Content!.ReadAsStringAsync(CancellationToken.None);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(AzureResponseJson, System.Text.Encoding.UTF8, "application/json")
@@ -54,7 +54,7 @@ public sealed class AzureOpenAiExtraParametersTests
         string? capturedBody = null;
         var handler = new MockHttpMessageHandler(async (request, _) =>
         {
-            capturedBody = await request.Content!.ReadAsStringAsync();
+            capturedBody = await request.Content!.ReadAsStringAsync(CancellationToken.None);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(AzureResponseJson, System.Text.Encoding.UTF8, "application/json")
@@ -86,6 +86,149 @@ public sealed class AzureOpenAiExtraParametersTests
             Assert.That(doc.RootElement.GetProperty("max_completion_tokens").GetInt32(), Is.EqualTo(1000));
             Assert.That(doc.RootElement.GetProperty("reasoning_effort").GetString(), Is.EqualTo("high"));
         });
+    }
+
+    [Test]
+    public async Task ReasoningEffortOption_IsSentForReasoningRequest()
+    {
+        string? capturedBody = null;
+        var handler = new MockHttpMessageHandler(async (request, _) =>
+        {
+            capturedBody = await request.Content!.ReadAsStringAsync(CancellationToken.None);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(AzureResponseJson, System.Text.Encoding.UTF8, "application/json")
+            };
+        });
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://myresource.openai.azure.com/") };
+        var options = new AzureOpenAiClientOptions
+        {
+            Endpoint = "https://myresource.openai.azure.com/",
+            DeploymentName = "o3",
+            ApiVersion = "2024-10-21",
+            ApiKey = "test-key",
+            ReasoningEffort = "medium"
+        };
+        var client = new AzureOpenAiChatCompletionClient(httpClient, options);
+
+        var request = new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "Hello")],
+            Model: "o3",
+            MaxTokens: 1000);
+
+        await client.GetChatCompletionAsync(request);
+
+        var doc = JsonDocument.Parse(capturedBody!);
+        Assert.That(doc.RootElement.GetProperty("reasoning_effort").GetString(), Is.EqualTo("medium"));
+    }
+
+    [Test]
+    public async Task ReasoningEffort_OnRequest_OverridesOptionsDefault()
+    {
+        string? capturedBody = null;
+        var handler = new MockHttpMessageHandler(async (request, _) =>
+        {
+            capturedBody = await request.Content!.ReadAsStringAsync(CancellationToken.None);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(AzureResponseJson, System.Text.Encoding.UTF8, "application/json")
+            };
+        });
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://myresource.openai.azure.com/") };
+        var options = new AzureOpenAiClientOptions
+        {
+            Endpoint = "https://myresource.openai.azure.com/",
+            DeploymentName = "o3",
+            ApiVersion = "2024-10-21",
+            ApiKey = "test-key",
+            ReasoningEffort = "low"
+        };
+        var client = new AzureOpenAiChatCompletionClient(httpClient, options);
+
+        var request = new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "Hello")],
+            Model: "o3",
+            MaxTokens: 1000,
+            ReasoningEffort: "high");
+
+        await client.GetChatCompletionAsync(request);
+
+        var doc = JsonDocument.Parse(capturedBody!);
+        Assert.That(doc.RootElement.GetProperty("reasoning_effort").GetString(), Is.EqualTo("high"));
+    }
+
+    [Test]
+    public async Task ReasoningEffort_OnRequest_IsIgnoredForNonReasoningModel()
+    {
+        string? capturedBody = null;
+        var handler = new MockHttpMessageHandler(async (request, _) =>
+        {
+            capturedBody = await request.Content!.ReadAsStringAsync(CancellationToken.None);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(AzureResponseJson, System.Text.Encoding.UTF8, "application/json")
+            };
+        });
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://myresource.openai.azure.com/") };
+        var options = new AzureOpenAiClientOptions
+        {
+            Endpoint = "https://myresource.openai.azure.com/",
+            DeploymentName = "gpt-4o",
+            ApiVersion = "2024-10-21",
+            ApiKey = "test-key"
+        };
+        var client = new AzureOpenAiChatCompletionClient(httpClient, options);
+
+        var request = new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "Hello")],
+            Model: "gpt-4o",
+            MaxTokens: 1000,
+            ReasoningEffort: "high");
+
+        await client.GetChatCompletionAsync(request);
+
+        var doc = JsonDocument.Parse(capturedBody!);
+        Assert.That(doc.RootElement.TryGetProperty("reasoning_effort", out _), Is.False);
+    }
+
+    [Test]
+    public async Task ExtraParameters_CanOverrideReasoningEffortOption()
+    {
+        string? capturedBody = null;
+        var handler = new MockHttpMessageHandler(async (request, _) =>
+        {
+            capturedBody = await request.Content!.ReadAsStringAsync(CancellationToken.None);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(AzureResponseJson, System.Text.Encoding.UTF8, "application/json")
+            };
+        });
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://myresource.openai.azure.com/") };
+        var options = new AzureOpenAiClientOptions
+        {
+            Endpoint = "https://myresource.openai.azure.com/",
+            DeploymentName = "o3",
+            ApiVersion = "2024-10-21",
+            ApiKey = "test-key",
+            ReasoningEffort = "medium"
+        };
+        var client = new AzureOpenAiChatCompletionClient(httpClient, options);
+
+        var extra = JsonDocument.Parse("""{"reasoning_effort":"high"}""").RootElement;
+        var request = new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "Hello")],
+            Model: "o3",
+            MaxTokens: 1000,
+            ExtraParameters: extra);
+
+        await client.GetChatCompletionAsync(request);
+
+        var doc = JsonDocument.Parse(capturedBody!);
+        Assert.That(doc.RootElement.GetProperty("reasoning_effort").GetString(), Is.EqualTo("high"));
     }
 
     [Test]

@@ -8,4 +8,5 @@ public sealed record ChatCompletionRequest(
     double? Temperature = null,
     int? MaxTokens = null,
     bool IncludeRawResponse = false,
-    JsonElement? ExtraParameters = null);
+    JsonElement? ExtraParameters = null,
+    string? ReasoningEffort = null);

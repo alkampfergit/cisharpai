@@ -19,15 +19,15 @@ var msg = LlmMessage.WithBase64Image("Describe this", base64Data, "image/png");
 ## Multi-Part Messages
 
 ```csharp
-var msg = new LlmMessage("user")
-{
-    ContentParts =
+var msg = new LlmMessage(
+    LlmRole.User,
+    string.Empty,
+    ContentParts:
     [
         new TextContentPart("Compare these two images:"),
         new ImageFileContentPart("before.png"),
         new ImageFileContentPart("after.png")
-    ]
-};
+    ]);
 ```
 
 ## Supported Formats

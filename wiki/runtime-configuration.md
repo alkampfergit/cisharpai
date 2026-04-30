@@ -45,7 +45,8 @@ public class LlmClientService(
                            {
                                Endpoint       = cfg.Endpoint,
                                ApiKey         = cfg.ApiKey,
-                               DeploymentName = cfg.DeploymentName
+                               DeploymentName = cfg.DeploymentName,
+                               ReasoningEffort = cfg.ReasoningEffort // optional; sent only for reasoning deployments
                            },
                            loggerFactory: loggerFactory),
 
@@ -133,3 +134,4 @@ var azureClient = AzureOpenAiChatCompletionClient.Create(
 - **Logging and telemetry**: Pass `ILoggerFactory` to get structured EventId 1000–1005 logs and `Cisharpai` `ActivitySource` spans (see [Logging](logging.md)).
 - **Features**: Clients created via `Create` expose the same `IFeatureCollection` features (streaming, tool calling, JSON output, etc.) as DI-registered clients.
 - **Resilience handlers**: The DI helpers (`AddOpenAiClient`, etc.) automatically wire `AddCisharpaiResilienceHandler()`. `Create` bypasses DI, so no resilience policy is applied by default. Add one to the named HttpClient registration if needed: `services.AddHttpClient("cisharpai").AddCisharpaiResilienceHandler()`.
+- **Azure OpenAI reasoning effort**: Set `AzureOpenAiClientOptions.ReasoningEffort` (`"low"`, `"medium"`, `"high"` or any provider-supported value) for o1/o3/o4/gpt-5 deployments. It is omitted for non-reasoning deployments. Per-request `ExtraParameters` can still override it with `{"reasoning_effort":"high"}`.

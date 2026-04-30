@@ -3,17 +3,20 @@
 ## Quick Start
 
 ```csharp
+using Cisharpai.Features.Chat;
+using Cisharpai.Models;
+using System.Text.Json;
+
 var toolFeature = client.Features.Get<IToolCallingFeature>();
 if (toolFeature is null) throw new NotSupportedException("Provider doesn't support tools");
 
 // 1. Define tools
 var tools = new[]
 {
-    new ToolDefinition
-    {
-        Name = "get_weather",
-        Description = "Get current weather for a location",
-        Parameters = JsonDocument.Parse("""
+    new ToolDefinition(
+        Name: "get_weather",
+        Description: "Get current weather for a location",
+        Parameters: JsonDocument.Parse("""
         {
             "type": "object",
             "properties": {
@@ -24,13 +27,13 @@ var tools = new[]
             "additionalProperties": false
         }
         """).RootElement,
-        Strict = true
-    }
+        Strict: true)
 };
 
 // 2. Send request with tools
-var response = await toolFeature.GetToolCallingChatCompletionAsync(request,
-    new ToolCallingOptions { Tools = tools });
+var response = await toolFeature.GetChatCompletionWithToolsAsync(
+    request,
+    new ToolCallingOptions(Tools: tools));
 
 // 3. Handle tool calls
 if (response.ToolCalls is { Count: > 0 })
@@ -68,14 +71,15 @@ if (response.ToolCalls is { Count: > 0 })
 ```csharp
 var messages = new List<LlmMessage>
 {
-    new("user", "What's the weather in Paris?")
+    new(LlmRole.User, "What's the weather in Paris?")
 };
 
 while (true)
 {
-    var request = new ChatCompletionRequest { Messages = messages.ToArray() };
-    var response = await toolFeature.GetToolCallingChatCompletionAsync(request,
-        new ToolCallingOptions { Tools = tools });
+    var request = new ChatCompletionRequest(Messages: messages);
+    var response = await toolFeature.GetChatCompletionWithToolsAsync(
+        request,
+        new ToolCallingOptions(Tools: tools));
 
     if (response.ToolCalls is not { Count: > 0 })
     {
@@ -84,16 +88,19 @@ while (true)
     }
 
     // Add assistant message with tool calls
-    messages.Add(new LlmMessage("assistant", response.Content)
-    {
-        ToolCalls = response.ToolCalls
-    });
+    messages.Add(new LlmMessage(
+        LlmRole.Assistant,
+        response.Content,
+        ToolCalls: response.ToolCalls));
 
     // Execute each tool and add results
     foreach (var call in response.ToolCalls)
     {
         var result = ExecuteTool(call.FunctionName, call.Arguments);
-        messages.Add(new LlmMessage("tool", result) { ToolCallId = call.Id });
+        messages.Add(new LlmMessage(
+            LlmRole.Tool,
+            result,
+            ToolCallId: call.Id));
     }
 }
 ```
