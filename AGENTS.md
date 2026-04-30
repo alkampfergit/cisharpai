@@ -76,6 +76,7 @@ When modifying core features (new feature interface, new provider, new model sup
 4. Update `Cisharpai.Testing` — add queues/defaults/capture for any new feature interface on fake clients
 5. Update `scripts/build.ps1` `$packProjects` if a new publishable project is added
 6. Update `RELEASE_NOTES.md` — add one line for each new user-facing feature
+7. Update if needed the [integrated skill](./llm/cisharpai-expert/SKILL.md) to include all the details on how user of library can use the various features.
 
 ## Environment Variable Maintenance
 

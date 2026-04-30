@@ -4,13 +4,13 @@
 
 | Mode | Description | Provider Support |
 |------|-------------|-----------------|
-| `JsonOutputMode.JsonObject` | Valid JSON, no schema enforcement | All 5 providers |
-| `JsonOutputMode.JsonSchema` | Strict schema enforcement | All 5 providers |
+| `JsonOutputMode.JsonMode` | Valid JSON, no schema enforcement | All 5 providers |
+| `JsonOutputMode.JsonSchema` | Strict schema enforcement (Structured Outputs) | All 5 providers |
 
 ## Quick Start
 
 ```csharp
-using Cisharpai.Features.Chat;
+using Cisharpai.Features.Chat;  // IJsonOutputFeature is in Cisharpai.Features.Chat
 using Cisharpai.Models;
 
 var jsonFeature = client.Features.Get<IJsonOutputFeature>();
@@ -18,7 +18,7 @@ var jsonFeature = client.Features.Get<IJsonOutputFeature>();
 // JSON Mode (no schema)
 var response = await jsonFeature.GetChatCompletionWithJsonOutputAsync(
     request,
-    new JsonOutputOptions(Mode: JsonOutputMode.JsonObject));
+    new JsonOutputOptions(Mode: JsonOutputMode.JsonMode));
 
 // Structured Outputs (with schema)
 var schema = """

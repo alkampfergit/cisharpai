@@ -16,8 +16,9 @@
     <!-- Ship LLM-oriented documentation with the package without affecting compilation. -->
     <None Include="..\..\llm\**\*.md"
           Pack="true"
-          PackagePath="contentFiles\any\any\llm\%(RecursiveDir)%(Filename)%(Extension)"
+          PackagePath="contentFiles/any/any/llm/%(RecursiveDir)%(Filename)%(Extension)"
           PackageCopyToOutput="false"
+          BuildAction="None"
           Visible="false" />
   </ItemGroup>
 

@@ -157,6 +157,8 @@ if (streaming is not null)
 
 ## Feature Interfaces
 
+All feature interfaces live in the `Cisharpai.Features.Chat` namespace (not `Cisharpai.Features`).
+
 | Feature | Interface | Providers |
 |---------|-----------|-----------|
 | JSON Output | `IJsonOutputFeature` | All 5 |
@@ -230,6 +232,9 @@ var request = new ChatCompletionRequest(
 - Tool calling uses `IToolCallingFeature.GetChatCompletionWithToolsAsync(...)`.
 - JSON output uses `IJsonOutputFeature.GetChatCompletionWithJsonOutputAsync(...)`.
 - `FakeChatCompletionClient` queues responses with methods such as `EnqueueResponse(...)`, not a public `ResponseQueue` property.
+- `JsonOutputMode` has two values: `JsonMode` (json_object, no schema) and `JsonSchema` (strict schema enforcement). There is no `JsonObject` value.
+- `JsonOutputOptions` positional record signature: `(JsonOutputMode Mode, string? SchemaName = null, string? SchemaDescription = null, string? JsonSchema = null, bool Strict = true)`. `SchemaName` and `JsonSchema` are required when `Mode == JsonSchema`.
+- `IJsonOutputFeature` is in `Cisharpai.Features.Chat`, not `Cisharpai.Features`.
 
 ## Project Structure
 
