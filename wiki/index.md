@@ -1,60 +1,50 @@
 # Cisharpai Wiki
 
-Welcome to the Cisharpai wiki. This is the starting point for learning how to use the library and its provider integrations.
+Cisharpai is a unified .NET client library providing a single `IChatCompletionClient` / `IEmbeddingClient` interface across multiple LLM providers. Switching providers is a configuration change — application code stays the same.
 
-## What is Cisharpai?
+## Supported Providers
 
-Cisharpai is a unified .NET client library that provides shared interfaces for interacting with multiple LLM providers. You can swap providers with minimal code changes by keeping your application code focused on the shared abstractions.
+| Provider | Package | Chat | Embeddings | Notes |
+|----------|---------|------|------------|-------|
+| OpenAI | `Cisharpai.OpenAi` | Yes | Yes | Chat Completions, Responses API (GPT-5), reasoning models |
+| Azure OpenAI | `Cisharpai.Azure` | Yes | Yes | Deployment-based routing, Azure AD auth |
+| Azure AI Inference | `Cisharpai.Azure` | Yes | Yes | Model catalog: Phi, Llama, Mistral; image embeddings |
+| Anthropic | `Cisharpai.Anthropic` | Yes | -- | Claude model family |
+| Cohere | `Cisharpai.Cohere` | Yes | Yes | Grounded chat (RAG), multimodal embeddings |
 
-### Supported Providers
+## Key Design Principles
 
-| Provider | Package | Capabilities |
-|----------|---------|-------------|
-| OpenAI | `Cisharpai.OpenAi` | Chat, embeddings, JSON output, tool calling, vision, streaming, reasoning models, Responses API (GPT-5) |
-| Azure OpenAI | `Cisharpai.Azure` | Chat, embeddings, JSON output, tool calling, vision, streaming, reasoning models |
-| Azure AI Inference | `Cisharpai.Azure` | Chat, embeddings, image embeddings, JSON output, tool calling, vision, streaming |
-| Anthropic | `Cisharpai.Anthropic` | Chat, JSON output, tool calling, vision, streaming |
-| Cohere | `Cisharpai.Cohere` | Chat, embeddings, image embeddings, multimodal embeddings, JSON output, tool calling, grounded chat (RAG), streaming |
-
-### Key Features
-
-- **Chat Completions** -- unified `IChatCompletionClient` interface across all providers
-- **Text Embeddings** -- unified `IEmbeddingClient` interface (OpenAI, Azure OpenAI, Azure AI Inference, Cohere)
-- **JSON Output** -- JSON Mode and Structured Outputs via `IJsonOutputFeature`
-- **Tool Calling** -- function calling via `IToolCallingFeature` across all providers
-- **Vision** -- send images in messages via `LlmMessage.WithImage()` / `LlmMessage.WithBase64Image()`
-- **Streaming** -- token-by-token streaming via `IStreamingChatFeature` across all providers
-- **Grounded Chat (RAG)** -- document grounding with citations via `IGroundedChatFeature` (Cohere)
-- **Image Embeddings** -- via `IImageEmbeddingFeature` (Azure AI Inference, Cohere)
-- **Multimodal Embeddings** -- mixed text + image inputs via `IMultimodalEmbeddingFeature` (Cohere)
-- **Feature Discovery** -- optional capabilities discovered via the Feature Collection pattern
+- **No exceptions for API errors** — check `response.IsSuccess` and `response.ErrorMessage`; exceptions are only for network/config failures
+- **Feature Collection pattern** — optional capabilities (streaming, tool calling, JSON output, etc.) are discovered via `client.Features.Get<T>()`
+- **Immutable DTOs** — `ChatCompletionRequest`, `LlmMessage`, and all response types are immutable records
+- **Escape hatch** — `ExtraParameters` deep-merges arbitrary JSON into any request for provider-specific fields
 
 ## Contents
 
 ### Getting Started
 
-- [Getting Started](getting-started.md) -- setup and basic usage
-- [OpenAI Quickstart](openai.md) -- OpenAI-specific guide
-- [Runtime Configuration](runtime-configuration.md) -- create clients dynamically at request time (multi-tenant, runtime API keys)
+- [Getting Started](getting-started.md) — installation, DI setup, first request, multi-provider patterns
+- [OpenAI Provider](openai.md) — OpenAI-specific models, routing, reasoning models, Responses API
+
+### Architecture
+
+- [Feature Collection Pattern](feature-extensions.md) — how optional capabilities are discovered and accessed
+- [Provider Feature Matrix](provider-features.md) — full support table across all providers
 
 ### Feature Guides
 
-- [Embeddings](embeddings.md) -- text, image, and multimodal embeddings
-- [JSON Output](json-output.md) -- JSON Mode and Structured Outputs
-- [Tool Calling](tool-calling.md) -- function calling across providers
-- [Grounded Chat (RAG)](grounded-chat.md) -- document grounding with citations
-- [Vision](vision.md) -- sending images in chat messages
-- [Streaming](streaming.md) -- streaming chat completions token-by-token
-
-### Testing
-
-- [Testing with Cisharpai](testing.md) -- fake clients, response factories, DI helpers, and testing patterns
+- [Streaming](streaming.md) — token-by-token streaming via `IStreamingChatFeature`
+- [Tool Calling](tool-calling.md) — function calling via `IToolCallingFeature`
+- [JSON Output](json-output.md) — JSON Mode and Structured Outputs via `IJsonOutputFeature`
+- [Vision](vision.md) — sending images in chat messages
+- [Embeddings](embeddings.md) — text, image, and multimodal embeddings
+- [Grounded Chat (RAG)](grounded-chat.md) — document grounding with citations via `IGroundedChatFeature` (Cohere)
 
 ### Operations
 
-- [Logging](logging.md) -- structured ILogger output emitted by every HTTP call
+- [Logging](logging.md) — structured `ILogger` output and distributed tracing with `ActivitySource`
+- [Runtime Configuration](runtime-configuration.md) — creating clients dynamically at request time (multi-tenant, runtime API keys)
 
-### Reference
+### Testing
 
-- [Provider Feature Matrix](provider-features.md) -- complete feature support table
-- [Feature Extensions](feature-extensions.md) -- Feature Collection pattern documentation
+- [Testing with Cisharpai](testing.md) — fake clients, response factories, request capture, DI helpers

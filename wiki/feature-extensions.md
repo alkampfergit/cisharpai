@@ -1,19 +1,10 @@
-# Feature: Extension System & Capability Discovery
+# Feature Collection Pattern
 
-## Overview
-As the library integrates more diverse AI providers (OpenAI, Anthropic, Cohere, etc.), we face the challenge of "feature fragmentation." Some providers support multimodal input, JSON mode, or caching, while others do not. We need a unified way to:
-1.  Discover which features a generic client instance supports.
-2.  Access those specialized features in a type-safe manner.
-3.  Avoid polluting the core interfaces (`IChatCompletionClient`, `IEmbeddingClient`) with provider-specific methods.
+Cisharpai uses the Feature Collection pattern — inspired by ASP.NET Core's `HttpContext.Features` — to expose optional, provider-specific capabilities without polluting the core `IChatCompletionClient` and `IEmbeddingClient` interfaces.
 
-## Proposed Architecture: The Feature Collection Pattern
-
-We will implement a **Features Pattern** similar to ASP.NET Core's `HttpContext.Features` or `HttpClient` middleware. This allows for flexible, composition-based extension without breaking changes.
-
-### Core Structure
+## Core Interfaces
 
 ```csharp
-// 1. The container interface
 public interface IHasFeatures
 {
     IFeatureCollection Features { get; }
@@ -24,92 +15,111 @@ public interface IFeatureCollection : IEnumerable<KeyValuePair<Type, object>>
     T? Get<T>();
     void Set<T>(T instance);
 }
-
-// 2. Base clients implement this
-public interface IEmbeddingClient : IHasFeatures
-{
-    Task<EmbeddingResponse> GetEmbeddingsAsync(EmbeddingRequest request, CancellationToken cancellationToken = default);
-}
-
-// 3. Define the specific feature capability
-public interface IImageEmbeddingFeature
-{
-    /// <summary>
-    /// Embeds a single image.
-    /// </summary>
-    /// <param name="imagePath">Local file path.</param>
-    /// <param name="model">The model to use (must be multimodal compatible).</param>
-    Task<EmbeddingResponse> GetImageEmbeddingAsync(string imagePath, string model, CancellationToken cancellationToken = default);
-}
 ```
 
-### Usage Example
+Both `IChatCompletionClient` and `IEmbeddingClient` inherit `IHasFeatures`. The underlying `FeatureCollection` implementation is backed by a `ConcurrentDictionary` and is thread-safe.
+
+## Feature Discovery
+
+Call `Features.Get<T>()` to retrieve a feature. A `null` return means the provider or its current configuration does not support that capability.
 
 ```csharp
-public async Task ProcessInputs(IEmbeddingClient client)
+// Always null-check before use
+if (client.Features.Get<IStreamingChatFeature>() is { } streamFeature)
 {
-    // Standard text embedding (guaranteed by IEmbeddingClient)
-    await client.GetEmbeddingsAsync(new EmbeddingRequest(["Hello world"], "model-id"));
-
-    // Feature Discovery
-    // Note: The presence of this feature indicates the CLIENT was configured
-    // to allow image inputs for the configured model set.
-    if (client.Features.Get<IImageEmbeddingFeature>() is { } imageFeature)
-    {
-        // Use local file path
-        await imageFeature.GetImageEmbeddingAsync("path/to/image.png", "clip-model");
-    }
-    else
-    {
-        Console.WriteLine("This provider/configuration does not support image embeddings.");
-    }
+    await foreach (var chunk in streamFeature.GetChatCompletionStreamAsync(request))
+        Console.Write(chunk.Content);
 }
-
+else
+{
+    Console.WriteLine("This provider does not support streaming.");
+}
 ```
 
-## Implementation Plan
+The `is { }` pattern is the idiomatic way to null-check and bind in one step.
 
-### Phase 1: Core Infrastructure
-- Define `IFeatureCollection` and basic implementation `FeatureCollection`.
-- Update `IEmbeddingClient` and `IChatCompletionClient` to inherit from `IHasFeatures`.
-- Update base implementations (if any) or add default (empty) feature collections to existing clients.
+## Available Features
 
-### Phase 2: Feature Definitions
-- Define `IImageEmbeddingFeature` for multimodal embedding.
-- Add a follow-up to extend `IImageEmbeddingFeature` with `Stream` input.
-- Define `IToolCallingFeature` (if we want to extract that from core chat in the future, or advanced tool features).
-- Define `IJsonOutputFeature` for JSON Mode and Structured Outputs (see [json-output.md](json-output.md)).
+### Chat Features (on `IChatCompletionClient`)
 
-### Phase 3: Provider Implementation
-- **Cohere**: Implement `IImageEmbeddingFeature` in `CohereEmbeddingClient`.
-- **Azure AI Inference**: Implement `IImageEmbeddingFeature`.
-- **OpenAI**: Does not support image embedding currently.
+| Feature Interface | Description | Providers |
+|------------------|-------------|-----------|
+| `IJsonOutputFeature` | JSON Mode and Structured Outputs | All 5 |
+| `IToolCallingFeature` | Function/tool calling | All 5 |
+| `IStreamingChatFeature` | Token-by-token streaming via `IAsyncEnumerable` | All 5 |
+| `IGroundedChatFeature` | RAG with document citations | Cohere only |
 
-## Testing
-- **Unit**: Verify `IImageEmbeddingFeature` is only exposed when configured with image-capable models.
-- **Integration (Cohere)**: Use `embed-v4-0` with a local image path and assert:
-    - `EmbeddingResponse.IsSuccess` is true.
-    - `Embeddings` is not empty and dimensions are consistent.
-    - `TotalTokens` is populated.
-- **Integration (Azure AI Inference)**: Validate image embedding with a known image-capable model.
+### Embedding Features (on `IEmbeddingClient`)
 
-## Task Breakdown
+| Feature Interface | Description | Providers |
+|------------------|-------------|-----------|
+| `IImageEmbeddingFeature` | Single image embedding | Azure AI Inference, Cohere |
+| `IMultimodalEmbeddingFeature` | Mixed text + image embedding | Cohere only |
 
-### Task 1: Scaffolding
-- [ ] Create `Cisharpai/Features/IFeatureCollection.cs`
-- [ ] Create `Cisharpai/Features/FeatureCollection.cs` implementation.
-- [ ] Create `Cisharpai/Features/IHasFeatures.cs`
-- [ ] Modify `IEmbeddingClient.cs` to inherit `IHasFeatures`.
-- [ ] Modify `IChatCompletionClient.cs` to inherit `IHasFeatures`.
+## Checking Multiple Features
 
-### Task 2: Implementation Updates
-- [ ] Update `AnthropicChatCompletionClient` to initialize `Features`.
-- [ ] Update `CohereEmbeddingClient` to initialize `Features`.
-- [ ] Update `OpenAiChatCompletionClient` to initialize `Features`.
-- [ ] Update `OpenAiEmbeddingClient` to initialize `Features`.
+```csharp
+IChatCompletionClient client = /* any provider */;
 
-### Task 3: Image Embedding Feature
-- [ ] Create `Cisharpai/Features/Embeddings/IImageEmbeddingFeature.cs`.
-- [ ] Implement `IImageEmbeddingFeature` in `CohereEmbeddingClient`.
-- [ ] Implement `IImageEmbeddingFeature` in Azure AI Inference client.
-- [ ] Add integration test verifying feature discovery works.
+var jsonFeature    = client.Features.Get<IJsonOutputFeature>();
+var toolFeature    = client.Features.Get<IToolCallingFeature>();
+var streamFeature  = client.Features.Get<IStreamingChatFeature>();
+var groundedFeature = client.Features.Get<IGroundedChatFeature>();
+
+Console.WriteLine($"JSON output:    {jsonFeature is not null}");
+Console.WriteLine($"Tool calling:   {toolFeature is not null}");
+Console.WriteLine($"Streaming:      {streamFeature is not null}");
+Console.WriteLine($"Grounded chat:  {groundedFeature is not null}");
+```
+
+## Writing Provider-Agnostic Code
+
+Feature discovery is the right way to write code that degrades gracefully across providers:
+
+```csharp
+public static async Task<string> GetCompletionAsync(
+    IChatCompletionClient client,
+    ChatCompletionRequest request)
+{
+    // Prefer streaming when available
+    if (client.Features.Get<IStreamingChatFeature>() is { } streaming)
+    {
+        var sb = new StringBuilder();
+        await foreach (var chunk in streaming.GetChatCompletionStreamAsync(request))
+            sb.Append(chunk.Content);
+        return sb.ToString();
+    }
+
+    // Fall back to non-streaming
+    var response = await client.GetChatCompletionAsync(request);
+    return response.IsSuccess ? response.Content : throw new InvalidOperationException(response.ErrorMessage);
+}
+```
+
+## Testing with Feature Discovery
+
+When using `FakeChatCompletionClient`, you control which features are exposed via the `FakeChatFeatures` flags:
+
+```csharp
+// Only streaming + tool calling exposed
+var fake = new FakeChatCompletionClient(FakeChatFeatures.Streaming | FakeChatFeatures.ToolCalling);
+
+Assert.NotNull(fake.Features.Get<IStreamingChatFeature>());
+Assert.NotNull(fake.Features.Get<IToolCallingFeature>());
+Assert.Null(fake.Features.Get<IJsonOutputFeature>());  // not registered
+
+// Test that your code handles missing features gracefully
+var fake2 = new FakeChatCompletionClient(FakeChatFeatures.None);
+Assert.Null(fake2.Features.Get<IStreamingChatFeature>());
+```
+
+See [Testing with Cisharpai](testing.md) for the full fake client reference.
+
+## See Also
+
+- [Provider Feature Matrix](provider-features.md) — which providers support which features
+- [Tool Calling](tool-calling.md) — `IToolCallingFeature` guide
+- [Streaming](streaming.md) — `IStreamingChatFeature` guide
+- [JSON Output](json-output.md) — `IJsonOutputFeature` guide
+- [Grounded Chat (RAG)](grounded-chat.md) — `IGroundedChatFeature` guide
+- [Embeddings](embeddings.md) — `IImageEmbeddingFeature` and `IMultimodalEmbeddingFeature`
