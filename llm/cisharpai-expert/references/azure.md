@@ -91,7 +91,8 @@ This is a model catalog service. Capabilities depend on the deployed model:
 ```csharp
 var imageFeature = client.Features.Get<IImageEmbeddingFeature>();
 var response = await imageFeature.GetImageEmbeddingAsync(
-    new ImageEmbeddingRequest { ImagePath = "photo.png" });
+    imagePath: "photo.png",
+    model: "Phi-3-vision");
 ```
 
 ## DI with Keyed Services

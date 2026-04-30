@@ -66,11 +66,15 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Text Embeddings | text-embedding-ada-002, text-embedding-3-small, text-embedding-3-large |
 | JSON Mode | Via `response_format` (requires api-version 2024-08-01-preview+ for json_schema) |
 | Structured Outputs | Via `response_format.json_schema`; refusal extraction supported |
-| Reasoning Models | Detected automatically; uses `max_completion_tokens` instead of `max_tokens` |
+| Reasoning Models | Detected automatically; uses `max_completion_tokens` instead of `max_tokens`; `AzureOpenAiClientOptions.ReasoningEffort` sends `reasoning_effort` for o1/o3/o4/gpt-5 deployments |
 | Tool Calling | All deployments; identical JSON shape to OpenAI (`tools` array, `tool_choice` parameter); all `ToolChoice` variants supported |
 | Vision | Same data URI format as OpenAI; images sent as content parts in messages |
 | Streaming | `IStreamingChatFeature`; supports both legacy and reasoning request formats; `[DONE]` terminates the stream |
 | Authentication | API key (`api-key` header) or Azure AD (Bearer token) |
+
+`ReasoningEffort` is omitted for non-reasoning Azure OpenAI deployments to avoid unsupported-parameter errors. `ExtraParameters` still deep-merges into the final request and can override `reasoning_effort` or add newer Azure/OpenAI parameters before the typed options are updated.
+
+Azure OpenAI truncation is surfaced as a failed unified response when the provider returns `finish_reason: "length"`: `IsSuccess=false`, `Status="length"`, and `IncompleteReason="length"`. Some reasoning deployments may instead return an Azure HTTP error when the output limit is too low; those remain `IsSuccess=false` with the provider error in `ErrorMessage`/`RawResponseJson`.
 
 ### Azure AI Inference
 

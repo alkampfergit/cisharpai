@@ -79,10 +79,9 @@ Anthropic uses `output_config.format` for JSON mode:
 
 ```csharp
 var jsonFeature = client.Features.Get<IJsonOutputFeature>();
-var response = await jsonFeature.GetJsonChatCompletionAsync(request, new JsonOutputOptions
-{
-    Mode = JsonOutputMode.JsonObject
-});
+var response = await jsonFeature.GetChatCompletionWithJsonOutputAsync(
+    request,
+    new JsonOutputOptions(Mode: JsonOutputMode.JsonObject));
 ```
 
 Structured Outputs with schema are also supported.

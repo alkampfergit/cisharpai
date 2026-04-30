@@ -139,6 +139,17 @@ var request = new ChatCompletionRequest(
     ExtraParameters: extra);
 ```
 
+`ExtraParameters` is deep-merged into the generated provider request after typed options are serialized, so it can also override typed values. For example, Azure OpenAI exposes `AzureOpenAiClientOptions.ReasoningEffort`, but a single request can still override it:
+
+```csharp
+var extra = JsonDocument.Parse("""{"reasoning_effort":"high"}""").RootElement;
+var request = new ChatCompletionRequest(
+    Messages: [...],
+    Model: "gpt-5-nano",
+    MaxTokens: 200,
+    ExtraParameters: extra);
+```
+
 ## Model Compatibility
 
 ### Structured Outputs (json_schema)

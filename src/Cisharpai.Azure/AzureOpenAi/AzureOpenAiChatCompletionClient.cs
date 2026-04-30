@@ -72,7 +72,8 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
                 ? new AzureOpenAiReasoningChatRequest
                 {
                     Messages = messages,
-                    MaxCompletionTokens = request.MaxTokens
+                    MaxCompletionTokens = request.MaxTokens,
+                    ReasoningEffort = request.ReasoningEffort ?? _options.ReasoningEffort
                 }
                 : new AzureOpenAiChatRequest
                 {
@@ -113,6 +114,7 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
                 {
                     Messages = messages,
                     MaxCompletionTokens = request.MaxTokens,
+                    ReasoningEffort = request.ReasoningEffort ?? _options.ReasoningEffort,
                     ResponseFormat = responseFormat
                 }
                 : new AzureOpenAiChatRequest
@@ -155,6 +157,7 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
                 {
                     Messages = messages,
                     MaxCompletionTokens = request.MaxTokens,
+                    ReasoningEffort = request.ReasoningEffort ?? _options.ReasoningEffort,
                     Tools = tools,
                     ToolChoice = toolChoice
                 }
@@ -193,6 +196,7 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
             {
                 Messages = messages,
                 MaxCompletionTokens = request.MaxTokens,
+                ReasoningEffort = request.ReasoningEffort ?? _options.ReasoningEffort,
                 Stream = true,
                 StreamOptions = new AzureOpenAiStreamOptions { IncludeUsage = true }
             }
@@ -266,6 +270,8 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         }
 
         var choice = raw.Choices.FirstOrDefault();
+        var finishReason = choice?.FinishReason;
+        var isIncomplete = IsIncompleteFinishReason(finishReason);
 
         return new ChatCompletionResponse(
             Content: ContentPartHelper.ExtractStringContent(choice?.Message.Content),
@@ -274,6 +280,12 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
             CompletionTokens: raw.Usage.CompletionTokens,
             RawResponseJson: rawResponseJson,
             RawRequestJson: rawRequestJson,
+            Status: finishReason,
+            IncompleteReason: isIncomplete ? finishReason : null,
+            IsSuccess: !isIncomplete,
+            ErrorMessage: isIncomplete
+                ? $"Azure OpenAI response was incomplete because finish_reason was '{finishReason}'."
+                : null,
             Refusal: choice?.Message.Refusal);
     }
 
@@ -308,6 +320,8 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         string? rawRequestJson = null)
     {
         var choice = raw.Choices.FirstOrDefault();
+        var finishReason = choice?.FinishReason;
+        var isIncomplete = IsIncompleteFinishReason(finishReason);
         var content = ContentPartHelper.ExtractStringContent(choice?.Message.Content);
 
         var chatCompletion = new ChatCompletionResponse(
@@ -316,7 +330,13 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
             PromptTokens: raw.Usage.PromptTokens,
             CompletionTokens: raw.Usage.CompletionTokens,
             RawResponseJson: rawResponseJson,
-            RawRequestJson: rawRequestJson);
+            RawRequestJson: rawRequestJson,
+            Status: finishReason,
+            IncompleteReason: isIncomplete ? finishReason : null,
+            IsSuccess: !isIncomplete,
+            ErrorMessage: isIncomplete
+                ? $"Azure OpenAI response was incomplete because finish_reason was '{finishReason}'."
+                : null);
 
         var toolCalls = ToolCallingHelper.MapResponseToolCalls(
             choice?.Message.ToolCalls,
@@ -324,6 +344,9 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
 
         return new ToolCallingResponse(chatCompletion, toolCalls);
     }
+
+    private static bool IsIncompleteFinishReason(string? finishReason) =>
+        string.Equals(finishReason, "length", StringComparison.Ordinal);
 
     private static List<AzureOpenAiToolDefinition> MapToolDefinitions(IReadOnlyList<ToolDefinition> tools)
     {

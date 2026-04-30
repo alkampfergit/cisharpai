@@ -6,6 +6,18 @@
 <PackageReference Include="Cisharpai.Testing" />
 ```
 
+If the consuming project uses Central Package Management, also add a matching
+`<PackageVersion Include="Cisharpai.Testing" Version="..." />` in
+`Directory.Packages.props`.
+
+Most tests also need:
+
+```csharp
+using Cisharpai;
+using Cisharpai.Models;
+using Cisharpai.Testing;
+```
+
 ## FakeResponses Factory
 
 ```csharp
@@ -47,9 +59,9 @@ var fake = new FakeChatCompletionClient
 ### Response Queue (FIFO)
 
 ```csharp
-fake.ResponseQueue.Enqueue(FakeResponses.Chat("First"));
-fake.ResponseQueue.Enqueue(FakeResponses.Chat("Second"));
-fake.ResponseQueue.Enqueue(FakeResponses.ChatError("Oops"));
+fake.EnqueueResponse(FakeResponses.Chat("First"));
+fake.EnqueueResponse(FakeResponses.Chat("Second"));
+fake.EnqueueResponse(FakeResponses.ChatError("Oops"));
 // Queue is consumed first, then falls back to DefaultResponse
 ```
 
@@ -168,7 +180,20 @@ Assert.Null(streaming);  // feature not registered
 ### Sequential Responses
 
 ```csharp
-fake.ResponseQueue.Enqueue(FakeResponses.Chat("First call"));
-fake.ResponseQueue.Enqueue(FakeResponses.Chat("Second call"));
+fake.EnqueueResponse(FakeResponses.Chat("First call"));
+fake.EnqueueResponse(FakeResponses.Chat("Second call"));
 fake.DefaultResponse = FakeResponses.Chat("All subsequent calls");
 ```
+
+## Request DTO Syntax
+
+`ChatCompletionRequest` and `LlmMessage` are immutable positional records:
+
+```csharp
+var request = new ChatCompletionRequest(
+    Messages: [new LlmMessage(LlmRole.User, "What is 6x7?")],
+    Model: "gpt-4o");
+```
+
+Do not use object initializers for `ChatCompletionRequest`, and do not pass
+string roles such as `"user"` to `LlmMessage`.

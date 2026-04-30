@@ -56,6 +56,10 @@ public sealed class AzureOpenAiReasoningChatRequest
     [JsonPropertyName("max_completion_tokens")]
     public int? MaxCompletionTokens { get; set; }
 
+    [JsonPropertyName("reasoning_effort")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ReasoningEffort { get; set; }
+
     [JsonPropertyName("response_format")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AzureOpenAiResponseFormat? ResponseFormat { get; set; }

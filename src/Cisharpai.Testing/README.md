@@ -17,15 +17,19 @@ Lightweight fake clients for unit testing application code that depends on [Cish
 
 ```csharp
 using Cisharpai.Testing;
+using Cisharpai.Models;
 
 var fake = new FakeChatCompletionClient();
 fake.EnqueueResponse(FakeResponses.Chat("Hello from the fake!"));
 
 // Pass 'fake' wherever IChatCompletionClient is expected
+var request = new ChatCompletionRequest(
+    Messages: [new LlmMessage(LlmRole.User, "Say hello")]);
+
 var response = await fake.GetChatCompletionAsync(request);
 
 Assert.That(response.Content, Is.EqualTo("Hello from the fake!"));
-Assert.That(fake.CapturedRequests, Has.Count.EqualTo(1));
+Assert.That(fake.ReceivedRequests, Has.Count.EqualTo(1));
 ```
 
 ## Response Factories
@@ -49,7 +53,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 var services = new ServiceCollection();
 var fake = services.AddFakeChatCompletionClient();
-fake.SetDefaultResponse(FakeResponses.Chat("default"));
+fake.DefaultResponse = FakeResponses.Chat("default");
 
 var provider = services.BuildServiceProvider();
 var client = provider.GetRequiredService<IChatCompletionClient>();
@@ -61,7 +65,7 @@ Disable specific features to test code paths that check for feature availability
 
 ```csharp
 var fake = new FakeChatCompletionClient(
-    features: FakeChatFeatures.All & ~FakeChatFeatures.ToolCalling);
+    enabledFeatures: FakeChatFeatures.All & ~FakeChatFeatures.ToolCalling);
 
 // Features.Get<IToolCallingFeature>() will now return null
 ```

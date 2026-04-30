@@ -18,7 +18,7 @@ The only dependency needed by consuming applications.
   - `Embeddings/IMultimodalEmbeddingFeature.cs` — Mixed text+image embedding (Cohere Embed v4).
 - **`Models/`** — Unified DTOs (all immutable records):
   - `ChatCompletionRequest` (Messages, Model?, Temperature, MaxTokens, ExtraParameters)
-  - `ChatCompletionResponse` (Content, Usage, IsSuccess/ErrorMessage, RawResponseJson/RawRequestJson, Refusal)
+  - `ChatCompletionResponse` (Content, Usage, Status/IncompleteReason, IsSuccess/ErrorMessage, RawResponseJson/RawRequestJson, Refusal)
   - `EmbeddingRequest` / `EmbeddingResponse`
   - `LlmMessage` (Role, Content, ContentParts, ToolCallId, ToolCalls) + factory methods `WithImage()`, `WithBase64Image()`
   - `MessageContentPart` hierarchy: `TextContentPart`, `ImageFileContentPart`, `ImageBase64ContentPart`
@@ -44,7 +44,7 @@ The only dependency needed by consuming applications.
 Consolidated package for all Azure AI services. Uses HttpClient directly (no SDK deps except Azure.Identity).
 
 - **`Common/`** — `AzureClientOptionsBase`, `AzureAuthenticationHandler` (API key + Azure AD), `AzureErrorMapper`.
-- **`AzureOpenAi/`** — `AzureOpenAiChatCompletionClient` (chat + JSON + tools + streaming), `AzureOpenAiEmbeddingClient`. Endpoint: `openai/deployments/{deployment}/...`. Options: `DeploymentName`, `DefaultModel`. Both have static `Create(IHttpMessageHandlerFactory, options, TokenCredential?, ...)`.
+- **`AzureOpenAi/`** — `AzureOpenAiChatCompletionClient` (chat + JSON + tools + streaming), `AzureOpenAiEmbeddingClient`. Endpoint: `openai/deployments/{deployment}/...`. Options: `DeploymentName`, `DefaultModel`, `ReasoningEffort`. Both have static `Create(IHttpMessageHandlerFactory, options, TokenCredential?, ...)`.
 - **`AzureAiInference/`** — `AzureAiInferenceChatCompletionClient` (chat + JSON + tools + streaming), `AzureAiInferenceEmbeddingClient` (+ `IImageEmbeddingFeature`). Endpoint: `models/...`. Options: `ModelId`. Both have static `Create(IHttpMessageHandlerFactory, options, TokenCredential?, ...)`.
 - **`Extensions/`** — DI registration with keyed service overloads.
 

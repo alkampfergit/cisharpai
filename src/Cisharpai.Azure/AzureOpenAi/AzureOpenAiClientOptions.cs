@@ -19,6 +19,12 @@ public sealed class AzureOpenAiClientOptions : AzureClientOptionsBase
     public string? DefaultModel { get; set; }
 
     /// <summary>
+    /// Optional reasoning effort for Azure OpenAI reasoning models when the API version/model supports it.
+    /// Values are provider-defined, commonly "low", "medium", or "high".
+    /// </summary>
+    public string? ReasoningEffort { get; set; }
+
+    /// <summary>
     /// Initializes a new instance with the default API version.
     /// </summary>
     public AzureOpenAiClientOptions()
