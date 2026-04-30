@@ -224,8 +224,8 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
             MaxOutputTokens = request.MaxTokens,
             Input = await MapMessagesAsync(request.Messages, cancellationToken),
             Stream = true,
-            Reasoning = _options.ReasoningEffort is not null
-                ? new OpenAiReasoningOption { Effort = _options.ReasoningEffort }
+            Reasoning = (request.ReasoningEffort ?? _options.ReasoningEffort) is { } effort
+                ? new OpenAiReasoningOption { Effort = effort }
                 : null,
             Text = _options.TextVerbosity is not null
                 ? new OpenAiTextOption { Verbosity = _options.TextVerbosity }
@@ -461,8 +461,8 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
             Model = request.Model!,
             MaxOutputTokens = request.MaxTokens,
             Input = await MapMessagesAsync(request.Messages, cancellationToken),
-            Reasoning = _options.ReasoningEffort is not null
-                ? new OpenAiReasoningOption { Effort = _options.ReasoningEffort }
+            Reasoning = (request.ReasoningEffort ?? _options.ReasoningEffort) is { } effort
+                ? new OpenAiReasoningOption { Effort = effort }
                 : null,
             Text = _options.TextVerbosity is not null
                 ? new OpenAiTextOption { Verbosity = _options.TextVerbosity }
@@ -490,8 +490,8 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
             Model = request.Model!,
             MaxOutputTokens = request.MaxTokens,
             Input = await MapMessagesAsync(messages, cancellationToken),
-            Reasoning = _options.ReasoningEffort is not null
-                ? new OpenAiReasoningOption { Effort = _options.ReasoningEffort }
+            Reasoning = (request.ReasoningEffort ?? _options.ReasoningEffort) is { } effort
+                ? new OpenAiReasoningOption { Effort = effort }
                 : null,
             Text = textOption
         };

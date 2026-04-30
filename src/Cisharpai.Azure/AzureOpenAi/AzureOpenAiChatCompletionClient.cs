@@ -73,7 +73,7 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
                 {
                     Messages = messages,
                     MaxCompletionTokens = request.MaxTokens,
-                    ReasoningEffort = _options.ReasoningEffort
+                    ReasoningEffort = request.ReasoningEffort ?? _options.ReasoningEffort
                 }
                 : new AzureOpenAiChatRequest
                 {
@@ -114,7 +114,7 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
                 {
                     Messages = messages,
                     MaxCompletionTokens = request.MaxTokens,
-                    ReasoningEffort = _options.ReasoningEffort,
+                    ReasoningEffort = request.ReasoningEffort ?? _options.ReasoningEffort,
                     ResponseFormat = responseFormat
                 }
                 : new AzureOpenAiChatRequest
@@ -157,7 +157,7 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
                 {
                     Messages = messages,
                     MaxCompletionTokens = request.MaxTokens,
-                    ReasoningEffort = _options.ReasoningEffort,
+                    ReasoningEffort = request.ReasoningEffort ?? _options.ReasoningEffort,
                     Tools = tools,
                     ToolChoice = toolChoice
                 }
@@ -196,7 +196,7 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
             {
                 Messages = messages,
                 MaxCompletionTokens = request.MaxTokens,
-                ReasoningEffort = _options.ReasoningEffort,
+                ReasoningEffort = request.ReasoningEffort ?? _options.ReasoningEffort,
                 Stream = true,
                 StreamOptions = new AzureOpenAiStreamOptions { IncludeUsage = true }
             }

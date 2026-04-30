@@ -2,6 +2,7 @@ using Cisharpai.Models;
 using Cisharpai.Azure;
 using Cisharpai.Azure.AzureOpenAi;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Http;
 
 namespace Cisharpai.Integration.Tests.AzureOpenAi;
 
@@ -121,6 +122,47 @@ public sealed class AzureOpenAiChatCompletionIntegrationTests
         {
             Assert.That(response.ErrorMessage, Does.Contain("max_tokens").Or.Contain("output limit"));
         }
+    }
+
+    [TestCaseSource(nameof(Deployments))]
+    public async Task GetChatCompletionAsync_ViaCreateFactoryMethod_ReturnsValidResponse(string deployment)
+    {
+        var endpoint = Environment.GetEnvironmentVariable(DotEnv.AzureOpenAiTestEndpoint);
+        var apiKey = Environment.GetEnvironmentVariable(DotEnv.AzureOpenAiTestApiKey);
+
+        Assert.That(endpoint, Is.Not.Null.And.Not.Empty,
+            $"Environment variable {DotEnv.AzureOpenAiTestEndpoint} must be set.");
+        Assert.That(apiKey, Is.Not.Null.And.Not.Empty,
+            $"Environment variable {DotEnv.AzureOpenAiTestApiKey} must be set.");
+
+        var services = new ServiceCollection();
+        services.AddHttpClient();
+        await using var provider = services.BuildServiceProvider();
+        var handlerFactory = provider.GetRequiredService<IHttpMessageHandlerFactory>();
+
+        var client = AzureOpenAiChatCompletionClient.Create(
+            handlerFactory,
+            new AzureOpenAiClientOptions
+            {
+                Endpoint = endpoint!,
+                ApiKey = apiKey!,
+                DeploymentName = deployment
+            });
+
+        var request = new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "Reply with exactly: hello")],
+            Model: deployment,
+            Temperature: 0,
+            MaxTokens: 256,
+            IncludeRawResponse: true);
+
+        var response = await client.GetChatCompletionAsync(request);
+
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response.IsSuccess, Is.True, $"Request failed: {response.ErrorMessage}\nRaw: {response.RawResponseJson}");
+        Assert.That(response.Content, Is.Not.Null.And.Not.Empty);
+        Assert.That(response.PromptTokens, Is.GreaterThan(0));
+        Assert.That(response.CompletionTokens, Is.GreaterThan(0));
     }
 
     [TestCaseSource(nameof(Deployments))]
