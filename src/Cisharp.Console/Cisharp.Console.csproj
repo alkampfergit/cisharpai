@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" />
+    <PackageReference Include="Spectre.Console" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Cisharpai\Cisharpai.csproj" />
+    <ProjectReference Include="..\Cisharpai.OpenAi\Cisharpai.OpenAi.csproj" />
+    <ProjectReference Include="..\Cisharpai.Anthropic\Cisharpai.Anthropic.csproj" />
+    <ProjectReference Include="..\Cisharpai.Azure\Cisharpai.Azure.csproj" />
+    <ProjectReference Include="..\Cisharpai.Cohere\Cisharpai.Cohere.csproj" />
+  </ItemGroup>
+
+</Project>

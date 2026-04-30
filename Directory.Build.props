@@ -1,0 +1,38 @@
+<Project>
+
+  <PropertyGroup>
+    <!-- Packing defaults -->
+    <IsPackable>true</IsPackable>
+    <Authors>alkampfergit</Authors>
+    <Company>alkampfergit</Company>
+    <RepositoryUrl>https://github.com/alkampfergit/cisharpai</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/alkampfergit/cisharpai</PackageProjectUrl>
+    <Description>Unified .NET client library for chat completions and embeddings across multiple LLM providers.</Description>
+    <PackageTags>llm;openai;anthropic;azure;cohere;chat;embeddings;ai</PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup Condition="Exists('$(MSBuildThisFileDirectory)RELEASE_NOTES.md')">
+    <None Include="$(MSBuildThisFileDirectory)RELEASE_NOTES.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+
+  <ItemGroup Condition="Exists('$(MSBuildProjectDirectory)/README.md')">
+    <None Include="$(MSBuildProjectDirectory)/README.md" Pack="true" PackagePath="/" />
+  </ItemGroup>
+
+  <!-- Debuggable packages: Symbols and Source Link -->
+  <PropertyGroup>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />
+  </ItemGroup>
+
+</Project>

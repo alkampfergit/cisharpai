@@ -1,0 +1,36 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
+    <PackageReference Include="Microsoft.Extensions.Http" />
+    <PackageReference Include="NSubstitute" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NUnit" />
+    <PackageReference Include="NUnit.Analyzers" />
+    <PackageReference Include="NUnit3TestAdapter" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="NUnit.Framework" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Cisharpai\Cisharpai.csproj" />
+    <ProjectReference Include="..\Cisharpai.OpenAi\Cisharpai.OpenAi.csproj" />
+    <ProjectReference Include="..\Cisharpai.Anthropic\Cisharpai.Anthropic.csproj" />
+    <ProjectReference Include="..\Cisharpai.Azure\Cisharpai.Azure.csproj" />
+    <ProjectReference Include="..\Cisharpai.Cohere\Cisharpai.Cohere.csproj" />
+    <ProjectReference Include="..\Cisharpai.Tests.Common\Cisharpai.Tests.Common.csproj" />
+    <ProjectReference Include="..\Cisharpai.Testing\Cisharpai.Testing.csproj" />
+  </ItemGroup>
+
+</Project>

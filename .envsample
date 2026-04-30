@@ -1,0 +1,22 @@
+# OpenAI
+OPENAI_TEST_API_KEY=sk-your-openai-api-key-here
+
+# Anthropic
+ANTHROPIC_TEST_API_KEY=sk-ant-your-anthropic-api-key-here
+
+# Azure OpenAI
+AZURE_OPENAI_TEST_ENDPOINT=https://your-resource-name.openai.azure.com
+AZURE_OPENAI_TEST_API_KEY=your-azure-openai-api-key-here
+AZURE_OPENAI_TEST_DEPLOYMENTS=gpt-4o,gpt-4o-mini
+AZURE_OPENAI_TEST_EMBEDDING_DEPLOYMENT=text-embedding-ada-002
+
+# Azure AI Inference
+AZURE_INFERENCE_TEST_ENDPOINT=https://your-model-endpoint.region.inference.ai.azure.com
+AZURE_INFERENCE_TEST_API_KEY=your-azure-inference-api-key-here
+AZURE_INFERENCE_TEST_MODELS=Phi-3-mini-4k-instruct,Mistral-large
+AZURE_INFERENCE_TEST_EMBEDDING_ENDPOINT=https://your-embedding-endpoint.region.inference.ai.azure.com
+AZURE_INFERENCE_TEST_EMBEDDING_KEY=your-azure-inference-embedding-key-here
+AZURE_INFERENCE_TEST_EMBEDDING_MODEL=Cohere-embed-v3-english
+
+# Cohere
+COHERE_TEST_API_KEY=your-cohere-api-key-here
