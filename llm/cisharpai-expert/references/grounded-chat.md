@@ -23,12 +23,11 @@ var documents = new[]
     })
 };
 
-var response = await groundedFeature.GetGroundedChatCompletionAsync(request,
-    new GroundedChatOptions
-    {
-        Documents = documents,
-        CitationMode = CitationMode.Accurate
-    });
+var response = await groundedFeature.GetGroundedChatCompletionAsync(
+    request,
+    new GroundedChatOptions(
+        Documents: documents,
+        CitationMode: CitationMode.Accurate));
 
 Console.WriteLine(response.Content);
 foreach (var citation in response.Citations)

@@ -82,12 +82,10 @@ Streaming uses `response.completed` event instead of `[DONE]`.
 
 ```csharp
 var client = provider.GetRequiredService<IEmbeddingClient>();
-var response = await client.GetEmbeddingsAsync(new EmbeddingRequest
-{
-    Input = ["Hello world"],
-    Model = OpenAiModels.Embedding.TextEmbedding3Small,
-    Dimensions = 256  // dimension reduction supported
-});
+var response = await client.GetEmbeddingsAsync(new EmbeddingRequest(
+    Input: ["Hello world"],
+    Model: OpenAiModels.Embedding.TextEmbedding3Small,
+    Dimensions: 256)); // dimension reduction supported
 ```
 
 ## Troubleshooting

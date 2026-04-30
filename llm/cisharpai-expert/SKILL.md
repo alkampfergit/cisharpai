@@ -1,5 +1,5 @@
 ---
-name: csharpai-expert
+name: cisharpai-expert
 description: >
   Expert guidance for the Cisharpai .NET library — a unified HttpClient-based
   interface for OpenAI, Azure OpenAI, Azure AI Inference, Anthropic, and Cohere
@@ -64,11 +64,11 @@ services.AddCohereClient(o => { o.ApiKey = "..."; });
 ### 3. Send a Request
 
 ```csharp
-var request = new ChatCompletionRequest
-{
-    Messages = [new LlmMessage("user", "Hello!")],
-    Model = "gpt-4o"
-};
+using Cisharpai.Models;
+
+var request = new ChatCompletionRequest(
+    Messages: [new LlmMessage(LlmRole.User, "Hello!")],
+    Model: "gpt-4o");
 
 var response = await client.GetChatCompletionAsync(request);
 
@@ -117,13 +117,15 @@ if (streaming is not null)
 ## Core DTOs (Immutable Records)
 
 **ChatCompletionRequest:**
-- `Messages` (LlmMessage[]), `Model?`, `Temperature?`, `MaxTokens?`, `ExtraParameters?`, `IncludeRawResponse`
+- Positional immutable record: `new ChatCompletionRequest(Messages: [...], Model: "gpt-4o")`
+- Properties: `Messages`, `Model?`, `Temperature?`, `MaxTokens?`, `IncludeRawResponse`, `ExtraParameters?`
 
 **ChatCompletionResponse:**
 - `Content`, `Usage`, `IsSuccess`, `ErrorMessage`, `RawResponseJson`, `RawRequestJson`, `Refusal`
 
 **LlmMessage:**
 - `Role`, `Content`, `ContentParts`, `ToolCallId`, `ToolCalls`
+- Use `LlmRole.User`, `LlmRole.Assistant`, `LlmRole.System`, `LlmRole.Tool`; do not pass string roles.
 - Factory: `LlmMessage.WithImage(text, filePath)`, `LlmMessage.WithBase64Image(text, base64, mediaType)`
 
 **EmbeddingRequest:**
@@ -188,17 +190,24 @@ var content = response.Content;
 Deep-merge arbitrary JSON into the provider request for bleeding-edge features:
 
 ```csharp
-var request = new ChatCompletionRequest
-{
-    Messages = [new LlmMessage("user", "Hello")],
-    ExtraParameters = JsonDocument.Parse("""
+var request = new ChatCompletionRequest(
+    Messages: [new LlmMessage(LlmRole.User, "Hello")],
+    ExtraParameters: JsonDocument.Parse("""
     {
         "top_p": 0.9,
         "presence_penalty": 0.6
     }
-    """).RootElement
-};
+    """).RootElement);
 ```
+
+## Consumption Pitfalls
+
+- Import both `Cisharpai` for interfaces and `Cisharpai.Models` for DTOs.
+- `ChatCompletionRequest`, `LlmMessage`, `ToolDefinition`, `ToolCallingOptions`, and `JsonOutputOptions` are immutable positional records. Prefer constructor/named-argument syntax, not object initializers.
+- `LlmMessage` takes `LlmRole`, not a string. Use `new LlmMessage(LlmRole.User, "...")`.
+- Tool calling uses `IToolCallingFeature.GetChatCompletionWithToolsAsync(...)`.
+- JSON output uses `IJsonOutputFeature.GetChatCompletionWithJsonOutputAsync(...)`.
+- `FakeChatCompletionClient` queues responses with methods such as `EnqueueResponse(...)`, not a public `ResponseQueue` property.
 
 ## Project Structure
 

@@ -44,10 +44,10 @@ See [grounded-chat.md](grounded-chat.md) for full details.
 
 ```csharp
 var groundedFeature = client.Features.Get<IGroundedChatFeature>();
-var response = await groundedFeature.GetGroundedChatCompletionAsync(request,
-    new GroundedChatOptions
-    {
-        Documents =
+var response = await groundedFeature.GetGroundedChatCompletionAsync(
+    request,
+    new GroundedChatOptions(
+        Documents:
         [
             new DocumentChunk("doc-1", new Dictionary<string, string>
             {
@@ -55,8 +55,7 @@ var response = await groundedFeature.GetGroundedChatCompletionAsync(request,
                 ["snippet"] = "All employees must..."
             })
         ],
-        CitationMode = CitationMode.Accurate
-    });
+        CitationMode: CitationMode.Accurate));
 
 foreach (var citation in response.Citations)
     Console.WriteLine($"[{citation.Start}-{citation.End}] {citation.Text}");
