@@ -5,6 +5,7 @@ using Cisharpai.Features.Chat;
 using Cisharpai.Helpers;
 using Cisharpai.Models;
 using Cisharpai.OpenAi.Models;
+using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.OpenAi;
@@ -34,6 +35,20 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         features.Set<IToolCallingFeature>(this);
         features.Set<IStreamingChatFeature>(this);
         Features = features;
+    }
+
+    public static OpenAiChatCompletionClient Create(
+        IHttpMessageHandlerFactory handlerFactory,
+        OpenAiClientOptions options,
+        string handlerName = "cisharpai",
+        ILoggerFactory? loggerFactory = null)
+    {
+        var http = new HttpClient(new OpenAiAuthenticationHandler(options) { InnerHandler = handlerFactory.CreateHandler(handlerName) })
+        {
+            BaseAddress = new Uri(options.BaseUrl),
+            Timeout = TimeSpan.FromMinutes(2)
+        };
+        return new OpenAiChatCompletionClient(http, options, loggerFactory);
     }
 
     public async Task<ChatCompletionResponse> GetChatCompletionAsync(

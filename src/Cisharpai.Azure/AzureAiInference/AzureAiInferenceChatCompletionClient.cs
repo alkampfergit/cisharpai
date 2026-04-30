@@ -1,10 +1,13 @@
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using Azure.Core;
 using Cisharpai.Features;
 using Cisharpai.Features.Chat;
 using Cisharpai.Helpers;
 using Cisharpai.Models;
 using Cisharpai.Azure.AzureAiInference.Models;
+using Cisharpai.Azure.Common;
+using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.Azure.AzureAiInference;
@@ -38,6 +41,21 @@ public sealed class AzureAiInferenceChatCompletionClient : IChatCompletionClient
         features.Set<IToolCallingFeature>(this);
         features.Set<IStreamingChatFeature>(this);
         Features = features;
+    }
+
+    public static AzureAiInferenceChatCompletionClient Create(
+        IHttpMessageHandlerFactory handlerFactory,
+        AzureAiInferenceClientOptions options,
+        TokenCredential? credential = null,
+        string handlerName = "cisharpai",
+        ILoggerFactory? loggerFactory = null)
+    {
+        var http = new HttpClient(new AzureAuthenticationHandler(options, credential) { InnerHandler = handlerFactory.CreateHandler(handlerName) })
+        {
+            BaseAddress = new Uri(options.Endpoint),
+            Timeout = TimeSpan.FromMinutes(2)
+        };
+        return new AzureAiInferenceChatCompletionClient(http, options, loggerFactory);
     }
 
     public async Task<ChatCompletionResponse> GetChatCompletionAsync(
