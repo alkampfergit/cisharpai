@@ -2,7 +2,7 @@
   "$schema": "https://context7.com/schema/context7.json",
   "projectTitle": "Cisharpai",
   "description": "A unified .NET client library providing a common HttpClient-based interface for multiple LLM providers (OpenAI, Azure OpenAI, Azure AI Inference, Anthropic, Cohere).",
-  "folders": ["wiki"],
+  "folders": ["llm", "wiki"],
   "excludeFolders": [
     "src",
     "artifacts",
@@ -11,8 +11,7 @@
     ".config",
     ".devcontainer",
     "memories",
-    "scripts",
-    "llm"
+    "scripts"
   ],
   "excludeFiles": ["RELEASE_NOTES.md", "AGENTS.md", "CLAUDE.md"],
   "rules": [
