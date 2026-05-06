@@ -1,0 +1,5 @@
+root = true
+
+# Test files: suppress NUnit2045 (Assert.Multiple) — not enforced in this project
+[**/*Tests.cs]
+dotnet_diagnostic.NUnit2045.severity = none

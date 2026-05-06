@@ -71,7 +71,7 @@ public sealed class AzureOpenAiJsonOutputTests
         string? captured = null;
         var handler = new MockHttpMessageHandler(async (request, _) =>
         {
-            captured = await request.Content!.ReadAsStringAsync();
+            captured = await request.Content!.ReadAsStringAsync(CancellationToken.None);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(responseJson, System.Text.Encoding.UTF8, "application/json")

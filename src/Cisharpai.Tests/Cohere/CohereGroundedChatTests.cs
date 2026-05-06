@@ -117,7 +117,7 @@ public sealed class CohereGroundedChatTests
         string? capturedBody = null;
         var handler = new MockHttpMessageHandler(async (request, _) =>
         {
-            capturedBody = await request.Content!.ReadAsStringAsync();
+            capturedBody = await request.Content!.ReadAsStringAsync(CancellationToken.None);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(responseJson, System.Text.Encoding.UTF8, "application/json")
@@ -142,7 +142,7 @@ public sealed class CohereGroundedChatTests
         string? capturedBody = null;
         var handler = new MockHttpMessageHandler(async (req, _) =>
         {
-            capturedBody = await req.Content!.ReadAsStringAsync();
+            capturedBody = await req.Content!.ReadAsStringAsync(CancellationToken.None);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(responseJson, System.Text.Encoding.UTF8, "application/json")

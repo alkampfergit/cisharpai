@@ -49,7 +49,7 @@ public sealed class CohereJsonOutputTests
         string? capturedBody = null;
         var handler = new MockHttpMessageHandler(async (request, _) =>
         {
-            capturedBody = await request.Content!.ReadAsStringAsync();
+            capturedBody = await request.Content!.ReadAsStringAsync(CancellationToken.None);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(JsonResponseJson, System.Text.Encoding.UTF8, "application/json")
@@ -79,7 +79,7 @@ public sealed class CohereJsonOutputTests
         string? capturedBody = null;
         var handler = new MockHttpMessageHandler(async (request, _) =>
         {
-            capturedBody = await request.Content!.ReadAsStringAsync();
+            capturedBody = await request.Content!.ReadAsStringAsync(CancellationToken.None);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(JsonResponseJson, System.Text.Encoding.UTF8, "application/json")
@@ -109,7 +109,7 @@ public sealed class CohereJsonOutputTests
         string? capturedBody = null;
         var handler = new MockHttpMessageHandler(async (request, _) =>
         {
-            capturedBody = await request.Content!.ReadAsStringAsync();
+            capturedBody = await request.Content!.ReadAsStringAsync(CancellationToken.None);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(JsonResponseJson, System.Text.Encoding.UTF8, "application/json")
@@ -144,7 +144,7 @@ public sealed class CohereJsonOutputTests
         string? capturedBody = null;
         var handler = new MockHttpMessageHandler(async (request, _) =>
         {
-            capturedBody = await request.Content!.ReadAsStringAsync();
+            capturedBody = await request.Content!.ReadAsStringAsync(CancellationToken.None);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(JsonResponseJson, System.Text.Encoding.UTF8, "application/json")
@@ -179,7 +179,7 @@ public sealed class CohereJsonOutputTests
         string? capturedBody = null;
         var handler = new MockHttpMessageHandler(async (request, _) =>
         {
-            capturedBody = await request.Content!.ReadAsStringAsync();
+            capturedBody = await request.Content!.ReadAsStringAsync(CancellationToken.None);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(JsonResponseJson, System.Text.Encoding.UTF8, "application/json")
@@ -217,7 +217,7 @@ public sealed class CohereJsonOutputTests
         string? capturedBody = null;
         var handler = new MockHttpMessageHandler(async (request, _) =>
         {
-            capturedBody = await request.Content!.ReadAsStringAsync();
+            capturedBody = await request.Content!.ReadAsStringAsync(CancellationToken.None);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(JsonResponseJson, System.Text.Encoding.UTF8, "application/json")
@@ -254,7 +254,7 @@ public sealed class CohereJsonOutputTests
         string? capturedBody = null;
         var handler = new MockHttpMessageHandler(async (request, _) =>
         {
-            capturedBody = await request.Content!.ReadAsStringAsync();
+            capturedBody = await request.Content!.ReadAsStringAsync(CancellationToken.None);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(JsonResponseJson, System.Text.Encoding.UTF8, "application/json")
@@ -297,7 +297,7 @@ public sealed class CohereJsonOutputTests
         string? capturedBody = null;
         var handler = new MockHttpMessageHandler(async (request, _) =>
         {
-            capturedBody = await request.Content!.ReadAsStringAsync();
+            capturedBody = await request.Content!.ReadAsStringAsync(CancellationToken.None);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(JsonResponseJson, System.Text.Encoding.UTF8, "application/json")
