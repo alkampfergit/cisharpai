@@ -1,6 +1,6 @@
 # SonarCloud Issue Patterns
 
-Last updated: 2026-04-08
+Last updated: 2026-05-06
 
 ## Rules encountered
 
@@ -15,6 +15,36 @@ Last updated: 2026-04-08
 - **File**: Multiple command files
 - **Fix**: Use explicit type checks or template literals instead of `String(value)`
 - **Commit**: 6229d65
+
+### shelldre:S7688 - Use [[ ]] instead of [ ] in bash conditionals
+- **Language**: Shell (bash)
+- **Files**: `.devcontainer/postcreate.sh`, `.devcontainer/setup-git-aliases.sh`
+- **Fix**: Replace every `if [ ... ]` and `elif [ ... ]` with `if [[ ... ]]`/`elif [[ ... ]]`.
+  Combined `||`-joined single-bracket tests into a single `[[ cond1 || cond2 ]]`.
+- **Why**: `[[` avoids word splitting/glob expansion on variables; bash-idiomatic.
+  SonarCloud flags these as RELIABILITY/HIGH.
+- **PR**: alkampfergit/cisharpai#21 (2026-05-06)
+
+### external_roslyn:NUnit2045 - Wrap independent asserts in Assert.Multiple
+- **Language**: C#/.NET (NUnit)
+- **Fix**: Suppress via `.editorconfig` — not enforced in this project.
+  Add to `.editorconfig` scoped to `[**/*Tests.cs]`:
+  `dotnet_diagnostic.NUnit2045.severity = none`
+- **Why suppress**: The rule fires on every independent assert pair but using
+  Assert.Multiple everywhere adds noise with no real benefit in simple tests.
+  Suppressing at the Roslyn level makes SonarCloud (which ingests Roslyn diagnostics)
+  stop reporting it too.
+- **PR**: alkampfergit/cisharpai#22 (2026-05-06)
+
+### external_roslyn:CA2016 - Forward CancellationToken to async calls
+- **Language**: C#/.NET
+- **Fix**: Change `ReadAsStringAsync()` → `ReadAsStringAsync(CancellationToken.None)`
+  in test HTTP handler lambdas. Global sed works well:
+  `find src/ -name "*.cs" | xargs sed -i 's/ReadAsStringAsync()/ReadAsStringAsync(CancellationToken.None)/g'`
+- **Why**: Test lambdas use `CancellationToken _` (discard); the analyzer requires
+  either forwarding the token or passing `CancellationToken.None` explicitly.
+  `CancellationToken.None` is correct for test stubs — they are not real operations.
+- **PR**: alkampfergit/cisharpai#22 (2026-05-06)
 
 ### Duplication - Repeated command boilerplate
 - **Files**: assign.ts, get-item.ts, set-field.ts, set-state.ts

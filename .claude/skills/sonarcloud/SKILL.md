@@ -34,6 +34,23 @@ Before starting work, always read memory files to leverage past experience.
 
 ---
 
+## Project Discovery
+
+Before querying SonarCloud, find the project key and organization:
+
+```bash
+# From CI workflow (most reliable)
+grep -r "sonarscanner\|sonar.projectKey\|/k:" .github/workflows/
+
+# The key pattern is always: {org}_{repo} or defined explicitly
+# Example: /k:"alkampfergit_cisharpai" /o:"alkampfergit-github"
+```
+
+The SonarCloud API base URL is `https://sonarcloud.io`. No authentication is
+needed for public projects.
+
+---
+
 ## Read PR Issues
 
 ### Step 1 -- Find the PR
@@ -53,9 +70,13 @@ gh pr checks <pr-number>
 ```bash
 # Get all issues for a PR -- no authentication needed for public projects
 curl -s "https://sonarcloud.io/api/issues/search?componentKeys={owner}_{repo}&pullRequest={pr-number}&statuses=OPEN,CONFIRMED&ps=50"
-```
 
-This returns structured JSON with full issue details: rule, severity, message, file, line number, effort.
+# Get issues for the main branch (no PR filter)
+curl -s "https://sonarcloud.io/api/issues/search?componentKeys={owner}_{repo}&statuses=OPEN,CONFIRMED&impactSeverities=HIGH&ps=50"
+
+# Use facets to get rule distribution across all pages efficiently
+curl -s "https://sonarcloud.io/api/issues/search?componentKeys={owner}_{repo}&statuses=OPEN,CONFIRMED&impactSeverities=MEDIUM&ps=1&facets=rules"
+```
 
 **Fallback: GitHub check runs** (summary only, no individual issue details):
 
@@ -70,7 +91,7 @@ gh api repos/{owner}/{repo}/commits/{sha}/check-runs \
 ### Step 3 -- Parse the results
 
 From the SonarCloud API response, extract for each issue:
-- **rule** -- the SonarCloud rule ID (e.g., `typescript:S3776`)
+- **rule** -- the SonarCloud rule ID (e.g., `csharpsquid:S3776`, `external_roslyn:CA2016`)
 - **severity** -- MINOR, MAJOR, CRITICAL
 - **message** -- human-readable description
 - **component** -- file path (strip the `{project_key}:` prefix)
@@ -78,7 +99,18 @@ From the SonarCloud API response, extract for each issue:
 - **type** -- BUG, VULNERABILITY, CODE_SMELL
 - **impacts** -- softwareQuality + severity (e.g., MAINTAINABILITY/HIGH)
 
-Present a concise summary table to the user.
+Use the `facets=rules` parameter to get a count-per-rule summary efficiently
+instead of fetching all pages:
+
+```python
+# Parse rule distribution
+data = json.load(sys.stdin)
+facets = {f['property']: f['values'] for f in data.get('facets', [])}
+for r in sorted(facets['rules'], key=lambda x: -x['count'])[:10]:
+    print(f"{r['val']} -> {r['count']}")
+```
+
+Present a concise summary table to the user grouped by rule.
 
 ---
 
@@ -92,13 +124,16 @@ Group SonarCloud issues by type:
 3. **Code smells** -- Fix third
 4. **Duplication** -- Fix last (see [Fix Duplication](#fix-duplication))
 
+Within each type, fix by **count descending** — the highest-count rule clears
+the most issues per unit of effort.
+
 ### Step 2 -- Plan fixes with parallel safety
 
 **CRITICAL**: Check memory for known conflict hotspots before assigning work.
 
 When using parallel agents to fix issues:
 - **Partition by file** -- each agent gets exclusive files, never overlapping
-- **Never modify shared hub files** in parallel (e.g., `src/index.ts`, `package.json`)
+- **Never modify shared hub files** in parallel (e.g., `src/index.ts`, `package.json`, `Directory.Build.props`)
 - **Cross-cutting refactors** (extracting shared helpers, renaming across files) must be done sequentially, not in parallel
 
 Safe parallel pattern:
@@ -119,17 +154,27 @@ Agent 2: fixes duplication in get-item.ts, set-state.ts
 
 For each issue:
 1. Read the affected file
-2. Understand the SonarCloud rule being violated
+2. Understand the SonarCloud rule being violated (see [Known Rules](#known-rules) below)
 3. Apply the minimal fix (don't over-refactor)
-4. Run `npm test && npm run lint` to verify
+4. Verify the build is clean
 
 ### Step 4 -- Verify
 
+Choose the right check command for the project's tech stack:
+
 ```bash
-# Run full check suite
+# .NET projects
+dotnet build --nologo && dotnet test --no-build
+
+# Node.js / TypeScript projects
 npm test && npm run lint && npm run typecheck
 
-# Commit and push
+# General: always confirm 0 errors and all tests pass before committing
+```
+
+Then commit and push:
+
+```bash
 git add <specific-files>
 git commit -m "Fix SonarCloud issues: <brief description>"
 git push
@@ -141,7 +186,9 @@ After pushing, the SonarCloud check will re-run automatically on the PR.
 
 After fixing issues, update `memory/patterns.md` with:
 - Which rules triggered and how they were fixed
+- Language/ecosystem and why the fix is correct
 - Any new hotspot files identified
+- PR reference and date
 
 ---
 
@@ -168,25 +215,60 @@ gh api repos/{owner}/{repo}/commits/{sha}/check-runs \
 
 ---
 
+## Suppression Strategies
+
+Sometimes a rule genuinely doesn't apply to the project. Suppress at the source
+(build level) so SonarCloud stops seeing the diagnostic — never suppress only
+in SonarCloud's UI, as that doesn't help other developers.
+
+### .NET / C# — suppress a Roslyn analyzer rule
+
+```ini
+# .editorconfig at repo root
+root = true
+
+# Scope to test files only if appropriate
+[**/*Tests.cs]
+dotnet_diagnostic.NUnit2045.severity = none
+dotnet_diagnostic.CA2016.severity = none
+```
+
+After adding `.editorconfig`, rebuild — the warning count should drop.
+SonarCloud picks up the suppression on next analysis because it runs
+the same Roslyn analyzers.
+
+### TypeScript / ESLint — suppress a rule project-wide
+
+```json
+// .eslintrc.json
+{ "rules": { "rule-name": "off" } }
+```
+
+Or inline for a specific line:
+```ts
+// eslint-disable-next-line rule-name
+```
+
+---
+
 ## Fix Duplication
 
-Duplication is the most common quality gate failure in this project.
+Duplication is a common quality gate failure.
 
 ### Detection
 
 SonarCloud flags duplicated blocks (usually 10+ lines of identical or near-identical code).
 
-### Common duplication patterns in this project
+### Common duplication patterns
 
-1. **Command boilerplate** -- ID parsing, org/project validation, error handling
-   repeated across command files
-   - **Fix**: Extract to shared helpers (already done in `src/services/command-helpers.ts`)
+1. **Command boilerplate** -- ID parsing, validation, error handling repeated across command files
+   - **Fix**: Extract to shared helpers
 
 2. **Test setup** -- Same mock setup repeated across test files
-   - **Fix**: Extract to shared test utilities in `tests/unit/helpers/`
+   - **Fix**: Extract to shared test utilities; use parameterised tests (`it.each` / `[TestCase]`)
 
 3. **API call patterns** -- Similar fetch/auth/error patterns
-   - **Fix**: Use shared `fetchWithErrors` from `azdo-client.ts`
+   - **Fix**: Extract shared client/helper
 
 ### Duplication fix strategy
 
@@ -201,19 +283,43 @@ SonarCloud flags duplicated blocks (usually 10+ lines of identical or near-ident
 
 ---
 
-## Common SonarCloud Rules for This Project
+## Known Rules
 
-| Rule | What it means | Typical fix |
+Rules encountered across projects, with proven fixes.
+
+### Shell / Bash
+
+| Rule | What it means | Fix |
 |---|---|---|
-| S1192 | String literal duplication | Extract to constant |
-| S3358 | Nested ternary operations | Extract to if/else or helper function |
-| S3776 | Cognitive complexity too high | Extract helper functions |
-| S1481 | Unused local variable | Remove it |
-| S6551 | Avoid String() on object types | Use explicit toString() or template literal |
-| S6606 | Ternary instead of nullish coalescing | Use `??` operator |
-| S7735 | Unexpected negated condition | Flip condition or use `??` |
-| S7780 | Backslash escaping in strings | Use `String.raw` tagged template |
-| typescript:S107 | Too many parameters | Use options object |
+| `shelldre:S7688` | Use `[[` instead of `[` for conditional tests | Replace all `if [ ... ]` and `elif [ ... ]` with `if [[ ... ]]`. Merge `[ a ] \|\| [ b ]` into `[[ a \|\| b ]]`. Severity: RELIABILITY/HIGH |
+
+### C# / .NET
+
+| Rule | What it means | Fix |
+|---|---|---|
+| `external_roslyn:CA2016` | Forward `CancellationToken` to async methods | In test HTTP handler lambdas: `ReadAsStringAsync()` → `ReadAsStringAsync(CancellationToken.None)`. Use sed for bulk fix across test files |
+| `external_roslyn:NUnit2045` | Wrap independent asserts in `Assert.Multiple` | Suppress via `.editorconfig`: `dotnet_diagnostic.NUnit2045.severity = none` scoped to `[**/*Tests.cs]` if not enforced |
+| `external_roslyn:NUnit2046` | Use `Has.Length.EqualTo(n)` instead of `Is.EqualTo(n)` on `.Length` | Change `Assert.That(col.Length, Is.EqualTo(n))` → `Assert.That(col, Has.Length.EqualTo(n))` |
+| `external_roslyn:NUnit2009` | Actual and expected arguments are the same | Swap arguments so actual comes first, or fix the assertion logic |
+| `external_roslyn:NUnit4002` | Replace `Is.EqualTo(true)` with `Is.True` | Direct substitution |
+| `external_roslyn:CA1822` | Method doesn't access instance data | Add `static` modifier |
+| `csharpsquid:S6966` | Awaitable method called without `await` | Add `await` keyword |
+| `csharpsquid:S4457` | Method mixes sync validation and async code | Split into a sync validation method + separate async core |
+
+### TypeScript / JavaScript
+
+| Rule | What it means | Fix |
+|---|---|---|
+| `S1192` | String literal duplication | Extract to constant |
+| `S3358` | Nested ternary operations | Extract to if/else or helper function |
+| `S3776` | Cognitive complexity too high | Extract helper functions |
+| `S1481` | Unused local variable | Remove it |
+| `S5852` | Regex vulnerable to super-linear runtime | Replace backtracking regex with a linear character scan |
+| `S6551` | Avoid `String()` on object types | Use explicit `.toString()` or template literal |
+| `S6606` | Ternary instead of nullish coalescing | Use `??` operator |
+| `S7735` | Unexpected negated condition | Flip condition |
+| `S7780` | Backslash escaping in strings | Use `String.raw` tagged template |
+| `typescript:S107` | Too many parameters | Use options object |
 | Duplication | Code blocks repeated | Extract shared helper |
 
 ---
@@ -232,3 +338,11 @@ SonarCloud flags duplicated blocks (usually 10+ lines of identical or near-ident
 - This can happen with duplication -- if you copied code from an existing file,
   both the source and destination are flagged
 - Fix: refactor the shared code into a common location
+
+**RTK proxy summarizes curl output (token-saving mode)**
+- Use `rtk proxy curl ...` to bypass filtering and get raw JSON for parsing
+- Pipe to `python3 -c "import json,sys; ..."` for structured extraction
+
+**`impactSeverities` vs `severities` parameter**
+- Use `impactSeverities=HIGH` (new Clean Code model) not `severities=CRITICAL`
+- The new model maps to RELIABILITY/MAINTAINABILITY/SECURITY qualities with HIGH/MEDIUM/LOW severity
