@@ -1,4 +1,6 @@
 {
+  "url": "https://context7.com/alkampfergit/cisharpai",
+  "public_key": "pk_CZ2MIduVt5BsAxFsWVhKZ",
   "$schema": "https://context7.com/schema/context7.json",
   "projectTitle": "Cisharpai",
   "description": "A unified .NET client library providing a common HttpClient-based interface for multiple LLM providers (OpenAI, Azure OpenAI, Azure AI Inference, Anthropic, Cohere).",
