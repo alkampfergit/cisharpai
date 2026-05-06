@@ -275,18 +275,21 @@ public sealed class LlmHttpClient
         }
         finally
         {
-            if (activity is not null)
-            {
-                activity.SetTag("cisharpai.stream.chunks", chunkCount);
-                activity.SetTag("cisharpai.stream.completion_kind", completionKind);
-                if (activity.Status == ActivityStatusCode.Unset)
-                {
-                    activity.SetStatus(completionKind == "incomplete"
-                        ? ActivityStatusCode.Error
-                        : ActivityStatusCode.Ok);
-                }
-            }
+            FinalizeStreamActivity(activity, chunkCount, completionKind);
             response?.Dispose();
+        }
+    }
+
+    private static void FinalizeStreamActivity(Activity? activity, int chunkCount, string completionKind)
+    {
+        if (activity is null) return;
+        activity.SetTag("cisharpai.stream.chunks", chunkCount);
+        activity.SetTag("cisharpai.stream.completion_kind", completionKind);
+        if (activity.Status == ActivityStatusCode.Unset)
+        {
+            activity.SetStatus(completionKind == "incomplete"
+                ? ActivityStatusCode.Error
+                : ActivityStatusCode.Ok);
         }
     }
 
