@@ -13,7 +13,7 @@ public sealed class CohereMultimodalEmbeddingTests
         string? capturedBody = null;
         var handler = new MockHttpMessageHandler(async (request, _) =>
         {
-            capturedBody = await request.Content!.ReadAsStringAsync();
+            capturedBody = await request.Content!.ReadAsStringAsync(CancellationToken.None);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(MultimodalResponseJson, System.Text.Encoding.UTF8, "application/json")
@@ -57,7 +57,7 @@ public sealed class CohereMultimodalEmbeddingTests
         string? capturedBody = null;
         var handler = new MockHttpMessageHandler(async (request, _) =>
         {
-            capturedBody = await request.Content!.ReadAsStringAsync();
+            capturedBody = await request.Content!.ReadAsStringAsync(CancellationToken.None);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(MultimodalResponseJson, System.Text.Encoding.UTF8, "application/json")
@@ -97,7 +97,7 @@ public sealed class CohereMultimodalEmbeddingTests
         string? capturedBody = null;
         var handler = new MockHttpMessageHandler(async (request, _) =>
         {
-            capturedBody = await request.Content!.ReadAsStringAsync();
+            capturedBody = await request.Content!.ReadAsStringAsync(CancellationToken.None);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(MultimodalResponseJson, System.Text.Encoding.UTF8, "application/json")
@@ -141,7 +141,7 @@ public sealed class CohereMultimodalEmbeddingTests
         string? capturedBody = null;
         var handler = new MockHttpMessageHandler(async (request, _) =>
         {
-            capturedBody = await request.Content!.ReadAsStringAsync();
+            capturedBody = await request.Content!.ReadAsStringAsync(CancellationToken.None);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(MultimodalBatchResponseJson, System.Text.Encoding.UTF8, "application/json")
@@ -173,7 +173,7 @@ public sealed class CohereMultimodalEmbeddingTests
         string? capturedBody = null;
         var handler = new MockHttpMessageHandler(async (request, _) =>
         {
-            capturedBody = await request.Content!.ReadAsStringAsync();
+            capturedBody = await request.Content!.ReadAsStringAsync(CancellationToken.None);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(MultimodalResponseJson, System.Text.Encoding.UTF8, "application/json")
@@ -204,7 +204,7 @@ public sealed class CohereMultimodalEmbeddingTests
         string? capturedBody = null;
         var handler = new MockHttpMessageHandler(async (request, _) =>
         {
-            capturedBody = await request.Content!.ReadAsStringAsync();
+            capturedBody = await request.Content!.ReadAsStringAsync(CancellationToken.None);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(MultimodalResponseJson, System.Text.Encoding.UTF8, "application/json")
@@ -312,7 +312,7 @@ public sealed class CohereMultimodalEmbeddingTests
         string? capturedBody = null;
         var handler = new MockHttpMessageHandler(async (request, _) =>
         {
-            capturedBody = await request.Content!.ReadAsStringAsync();
+            capturedBody = await request.Content!.ReadAsStringAsync(CancellationToken.None);
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
                 Content = new StringContent(MultimodalResponseJson, System.Text.Encoding.UTF8, "application/json")
