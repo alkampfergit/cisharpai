@@ -29,13 +29,18 @@ public abstract record ToolChoice
     public static ToolChoice Specific(string functionName) => new SpecificChoice(functionName);
 
     /// <summary>Returns true if this is a <see cref="SpecificChoice"/>.</summary>
-    public bool IsSpecific => this is SpecificChoice;
+    public virtual bool IsSpecific => false;
 
     /// <summary>Gets the function name when this is a <see cref="SpecificChoice"/>, otherwise null.</summary>
-    public string? FunctionName => (this as SpecificChoice)?.Name;
+    public virtual string? FunctionName => null;
 
     internal sealed record AutoChoice() : ToolChoice;
     internal sealed record NoneChoice() : ToolChoice;
     internal sealed record RequiredChoice() : ToolChoice;
-    internal sealed record SpecificChoice(string Name) : ToolChoice;
+
+    internal sealed record SpecificChoice(string Name) : ToolChoice
+    {
+        public override bool IsSpecific => true;
+        public override string? FunctionName => Name;
+    }
 }
