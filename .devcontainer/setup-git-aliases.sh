@@ -6,7 +6,7 @@ set -euo pipefail
 echo "Setting up git aliases..."
 
 default_branch_ref="$(git symbolic-ref --quiet refs/remotes/origin/HEAD 2>/dev/null || true)"
-if [ -n "$default_branch_ref" ]; then
+if [[ -n "$default_branch_ref" ]]; then
   default_branch="${default_branch_ref#refs/remotes/origin/}"
 else
   default_branch="develop"
