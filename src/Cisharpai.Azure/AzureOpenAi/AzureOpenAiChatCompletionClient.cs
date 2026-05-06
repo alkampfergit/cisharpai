@@ -14,7 +14,7 @@ namespace Cisharpai.Azure.AzureOpenAi;
 
 /// <summary>
 /// Azure OpenAI chat completion client using HttpClient.
-/// Supports both legacy models (GPT-4) and reasoning models (o1/o3/o4/GPT-5).
+/// Supports legacy models (GPT-4), reasoning models (o1/o3/o4), and GPT-5 via the Responses API.
 /// </summary>
 public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature, IStreamingChatFeature
 {
@@ -25,6 +25,8 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
 
     private readonly LlmHttpClient _client;
     private readonly AzureOpenAiClientOptions _options;
+
+    internal enum AzureOpenAiModelType { Legacy, Reasoning, Gpt5 }
 
     public IFeatureCollection Features { get; }
 
@@ -64,11 +66,13 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
     {
         try
         {
-            var model = ResolveModel(request.Model);
-            var messages = await MapMessagesAsync(request.Messages, cancellationToken);
-            var isReasoning = IsReasoningModel(model);
+            var modelType = DetectModelTypeForRequest(request);
 
-            object providerRequest = isReasoning
+            if (modelType == AzureOpenAiModelType.Gpt5)
+                return await SendResponsesApiAsync(request, cancellationToken);
+
+            var messages = await MapMessagesAsync(request.Messages, cancellationToken);
+            object providerRequest = modelType == AzureOpenAiModelType.Reasoning
                 ? new AzureOpenAiReasoningChatRequest
                 {
                     Messages = messages,
@@ -103,13 +107,16 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         {
             jsonOutputOptions.Validate();
 
-            var model = ResolveModel(request.Model);
+            var modelType = DetectModelTypeForRequest(request);
+
+            if (modelType == AzureOpenAiModelType.Gpt5)
+                return await SendResponsesApiWithJsonAsync(request, jsonOutputOptions, cancellationToken);
+
             var adjustedMessages = JsonOutputHelper.EnsureJsonKeywordInSystemMessage(request.Messages, jsonOutputOptions);
             var messages = await MapMessagesAsync(adjustedMessages, cancellationToken);
-            var isReasoning = IsReasoningModel(model);
             var responseFormat = BuildResponseFormat(jsonOutputOptions);
 
-            object providerRequest = isReasoning
+            object providerRequest = modelType == AzureOpenAiModelType.Reasoning
                 ? new AzureOpenAiReasoningChatRequest
                 {
                     Messages = messages,
@@ -146,13 +153,13 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         {
             toolOptions.Validate();
 
-            var model = ResolveModel(request.Model);
+            var modelType = DetectModelTypeForRequest(request);
             var messages = await MapMessagesAsync(request.Messages, cancellationToken);
-            var isReasoning = IsReasoningModel(model);
             var tools = MapToolDefinitions(toolOptions.Tools);
             var toolChoice = MapToolChoiceValue(toolOptions.ToolChoice);
 
-            object providerRequest = isReasoning
+            // GPT-5 tool calling falls back to the Chat Completions path (same as OpenAI client)
+            object providerRequest = modelType == AzureOpenAiModelType.Reasoning
                 ? new AzureOpenAiReasoningChatRequest
                 {
                     Messages = messages,
@@ -186,12 +193,19 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         ChatCompletionRequest request,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var model = ResolveModel(request.Model);
+        var modelType = DetectModelTypeForRequest(request);
+
+        if (modelType == AzureOpenAiModelType.Gpt5)
+        {
+            await foreach (var chunk in StreamResponsesApiAsync(request, cancellationToken))
+                yield return chunk;
+            yield break;
+        }
+
         var messages = await MapMessagesAsync(request.Messages, cancellationToken);
-        var isReasoning = IsReasoningModel(model);
         var uri = $"openai/deployments/{_options.DeploymentName}/chat/completions?api-version={_options.ApiVersion}";
 
-        object providerRequest = isReasoning
+        object providerRequest = modelType == AzureOpenAiModelType.Reasoning
             ? new AzureOpenAiReasoningChatRequest
             {
                 Messages = messages,
@@ -245,6 +259,178 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
                     CompletionTokens: chunk.Usage.CompletionTokens);
             }
         }
+    }
+
+    private string ResponsesApiUri =>
+        $"openai/deployments/{_options.DeploymentName}/responses?api-version={_options.ApiVersion}";
+
+    private async Task<ChatCompletionResponse> SendResponsesApiAsync(
+        ChatCompletionRequest request,
+        CancellationToken cancellationToken)
+    {
+        var providerRequest = new AzureOpenAiResponsesApiRequest
+        {
+            MaxOutputTokens = request.MaxTokens,
+            Input = await MapMessagesAsync(request.Messages, cancellationToken),
+            Reasoning = (request.ReasoningEffort ?? _options.ReasoningEffort) is { } effort
+                ? new AzureOpenAiResponsesReasoningOption { Effort = effort }
+                : null,
+            Text = _options.TextVerbosity is not null
+                ? new AzureOpenAiTextOption { Verbosity = _options.TextVerbosity }
+                : null
+        };
+
+        return await ExecuteResponsesApiAsync(providerRequest, request, cancellationToken);
+    }
+
+    private async Task<ChatCompletionResponse> SendResponsesApiWithJsonAsync(
+        ChatCompletionRequest request,
+        JsonOutputOptions jsonOptions,
+        CancellationToken cancellationToken)
+    {
+        var messages = JsonOutputHelper.EnsureJsonKeywordInSystemMessage(request.Messages, jsonOptions);
+        var textOption = new AzureOpenAiTextOption
+        {
+            Verbosity = _options.TextVerbosity,
+            Format = BuildResponsesApiTextFormat(jsonOptions)
+        };
+
+        var providerRequest = new AzureOpenAiResponsesApiRequest
+        {
+            MaxOutputTokens = request.MaxTokens,
+            Input = await MapMessagesAsync(messages, cancellationToken),
+            Reasoning = (request.ReasoningEffort ?? _options.ReasoningEffort) is { } effort
+                ? new AzureOpenAiResponsesReasoningOption { Effort = effort }
+                : null,
+            Text = textOption
+        };
+
+        return await ExecuteResponsesApiAsync(providerRequest, request, cancellationToken);
+    }
+
+    private async Task<ChatCompletionResponse> ExecuteResponsesApiAsync(
+        AzureOpenAiResponsesApiRequest providerRequest,
+        ChatCompletionRequest request,
+        CancellationToken cancellationToken)
+    {
+        string? rawResponseJson = null;
+        string? rawRequestJson = null;
+        AzureOpenAiResponsesApiResponse raw;
+
+        if (request.IncludeRawResponse)
+        {
+            (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<AzureOpenAiResponsesApiRequest, AzureOpenAiResponsesApiResponse>(
+                ResponsesApiUri, providerRequest, request.ExtraParameters, cancellationToken);
+        }
+        else
+        {
+            raw = await _client.PostAsync<AzureOpenAiResponsesApiRequest, AzureOpenAiResponsesApiResponse>(
+                ResponsesApiUri, providerRequest, request.ExtraParameters, cancellationToken);
+        }
+
+        var content = raw.Output
+            .Where(o => o.Type == "message")
+            .SelectMany(o => o.Content)
+            .Where(c => c.Type == "output_text")
+            .Select(c => c.Text)
+            .FirstOrDefault() ?? string.Empty;
+
+        var refusal = raw.Output
+            .Where(o => o.Type == "message")
+            .SelectMany(o => o.Content)
+            .Where(c => c.Type == "refusal")
+            .Select(c => c.Refusal)
+            .FirstOrDefault();
+
+        var isIncomplete = raw.Status == "incomplete";
+        var incompleteReason = raw.IncompleteDetails?.Reason;
+
+        return new ChatCompletionResponse(
+            Content: content,
+            Model: raw.Model,
+            PromptTokens: raw.Usage.InputTokens,
+            CompletionTokens: raw.Usage.OutputTokens,
+            RawResponseJson: rawResponseJson,
+            RawRequestJson: rawRequestJson,
+            Status: raw.Status,
+            IncompleteReason: isIncomplete ? incompleteReason : null,
+            IsSuccess: !isIncomplete,
+            ErrorMessage: isIncomplete
+                ? $"Azure OpenAI Responses API response was incomplete: {incompleteReason}"
+                : null,
+            Refusal: refusal);
+    }
+
+    private async IAsyncEnumerable<ChatCompletionChunk> StreamResponsesApiAsync(
+        ChatCompletionRequest request,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        var providerRequest = new AzureOpenAiResponsesApiRequest
+        {
+            MaxOutputTokens = request.MaxTokens,
+            Input = await MapMessagesAsync(request.Messages, cancellationToken),
+            Stream = true,
+            Reasoning = (request.ReasoningEffort ?? _options.ReasoningEffort) is { } effort
+                ? new AzureOpenAiResponsesReasoningOption { Effort = effort }
+                : null,
+            Text = _options.TextVerbosity is not null
+                ? new AzureOpenAiTextOption { Verbosity = _options.TextVerbosity }
+                : null
+        };
+
+        string? model = null;
+
+        await foreach (var json in _client.PostStreamAsync(ResponsesApiUri, providerRequest, request.ExtraParameters, cancellationToken))
+        {
+            AzureOpenAiResponsesStreamEvent? evt;
+            try
+            {
+                evt = JsonSerializer.Deserialize<AzureOpenAiResponsesStreamEvent>(json, StreamJsonOptions);
+            }
+            catch
+            {
+                continue;
+            }
+
+            if (evt is null) continue;
+
+            switch (evt.Type)
+            {
+                case "response.output_text.delta":
+                    yield return new ChatCompletionChunk(
+                        Content: evt.Delta ?? string.Empty,
+                        Model: model);
+                    break;
+
+                case "response.completed":
+                    if (evt.Response is not null)
+                    {
+                        model = evt.Response.Model;
+                        yield return new ChatCompletionChunk(
+                            Content: string.Empty,
+                            FinishReason: evt.Response.Status,
+                            Model: model,
+                            PromptTokens: evt.Response.Usage?.InputTokens,
+                            CompletionTokens: evt.Response.Usage?.OutputTokens);
+                    }
+                    break;
+            }
+        }
+    }
+
+    private static AzureOpenAiTextFormat BuildResponsesApiTextFormat(JsonOutputOptions options)
+    {
+        if (options.Mode == JsonOutputMode.JsonMode)
+            return new AzureOpenAiTextFormat { Type = "json_object" };
+
+        return new AzureOpenAiTextFormat
+        {
+            Type = "json_schema",
+            Name = options.SchemaName,
+            Description = options.SchemaDescription,
+            Strict = options.Strict,
+            Schema = JsonDocument.Parse(options.JsonSchema!).RootElement.Clone()
+        };
     }
 
     private async Task<ChatCompletionResponse> ExecuteRequestAsync(
@@ -447,10 +633,31 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         return model ?? _options.DefaultModel;
     }
 
-    private static bool IsReasoningModel(string? model) =>
-        model is not null &&
-        (model.StartsWith("o1", StringComparison.OrdinalIgnoreCase) ||
-         model.StartsWith("o3", StringComparison.OrdinalIgnoreCase) ||
-         model.StartsWith("o4", StringComparison.OrdinalIgnoreCase) ||
-         model.StartsWith("gpt-5", StringComparison.OrdinalIgnoreCase));
+    /// <summary>
+    /// Picks the model identifier used for routing decisions.
+    /// <see cref="AzureOpenAiClientOptions.ModelFamily"/> wins when set (covers opaque deployment names);
+    /// otherwise falls back to the request/options model name.
+    /// </summary>
+    private AzureOpenAiModelType DetectModelTypeForRequest(ChatCompletionRequest request)
+    {
+        var hint = !string.IsNullOrWhiteSpace(_options.ModelFamily)
+            ? _options.ModelFamily
+            : ResolveModel(request.Model);
+        return DetectModelType(hint);
+    }
+
+    internal static AzureOpenAiModelType DetectModelType(string? model)
+    {
+        if (model is null) return AzureOpenAiModelType.Legacy;
+
+        if (model.StartsWith("gpt-5", StringComparison.OrdinalIgnoreCase))
+            return AzureOpenAiModelType.Gpt5;
+
+        if (model.StartsWith("o1", StringComparison.OrdinalIgnoreCase) ||
+            model.StartsWith("o3", StringComparison.OrdinalIgnoreCase) ||
+            model.StartsWith("o4", StringComparison.OrdinalIgnoreCase))
+            return AzureOpenAiModelType.Reasoning;
+
+        return AzureOpenAiModelType.Legacy;
+    }
 }

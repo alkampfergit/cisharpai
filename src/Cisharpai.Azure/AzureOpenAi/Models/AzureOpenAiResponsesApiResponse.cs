@@ -1,0 +1,72 @@
+using System.Text.Json.Serialization;
+
+namespace Cisharpai.Azure.AzureOpenAi.Models;
+
+public sealed class AzureOpenAiResponsesApiResponse
+{
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = string.Empty;
+
+    [JsonPropertyName("model")]
+    public string Model { get; set; } = string.Empty;
+
+    [JsonPropertyName("status")]
+    public string Status { get; set; } = string.Empty;
+
+    [JsonPropertyName("incomplete_details")]
+    public AzureOpenAiIncompleteDetails? IncompleteDetails { get; set; }
+
+    [JsonPropertyName("output")]
+    public List<AzureOpenAiResponseOutput> Output { get; set; } = [];
+
+    [JsonPropertyName("usage")]
+    public AzureOpenAiResponsesUsage Usage { get; set; } = new();
+}
+
+public sealed class AzureOpenAiIncompleteDetails
+{
+    [JsonPropertyName("reason")]
+    public string Reason { get; set; } = string.Empty;
+}
+
+public sealed class AzureOpenAiResponseOutput
+{
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = string.Empty;
+
+    [JsonPropertyName("role")]
+    public string Role { get; set; } = string.Empty;
+
+    [JsonPropertyName("content")]
+    public List<AzureOpenAiResponseContent> Content { get; set; } = [];
+}
+
+public sealed class AzureOpenAiResponseContent
+{
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = string.Empty;
+
+    [JsonPropertyName("text")]
+    public string Text { get; set; } = string.Empty;
+
+    [JsonPropertyName("refusal")]
+    public string? Refusal { get; set; }
+}
+
+public sealed class AzureOpenAiResponsesUsage
+{
+    [JsonPropertyName("input_tokens")]
+    public int InputTokens { get; set; }
+
+    [JsonPropertyName("output_tokens")]
+    public int OutputTokens { get; set; }
+
+    [JsonPropertyName("output_tokens_details")]
+    public AzureOpenAiOutputTokensDetails? OutputTokensDetails { get; set; }
+}
+
+public sealed class AzureOpenAiOutputTokensDetails
+{
+    [JsonPropertyName("reasoning_tokens")]
+    public int ReasoningTokens { get; set; }
+}
