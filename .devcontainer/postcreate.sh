@@ -57,7 +57,7 @@ echo "Installing tokensave..."
 TOKENSAVE_TAG=$(curl -sI https://github.com/aovestdipaperino/tokensave/releases/latest | grep -i '^location:' | sed 's|.*/tag/||;s/\r//')
 TOKENSAVE_VERSION="${TOKENSAVE_TAG#v}"
 ARCH=$(uname -m)
-if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
+if [[ "$ARCH" = "aarch64" || "$ARCH" = "arm64" ]]; then
     TOKENSAVE_ARCH="aarch64-linux"
 else
     TOKENSAVE_ARCH="x86_64-linux"
@@ -65,9 +65,9 @@ fi
 TOKENSAVE_URL="https://github.com/aovestdipaperino/tokensave/releases/download/${TOKENSAVE_TAG}/tokensave-${TOKENSAVE_TAG}-${TOKENSAVE_ARCH}.tar.gz"
 echo "  Downloading tokensave ${TOKENSAVE_VERSION} (${TOKENSAVE_ARCH})..."
 curl --proto '=https' --tlsv1.2 -sL "$TOKENSAVE_URL" -o /tmp/tokensave.tar.gz || true
-if [ -f /tmp/tokensave.tar.gz ]; then
+if [[ -f /tmp/tokensave.tar.gz ]]; then
     tar xzf /tmp/tokensave.tar.gz -C /tmp || true
-    if [ -f /tmp/tokensave ]; then
+    if [[ -f /tmp/tokensave ]]; then
         sudo mv /tmp/tokensave /usr/local/bin/tokensave
         echo "  tokensave installed."
     fi
@@ -104,15 +104,15 @@ else
     echo "Homebrew already installed, skipping."
 fi
 
-if [ -x /home/linuxbrew/.linuxbrew/bin/brew ]; then
+if [[ -x /home/linuxbrew/.linuxbrew/bin/brew ]]; then
     BREW_BIN="/home/linuxbrew/.linuxbrew/bin/brew"
-elif [ -x /opt/homebrew/bin/brew ]; then
+elif [[ -x /opt/homebrew/bin/brew ]]; then
     BREW_BIN="/opt/homebrew/bin/brew"
 else
     BREW_BIN=""
 fi
 
-if [ -n "$BREW_BIN" ]; then
+if [[ -n "$BREW_BIN" ]]; then
     BREW_SHELLENV_LINE="eval \"\$($BREW_BIN shellenv)\""
     append_if_missing "$BREW_SHELLENV_LINE" "$HOME/.zprofile"
     append_if_missing "$BREW_SHELLENV_LINE" "$HOME/.zshrc"
