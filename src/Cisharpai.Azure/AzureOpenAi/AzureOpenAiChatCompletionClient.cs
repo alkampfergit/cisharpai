@@ -313,20 +313,8 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         ChatCompletionRequest request,
         CancellationToken cancellationToken)
     {
-        string? rawResponseJson = null;
-        string? rawRequestJson = null;
-        AzureOpenAiResponsesApiResponse raw;
-
-        if (request.IncludeRawResponse)
-        {
-            (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<AzureOpenAiResponsesApiRequest, AzureOpenAiResponsesApiResponse>(
-                ResponsesApiUri, providerRequest, request.ExtraParameters, cancellationToken);
-        }
-        else
-        {
-            raw = await _client.PostAsync<AzureOpenAiResponsesApiRequest, AzureOpenAiResponsesApiResponse>(
-                ResponsesApiUri, providerRequest, request.ExtraParameters, cancellationToken);
-        }
+        var (raw, rawResponseJson, rawRequestJson) = await PostWithOptionalRawAsync<AzureOpenAiResponsesApiRequest, AzureOpenAiResponsesApiResponse>(
+            ResponsesApiUri, providerRequest, request, cancellationToken);
 
         var content = raw.Output
             .Where(o => o.Type == "message")
@@ -440,20 +428,8 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
     {
         var uri = $"openai/deployments/{_options.DeploymentName}/chat/completions?api-version={_options.ApiVersion}";
 
-        string? rawResponseJson = null;
-        string? rawRequestJson = null;
-        AzureOpenAiChatResponse raw;
-
-        if (request.IncludeRawResponse)
-        {
-            (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<object, AzureOpenAiChatResponse>(
-                uri, providerRequest, request.ExtraParameters, cancellationToken);
-        }
-        else
-        {
-            raw = await _client.PostAsync<object, AzureOpenAiChatResponse>(
-                uri, providerRequest, request.ExtraParameters, cancellationToken);
-        }
+        var (raw, rawResponseJson, rawRequestJson) = await PostWithOptionalRawAsync<object, AzureOpenAiChatResponse>(
+            uri, providerRequest, request, cancellationToken);
 
         var choice = raw.Choices.FirstOrDefault();
         var finishReason = choice?.FinishReason;
@@ -482,22 +458,33 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
     {
         var uri = $"openai/deployments/{_options.DeploymentName}/chat/completions?api-version={_options.ApiVersion}";
 
-        string? rawResponseJson = null;
-        string? rawRequestJson = null;
-        AzureOpenAiChatResponse raw;
-
-        if (request.IncludeRawResponse)
-        {
-            (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<object, AzureOpenAiChatResponse>(
-                uri, providerRequest, request.ExtraParameters, cancellationToken);
-        }
-        else
-        {
-            raw = await _client.PostAsync<object, AzureOpenAiChatResponse>(
-                uri, providerRequest, request.ExtraParameters, cancellationToken);
-        }
+        var (raw, rawResponseJson, rawRequestJson) = await PostWithOptionalRawAsync<object, AzureOpenAiChatResponse>(
+            uri, providerRequest, request, cancellationToken);
 
         return MapToolCallingResponse(raw, rawResponseJson, rawRequestJson);
+    }
+
+    /// <summary>
+    /// Centralizes the IncludeRawResponse-aware POST so the three execute paths
+    /// (chat completions, tool calling, responses API) don't repeat the if/else block.
+    /// </summary>
+    private async Task<(TResponse Raw, string? RawResponseJson, string? RawRequestJson)> PostWithOptionalRawAsync<TRequest, TResponse>(
+        string uri,
+        TRequest providerRequest,
+        ChatCompletionRequest request,
+        CancellationToken cancellationToken)
+        where TRequest : class
+    {
+        if (request.IncludeRawResponse)
+        {
+            var (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<TRequest, TResponse>(
+                uri, providerRequest, request.ExtraParameters, cancellationToken);
+            return (raw, rawResponseJson, rawRequestJson);
+        }
+
+        var response = await _client.PostAsync<TRequest, TResponse>(
+            uri, providerRequest, request.ExtraParameters, cancellationToken);
+        return (response, null, null);
     }
 
     private static ToolCallingResponse MapToolCallingResponse(

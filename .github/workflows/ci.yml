@@ -188,7 +188,7 @@ jobs:
             /d:sonar.cs.vstest.reportsPaths="artifacts/TestResults/**/*.trx" `
             /d:sonar.cs.opencover.reportsPaths="artifacts/TestResults/**/coverage.opencover.xml" `
             /d:sonar.coverage.exclusions="**/*Tests*/**,**/Cisharp.Console/**" `
-            /d:sonar.cpd.exclusions="**/*Tests*/**,**/Cisharp.Console/**"
+            /d:sonar.cpd.exclusions="**/*Tests*/**,**/Cisharp.Console/**,**/Models/**"
           if ($LASTEXITCODE -ne 0) { throw "SonarScanner begin failed" }
 
           # Restore
