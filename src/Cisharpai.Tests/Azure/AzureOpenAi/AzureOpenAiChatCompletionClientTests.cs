@@ -230,7 +230,7 @@ public sealed class AzureOpenAiChatCompletionClientTests
     }
 
     [Test]
-    public async Task GetChatCompletionAsync_OpaqueDeploymentName_WithModelFamilyGpt5_RoutesToResponsesApi()
+    public async Task GetChatCompletionAsync_OpaqueDeploymentName_WithModelNameGpt5_RoutesToResponsesApi()
     {
         string? capturedUri = null;
         var handler = new MockHttpMessageHandler(async (req, _) =>
@@ -249,7 +249,7 @@ public sealed class AzureOpenAiChatCompletionClientTests
             DeploymentName = "foo",
             ApiVersion = "2025-04-01-preview",
             ApiKey = "test-key",
-            ModelFamily = "gpt-5"
+            ModelName = "gpt-5"
         };
         var client = new AzureOpenAiChatCompletionClient(httpClient, options);
 
@@ -265,7 +265,7 @@ public sealed class AzureOpenAiChatCompletionClientTests
     }
 
     [Test]
-    public async Task GetChatCompletionAsync_OpaqueDeploymentName_WithoutModelFamily_FallsBackToChatCompletions()
+    public async Task GetChatCompletionAsync_OpaqueDeploymentName_WithoutModelName_FallsBackToChatCompletions()
     {
         string? capturedUri = null;
         var handler = new MockHttpMessageHandler(async (req, _) =>
@@ -295,9 +295,9 @@ public sealed class AzureOpenAiChatCompletionClientTests
     }
 
     [Test]
-    public async Task GetChatCompletionAsync_ModelFamily_OverridesDeploymentNameHint()
+    public async Task GetChatCompletionAsync_ModelName_OverridesDeploymentNameHint()
     {
-        // Deployment name suggests gpt-5 but ModelFamily explicitly says legacy gpt-4o
+        // Deployment name suggests gpt-5 but ModelName explicitly says legacy gpt-4o
         string? capturedUri = null;
         var handler = new MockHttpMessageHandler(async (req, _) =>
         {
@@ -315,7 +315,7 @@ public sealed class AzureOpenAiChatCompletionClientTests
             DeploymentName = "gpt-5-misnamed",
             ApiVersion = "2024-10-21",
             ApiKey = "test-key",
-            ModelFamily = "gpt-4o"
+            ModelName = "gpt-4o"
         };
         var client = new AzureOpenAiChatCompletionClient(httpClient, options);
 
@@ -324,6 +324,209 @@ public sealed class AzureOpenAiChatCompletionClientTests
             Model: "gpt-5-misnamed"));
 
         Assert.That(capturedUri, Does.Contain("/chat/completions"));
+    }
+
+    [Test]
+    public async Task GetChatCompletionAsync_ChatCompletions404_FallsBackToResponsesApi_AndCachesRoute()
+    {
+        const string notFoundJson = """{"error":{"code":"404","message":"Resource not found"}}""";
+        var requestedUris = new List<string>();
+        var handler = new MockHttpMessageHandler((req, _) =>
+        {
+            requestedUris.Add(req.RequestUri!.PathAndQuery);
+
+            if (req.RequestUri.AbsolutePath.EndsWith("/chat/completions", StringComparison.Ordinal))
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)
+                {
+                    Content = new StringContent(notFoundJson, Encoding.UTF8, "application/json")
+                });
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(Gpt5ResponseJson, Encoding.UTF8, "application/json")
+            });
+        });
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://myresource.openai.azure.com/") };
+        var options = new AzureOpenAiClientOptions
+        {
+            Endpoint = "https://myresource.openai.azure.com/",
+            DeploymentName = "opaque-deployment",
+            ApiVersion = "2025-04-01-preview",
+            ApiKey = "test-key"
+        };
+        var client = new AzureOpenAiChatCompletionClient(httpClient, options);
+        var request = new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "Hello")],
+            Model: "opaque-deployment");
+
+        var firstResponse = await client.GetChatCompletionAsync(request);
+        var secondResponse = await client.GetChatCompletionAsync(request);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(firstResponse.IsSuccess, Is.True);
+            Assert.That(firstResponse.Content, Is.EqualTo("Hello there!"));
+            Assert.That(secondResponse.IsSuccess, Is.True);
+            Assert.That(requestedUris, Is.EqualTo(new[]
+            {
+                "/openai/deployments/opaque-deployment/chat/completions?api-version=2025-04-01-preview",
+                "/openai/deployments/opaque-deployment/responses?api-version=2025-04-01-preview",
+                "/openai/deployments/opaque-deployment/responses?api-version=2025-04-01-preview"
+            }));
+        });
+    }
+
+    [Test]
+    public async Task GetChatCompletionAsync_ResponsesApi404_FallsBackToChatCompletions_AndCachesRoute()
+    {
+        const string notFoundJson = """{"error":{"code":"404","message":"Resource not found"}}""";
+        var requestedUris = new List<string>();
+        var handler = new MockHttpMessageHandler((req, _) =>
+        {
+            requestedUris.Add(req.RequestUri!.PathAndQuery);
+
+            if (req.RequestUri.AbsolutePath.EndsWith("/responses", StringComparison.Ordinal))
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)
+                {
+                    Content = new StringContent(notFoundJson, Encoding.UTF8, "application/json")
+                });
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(AzureResponseJson, Encoding.UTF8, "application/json")
+            });
+        });
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://myresource.openai.azure.com/") };
+        var options = new AzureOpenAiClientOptions
+        {
+            Endpoint = "https://myresource.openai.azure.com/",
+            DeploymentName = "gpt-5-misleading",
+            ApiVersion = "2025-04-01-preview",
+            ApiKey = "test-key"
+        };
+        var client = new AzureOpenAiChatCompletionClient(httpClient, options);
+        var request = new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "Hello")],
+            Model: "gpt-5-misleading");
+
+        var firstResponse = await client.GetChatCompletionAsync(request);
+        var secondResponse = await client.GetChatCompletionAsync(request);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(firstResponse.IsSuccess, Is.True);
+            Assert.That(firstResponse.Content, Is.EqualTo("Hello there!"));
+            Assert.That(secondResponse.IsSuccess, Is.True);
+            Assert.That(requestedUris, Is.EqualTo(new[]
+            {
+                "/openai/deployments/gpt-5-misleading/responses?api-version=2025-04-01-preview",
+                "/openai/deployments/gpt-5-misleading/chat/completions?api-version=2025-04-01-preview",
+                "/openai/deployments/gpt-5-misleading/chat/completions?api-version=2025-04-01-preview"
+            }));
+        });
+    }
+
+    [Test]
+    public async Task GetChatCompletionWithToolsAsync_LegacyPayloadRejected_RetriesReasoningFormat()
+    {
+        const string unsupportedParameterJson = """
+            {
+              "error": {
+                "message": "Unsupported parameter: 'max_tokens' is not supported with this model. Use 'max_completion_tokens' instead.",
+                "type": "invalid_request_error",
+                "param": "max_tokens",
+                "code": "unsupported_parameter"
+              }
+            }
+            """;
+        const string toolCallResponseJson = """
+            {
+              "model": "o3-mini",
+              "choices": [
+                {
+                  "message": {
+                    "role": "assistant",
+                    "tool_calls": [
+                      {
+                        "id": "call_1",
+                        "type": "function",
+                        "function": {
+                          "name": "get_weather",
+                          "arguments": "{\"city\":\"Paris\"}"
+                        }
+                      }
+                    ]
+                  },
+                  "finish_reason": "tool_calls"
+                }
+              ],
+              "usage": {
+                "prompt_tokens": 10,
+                "completion_tokens": 5
+              }
+            }
+            """;
+
+        var capturedBodies = new List<string>();
+        var handler = new MockHttpMessageHandler(async (req, _) =>
+        {
+            var body = await req.Content!.ReadAsStringAsync(CancellationToken.None);
+            capturedBodies.Add(body);
+
+            if (body.Contains("\"max_tokens\"", StringComparison.Ordinal))
+            {
+                return new HttpResponseMessage(HttpStatusCode.BadRequest)
+                {
+                    Content = new StringContent(unsupportedParameterJson, Encoding.UTF8, "application/json")
+                };
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(toolCallResponseJson, Encoding.UTF8, "application/json")
+            };
+        });
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://myresource.openai.azure.com/") };
+        var options = new AzureOpenAiClientOptions
+        {
+            Endpoint = "https://myresource.openai.azure.com/",
+            DeploymentName = "opaque-reasoning",
+            ApiVersion = "2024-10-21",
+            ApiKey = "test-key"
+        };
+        var client = new AzureOpenAiChatCompletionClient(httpClient, options);
+        var toolOptions = new ToolCallingOptions(
+            Tools:
+            [
+                new ToolDefinition(
+                    "get_weather",
+                    "Get the weather for a city",
+                    JsonDocument.Parse("""{"type":"object","properties":{"city":{"type":"string"}},"required":["city"]}""").RootElement.Clone())
+            ]);
+
+        var response = await client.GetChatCompletionWithToolsAsync(
+            new ChatCompletionRequest(
+                Messages: [new LlmMessage(LlmRole.User, "What is the weather in Paris?")],
+                Model: "opaque-reasoning",
+                MaxTokens: 128),
+            toolOptions);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.True, response.ErrorMessage);
+            Assert.That(response.ToolCalls, Is.Not.Null.And.Count.EqualTo(1));
+            Assert.That(response.ToolCalls![0].FunctionName, Is.EqualTo("get_weather"));
+            Assert.That(capturedBodies, Has.Count.EqualTo(2));
+            Assert.That(capturedBodies[0], Does.Contain("\"max_tokens\""));
+            Assert.That(capturedBodies[1], Does.Contain("max_completion_tokens"));
+        });
     }
 
     [Test]

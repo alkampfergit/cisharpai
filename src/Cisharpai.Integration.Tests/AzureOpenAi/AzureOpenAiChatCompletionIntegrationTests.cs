@@ -35,10 +35,8 @@ public sealed class AzureOpenAiChatCompletionIntegrationTests
         deployment.StartsWith("o3", StringComparison.OrdinalIgnoreCase) ||
         deployment.StartsWith("o4", StringComparison.OrdinalIgnoreCase);
 
-    // Filters deployments that the Azure client routes through the Responses API
-    // (currently only gpt-5 family; extend here when Azure adds more Responses-API models).
-    private static bool UsesResponsesApi(string deployment) =>
-        deployment.StartsWith("gpt-5", StringComparison.OrdinalIgnoreCase);
+    private static bool UsesResponsesApiRequest(string? rawRequestJson) =>
+        rawRequestJson?.Contains("\"input\"", StringComparison.Ordinal) == true;
 
     [TestCaseSource(nameof(Deployments))]
     public async Task GetChatCompletionAsync_ReturnsValidResponse(string deployment)
@@ -180,9 +178,6 @@ public sealed class AzureOpenAiChatCompletionIntegrationTests
     [TestCaseSource(nameof(Deployments))]
     public async Task GetChatCompletionAsync_Gpt5_UsesResponsesApi_AndReturnsValidResponse(string deployment)
     {
-        if (!UsesResponsesApi(deployment))
-            Assert.Ignore($"Deployment {deployment} does not use the Responses API.");
-
         var endpoint = Environment.GetEnvironmentVariable(DotEnv.AzureOpenAiTestEndpoint);
         var apiKey = Environment.GetEnvironmentVariable(DotEnv.AzureOpenAiTestApiKey);
 
@@ -214,6 +209,9 @@ public sealed class AzureOpenAiChatCompletionIntegrationTests
 
         var response = await client.GetChatCompletionAsync(request);
 
+        if (!UsesResponsesApiRequest(response.RawRequestJson))
+            Assert.Ignore($"Deployment {deployment} did not route through the Responses API.");
+
         Assert.Multiple(() =>
         {
             Assert.That(response, Is.Not.Null);
@@ -228,9 +226,6 @@ public sealed class AzureOpenAiChatCompletionIntegrationTests
     [TestCaseSource(nameof(Deployments))]
     public async Task GetChatCompletionAsync_Gpt5_TextVerbosityHigh_IsSentInRequest(string deployment)
     {
-        if (!UsesResponsesApi(deployment))
-            Assert.Ignore($"Deployment {deployment} does not use the Responses API.");
-
         var endpoint = Environment.GetEnvironmentVariable(DotEnv.AzureOpenAiTestEndpoint);
         var apiKey = Environment.GetEnvironmentVariable(DotEnv.AzureOpenAiTestApiKey);
 
@@ -262,6 +257,9 @@ public sealed class AzureOpenAiChatCompletionIntegrationTests
             IncludeRawResponse: true);
 
         var response = await client.GetChatCompletionAsync(request);
+
+        if (!UsesResponsesApiRequest(response.RawRequestJson))
+            Assert.Ignore($"Deployment {deployment} did not route through the Responses API.");
 
         Assert.Multiple(() =>
         {

@@ -106,4 +106,21 @@ public sealed class AzureOpenAiClientOptionsTests
 
         Assert.That(options.ApiVersion, Is.EqualTo("2024-10-21"));
     }
+
+    [Test]
+    public void ModelFamilyAlias_ReadsAndWrites_ModelName()
+    {
+        var options = new AzureOpenAiClientOptions
+        {
+            ModelName = "gpt-5"
+        };
+
+#pragma warning disable CS0618
+        Assert.That(options.ModelFamily, Is.EqualTo("gpt-5"));
+
+        options.ModelFamily = "o3-mini";
+#pragma warning restore CS0618
+
+        Assert.That(options.ModelName, Is.EqualTo("o3-mini"));
+    }
 }

@@ -7,6 +7,8 @@ namespace Cisharpai.Azure.AzureOpenAi;
 /// </summary>
 public sealed class AzureOpenAiClientOptions : AzureClientOptionsBase
 {
+    private string? _modelName;
+
     /// <summary>
     /// The deployment name for the Azure OpenAI model.
     /// </summary>
@@ -19,15 +21,30 @@ public sealed class AzureOpenAiClientOptions : AzureClientOptionsBase
     public string? DefaultModel { get; set; }
 
     /// <summary>
-    /// Optional explicit underlying model family used for routing decisions
+    /// Optional explicit underlying model name used for routing decisions.
+    /// Use the same OpenAI model name you would pass to the OpenAI client,
+    /// for example "gpt-5", "o3-mini", or "gpt-4o".
     /// (e.g. whether to use Chat Completions vs the Responses API for GPT-5).
     /// Set this when <see cref="DeploymentName"/> is opaque (e.g. "foo") and does not
-    /// carry the model family in its name. Accepts the OpenAI model name prefixes,
-    /// e.g. "gpt-5", "o3", "o4", "gpt-4o". When null, routing falls back to the
+    /// carry the model name in its name. When null, routing falls back to the
     /// deployment / request model name; if neither indicates a known family the
     /// standard Chat Completions API is used.
     /// </summary>
-    public string? ModelFamily { get; set; }
+    public string? ModelName
+    {
+        get => _modelName;
+        set => _modelName = value;
+    }
+
+    /// <summary>
+    /// Backward-compatible alias for <see cref="ModelName"/>.
+    /// </summary>
+    [Obsolete("Use ModelName instead. Pass the same OpenAI model name you would use with the OpenAI client.")]
+    public string? ModelFamily
+    {
+        get => _modelName;
+        set => _modelName = value;
+    }
 
     /// <summary>
     /// Optional reasoning effort for Azure OpenAI reasoning models when the API version/model supports it.

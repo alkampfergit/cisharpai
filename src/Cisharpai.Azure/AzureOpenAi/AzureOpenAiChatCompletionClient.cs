@@ -1,3 +1,4 @@
+using System.Net;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Azure.Core;
@@ -25,8 +26,12 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
 
     private readonly LlmHttpClient _client;
     private readonly AzureOpenAiClientOptions _options;
+    private AzureOpenAiRoutingMode _routingMode = AzureOpenAiRoutingMode.Auto;
+    private AzureOpenAiModelType? _chatCompletionsModelOverride;
 
     internal enum AzureOpenAiModelType { Legacy, Reasoning, Gpt5 }
+
+    private enum AzureOpenAiRoutingMode { Auto, ChatCompletions, ResponsesApi }
 
     public IFeatureCollection Features { get; }
 
@@ -69,24 +74,22 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
             var modelType = DetectModelTypeForRequest(request);
 
             if (modelType == AzureOpenAiModelType.Gpt5)
-                return await SendResponsesApiAsync(request, cancellationToken);
+            {
+                return await ExecuteWithRouteFallbackAsync(
+                    () => SendResponsesApiAsync(request, cancellationToken),
+                    AzureOpenAiRoutingMode.ResponsesApi,
+                    () => SendChatCompletionsAsync(
+                        request,
+                        DetectChatCompletionsModelTypeForRequest(request),
+                        cancellationToken),
+                    AzureOpenAiRoutingMode.ChatCompletions);
+            }
 
-            var messages = await MapMessagesAsync(request.Messages, cancellationToken);
-            object providerRequest = modelType == AzureOpenAiModelType.Reasoning
-                ? new AzureOpenAiReasoningChatRequest
-                {
-                    Messages = messages,
-                    MaxCompletionTokens = request.MaxTokens,
-                    ReasoningEffort = request.ReasoningEffort ?? _options.ReasoningEffort
-                }
-                : new AzureOpenAiChatRequest
-                {
-                    Temperature = request.Temperature,
-                    MaxTokens = request.MaxTokens,
-                    Messages = messages
-                };
-
-            return await ExecuteRequestAsync(providerRequest, request, cancellationToken);
+            return await ExecuteWithRouteFallbackAsync(
+                () => SendChatCompletionsAsync(request, modelType, cancellationToken),
+                AzureOpenAiRoutingMode.ChatCompletions,
+                () => SendResponsesApiAsync(request, cancellationToken),
+                AzureOpenAiRoutingMode.ResponsesApi);
         }
         catch (LlmHttpRequestException ex)
         {
@@ -110,29 +113,23 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
             var modelType = DetectModelTypeForRequest(request);
 
             if (modelType == AzureOpenAiModelType.Gpt5)
-                return await SendResponsesApiWithJsonAsync(request, jsonOutputOptions, cancellationToken);
+            {
+                return await ExecuteWithRouteFallbackAsync(
+                    () => SendResponsesApiWithJsonAsync(request, jsonOutputOptions, cancellationToken),
+                    AzureOpenAiRoutingMode.ResponsesApi,
+                    () => SendChatCompletionsWithJsonAsync(
+                        request,
+                        jsonOutputOptions,
+                        DetectChatCompletionsModelTypeForRequest(request),
+                        cancellationToken),
+                    AzureOpenAiRoutingMode.ChatCompletions);
+            }
 
-            var adjustedMessages = JsonOutputHelper.EnsureJsonKeywordInSystemMessage(request.Messages, jsonOutputOptions);
-            var messages = await MapMessagesAsync(adjustedMessages, cancellationToken);
-            var responseFormat = BuildResponseFormat(jsonOutputOptions);
-
-            object providerRequest = modelType == AzureOpenAiModelType.Reasoning
-                ? new AzureOpenAiReasoningChatRequest
-                {
-                    Messages = messages,
-                    MaxCompletionTokens = request.MaxTokens,
-                    ReasoningEffort = request.ReasoningEffort ?? _options.ReasoningEffort,
-                    ResponseFormat = responseFormat
-                }
-                : new AzureOpenAiChatRequest
-                {
-                    Temperature = request.Temperature,
-                    MaxTokens = request.MaxTokens,
-                    Messages = messages,
-                    ResponseFormat = responseFormat
-                };
-
-            return await ExecuteRequestAsync(providerRequest, request, cancellationToken);
+            return await ExecuteWithRouteFallbackAsync(
+                () => SendChatCompletionsWithJsonAsync(request, jsonOutputOptions, modelType, cancellationToken),
+                AzureOpenAiRoutingMode.ChatCompletions,
+                () => SendResponsesApiWithJsonAsync(request, jsonOutputOptions, cancellationToken),
+                AzureOpenAiRoutingMode.ResponsesApi);
         }
         catch (LlmHttpRequestException ex)
         {
@@ -153,31 +150,8 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         {
             toolOptions.Validate();
 
-            var modelType = DetectModelTypeForRequest(request);
-            var messages = await MapMessagesAsync(request.Messages, cancellationToken);
-            var tools = MapToolDefinitions(toolOptions.Tools);
-            var toolChoice = MapToolChoiceValue(toolOptions.ToolChoice);
-
-            // GPT-5 tool calling falls back to the Chat Completions path (same as OpenAI client)
-            object providerRequest = modelType == AzureOpenAiModelType.Reasoning
-                ? new AzureOpenAiReasoningChatRequest
-                {
-                    Messages = messages,
-                    MaxCompletionTokens = request.MaxTokens,
-                    ReasoningEffort = request.ReasoningEffort ?? _options.ReasoningEffort,
-                    Tools = tools,
-                    ToolChoice = toolChoice
-                }
-                : new AzureOpenAiChatRequest
-                {
-                    Temperature = request.Temperature,
-                    MaxTokens = request.MaxTokens,
-                    Messages = messages,
-                    Tools = tools,
-                    ToolChoice = toolChoice
-                };
-
-            return await ExecuteToolCallingRequestAsync(providerRequest, request, cancellationToken);
+            var modelType = DetectChatCompletionsModelTypeForRequest(request);
+            return await SendChatCompletionsWithToolsAsync(request, toolOptions, modelType, cancellationToken);
         }
         catch (LlmHttpRequestException ex)
         {
@@ -259,6 +233,169 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
                     CompletionTokens: chunk.Usage.CompletionTokens);
             }
         }
+    }
+
+    private async Task<ChatCompletionResponse> SendChatCompletionsAsync(
+        ChatCompletionRequest request,
+        AzureOpenAiModelType modelType,
+        CancellationToken cancellationToken)
+    {
+        var providerRequest = await CreateChatCompletionsRequestAsync(request, modelType, cancellationToken);
+
+        try
+        {
+            var response = await ExecuteRequestAsync(providerRequest, request, cancellationToken);
+            _chatCompletionsModelOverride = modelType;
+            return response;
+        }
+        catch (LlmHttpRequestException ex) when (CanRetryWithAlternateChatCompletionsModel(ex, modelType))
+        {
+            var fallbackModelType = GetAlternateChatCompletionsModelType(modelType);
+            var fallbackRequest = await CreateChatCompletionsRequestAsync(
+                request,
+                fallbackModelType,
+                cancellationToken);
+            var response = await ExecuteRequestAsync(fallbackRequest, request, cancellationToken);
+            _chatCompletionsModelOverride = fallbackModelType;
+            return response;
+        }
+    }
+
+    private async Task<ChatCompletionResponse> SendChatCompletionsWithJsonAsync(
+        ChatCompletionRequest request,
+        JsonOutputOptions jsonOutputOptions,
+        AzureOpenAiModelType modelType,
+        CancellationToken cancellationToken)
+    {
+        var providerRequest = await CreateChatCompletionsJsonRequestAsync(
+            request,
+            jsonOutputOptions,
+            modelType,
+            cancellationToken);
+
+        try
+        {
+            var response = await ExecuteRequestAsync(providerRequest, request, cancellationToken);
+            _chatCompletionsModelOverride = modelType;
+            return response;
+        }
+        catch (LlmHttpRequestException ex) when (CanRetryWithAlternateChatCompletionsModel(ex, modelType))
+        {
+            var fallbackModelType = GetAlternateChatCompletionsModelType(modelType);
+            var fallbackRequest = await CreateChatCompletionsJsonRequestAsync(
+                request,
+                jsonOutputOptions,
+                fallbackModelType,
+                cancellationToken);
+            var response = await ExecuteRequestAsync(fallbackRequest, request, cancellationToken);
+            _chatCompletionsModelOverride = fallbackModelType;
+            return response;
+        }
+    }
+
+    private async Task<ToolCallingResponse> SendChatCompletionsWithToolsAsync(
+        ChatCompletionRequest request,
+        ToolCallingOptions toolOptions,
+        AzureOpenAiModelType modelType,
+        CancellationToken cancellationToken)
+    {
+        var providerRequest = await CreateChatCompletionsToolRequestAsync(request, toolOptions, modelType, cancellationToken);
+
+        try
+        {
+            var response = await ExecuteToolCallingRequestAsync(providerRequest, request, cancellationToken);
+            _chatCompletionsModelOverride = modelType;
+            return response;
+        }
+        catch (LlmHttpRequestException ex) when (CanRetryWithAlternateChatCompletionsModel(ex, modelType))
+        {
+            var fallbackModelType = GetAlternateChatCompletionsModelType(modelType);
+            var fallbackRequest = await CreateChatCompletionsToolRequestAsync(
+                request,
+                toolOptions,
+                fallbackModelType,
+                cancellationToken);
+            var response = await ExecuteToolCallingRequestAsync(fallbackRequest, request, cancellationToken);
+            _chatCompletionsModelOverride = fallbackModelType;
+            return response;
+        }
+    }
+
+    private async Task<object> CreateChatCompletionsRequestAsync(
+        ChatCompletionRequest request,
+        AzureOpenAiModelType modelType,
+        CancellationToken cancellationToken)
+    {
+        var messages = await MapMessagesAsync(request.Messages, cancellationToken);
+        return modelType == AzureOpenAiModelType.Reasoning
+            ? new AzureOpenAiReasoningChatRequest
+            {
+                Messages = messages,
+                MaxCompletionTokens = request.MaxTokens,
+                ReasoningEffort = request.ReasoningEffort ?? _options.ReasoningEffort
+            }
+            : new AzureOpenAiChatRequest
+            {
+                Temperature = request.Temperature,
+                MaxTokens = request.MaxTokens,
+                Messages = messages
+            };
+    }
+
+    private async Task<object> CreateChatCompletionsJsonRequestAsync(
+        ChatCompletionRequest request,
+        JsonOutputOptions jsonOutputOptions,
+        AzureOpenAiModelType modelType,
+        CancellationToken cancellationToken)
+    {
+        var adjustedMessages = JsonOutputHelper.EnsureJsonKeywordInSystemMessage(request.Messages, jsonOutputOptions);
+        var messages = await MapMessagesAsync(adjustedMessages, cancellationToken);
+        var responseFormat = BuildResponseFormat(jsonOutputOptions);
+
+        return modelType == AzureOpenAiModelType.Reasoning
+            ? new AzureOpenAiReasoningChatRequest
+            {
+                Messages = messages,
+                MaxCompletionTokens = request.MaxTokens,
+                ReasoningEffort = request.ReasoningEffort ?? _options.ReasoningEffort,
+                ResponseFormat = responseFormat
+            }
+            : new AzureOpenAiChatRequest
+            {
+                Temperature = request.Temperature,
+                MaxTokens = request.MaxTokens,
+                Messages = messages,
+                ResponseFormat = responseFormat
+            };
+    }
+
+    private async Task<object> CreateChatCompletionsToolRequestAsync(
+        ChatCompletionRequest request,
+        ToolCallingOptions toolOptions,
+        AzureOpenAiModelType modelType,
+        CancellationToken cancellationToken)
+    {
+        var messages = await MapMessagesAsync(request.Messages, cancellationToken);
+        var tools = MapToolDefinitions(toolOptions.Tools);
+        var toolChoice = MapToolChoiceValue(toolOptions.ToolChoice);
+
+        return modelType == AzureOpenAiModelType.Reasoning
+            ? new AzureOpenAiReasoningChatRequest
+            {
+                Messages = messages,
+                MaxCompletionTokens = request.MaxTokens,
+                ReasoningEffort = request.ReasoningEffort ?? _options.ReasoningEffort,
+                Tools = tools,
+                ToolChoice = toolChoice
+            }
+            : new AzureOpenAiChatRequest
+            {
+                Temperature = request.Temperature,
+                MaxTokens = request.MaxTokens,
+                Messages = messages,
+                Tools = tools,
+                ToolChoice = toolChoice
+            };
     }
 
     private string ResponsesApiUri =>
@@ -464,6 +601,58 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         return MapToolCallingResponse(raw, rawResponseJson, rawRequestJson);
     }
 
+    private async Task<ChatCompletionResponse> ExecuteWithRouteFallbackAsync(
+        Func<Task<ChatCompletionResponse>> primaryAction,
+        AzureOpenAiRoutingMode primaryRoute,
+        Func<Task<ChatCompletionResponse>> fallbackAction,
+        AzureOpenAiRoutingMode fallbackRoute)
+    {
+        try
+        {
+            var response = await primaryAction();
+            _routingMode = primaryRoute;
+            return response;
+        }
+        catch (LlmHttpRequestException ex) when (CanRetryWithAlternateRoute(ex))
+        {
+            var response = await fallbackAction();
+            _routingMode = fallbackRoute;
+            return response;
+        }
+    }
+
+    private static bool CanRetryWithAlternateRoute(LlmHttpRequestException exception)
+    {
+        return exception.StatusCode == HttpStatusCode.NotFound &&
+               exception.ResponseBody?.Contains("Resource not found", StringComparison.OrdinalIgnoreCase) == true;
+    }
+
+    private static bool CanRetryWithAlternateChatCompletionsModel(
+        LlmHttpRequestException exception,
+        AzureOpenAiModelType modelType)
+    {
+        if (modelType == AzureOpenAiModelType.Gpt5 ||
+            exception.StatusCode != HttpStatusCode.BadRequest ||
+            string.IsNullOrWhiteSpace(exception.ResponseBody))
+        {
+            return false;
+        }
+
+        var responseBody = exception.ResponseBody;
+        return modelType == AzureOpenAiModelType.Reasoning
+            ? responseBody.Contains("max_completion_tokens", StringComparison.OrdinalIgnoreCase) ||
+              responseBody.Contains("reasoning_effort", StringComparison.OrdinalIgnoreCase)
+            : responseBody.Contains("max_tokens", StringComparison.OrdinalIgnoreCase) &&
+              responseBody.Contains("max_completion_tokens", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static AzureOpenAiModelType GetAlternateChatCompletionsModelType(AzureOpenAiModelType modelType)
+    {
+        return modelType == AzureOpenAiModelType.Reasoning
+            ? AzureOpenAiModelType.Legacy
+            : AzureOpenAiModelType.Reasoning;
+    }
+
     /// <summary>
     /// Centralizes the IncludeRawResponse-aware POST so the three execute paths
     /// (chat completions, tool calling, responses API) don't repeat the if/else block.
@@ -615,36 +804,64 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         }).ToList();
     }
 
-    private string? ResolveModel(string? model)
-    {
-        return model ?? _options.DefaultModel;
-    }
-
     /// <summary>
     /// Picks the model identifier used for routing decisions.
-    /// <see cref="AzureOpenAiClientOptions.ModelFamily"/> wins when set (covers opaque deployment names);
-    /// otherwise falls back to the request/options model name.
+    /// <see cref="AzureOpenAiClientOptions.ModelName"/> wins when set (covers opaque deployment names);
+    /// otherwise falls back to the first recognizable hint from request model,
+    /// default model, or deployment name.
     /// </summary>
     private AzureOpenAiModelType DetectModelTypeForRequest(ChatCompletionRequest request)
     {
-        var hint = !string.IsNullOrWhiteSpace(_options.ModelFamily)
-            ? _options.ModelFamily
-            : ResolveModel(request.Model);
-        return DetectModelType(hint);
+        return _routingMode switch
+        {
+            AzureOpenAiRoutingMode.ResponsesApi => AzureOpenAiModelType.Gpt5,
+            AzureOpenAiRoutingMode.ChatCompletions => DetectChatCompletionsModelTypeForRequest(request),
+            _ => GetRoutingHints(request)
+                .Select(TryDetectModelType)
+                .FirstOrDefault(modelType => modelType.HasValue)
+                ?? AzureOpenAiModelType.Legacy
+        };
     }
 
-    internal static AzureOpenAiModelType DetectModelType(string? model)
+    private AzureOpenAiModelType DetectChatCompletionsModelTypeForRequest(ChatCompletionRequest request)
     {
-        if (model is null) return AzureOpenAiModelType.Legacy;
+        if (_chatCompletionsModelOverride is { } overrideModel)
+            return overrideModel;
 
-        if (model.StartsWith("gpt-5", StringComparison.OrdinalIgnoreCase))
-            return AzureOpenAiModelType.Gpt5;
+        return GetRoutingHints(request)
+            .Select(TryDetectModelType)
+            .FirstOrDefault(modelType => modelType == AzureOpenAiModelType.Reasoning)
+            ?? AzureOpenAiModelType.Legacy;
+    }
+
+    private IEnumerable<string?> GetRoutingHints(ChatCompletionRequest request)
+    {
+        yield return _options.ModelName;
+        yield return request.Model;
+        yield return _options.DefaultModel;
+        yield return _options.DeploymentName;
+    }
+
+    private static AzureOpenAiModelType? TryDetectModelType(string? model)
+    {
+        if (string.IsNullOrWhiteSpace(model))
+            return null;
+
+        if (model.StartsWith("gpt-", StringComparison.OrdinalIgnoreCase))
+            return model.StartsWith("gpt-5", StringComparison.OrdinalIgnoreCase)
+                ? AzureOpenAiModelType.Gpt5
+                : AzureOpenAiModelType.Legacy;
 
         if (model.StartsWith("o1", StringComparison.OrdinalIgnoreCase) ||
             model.StartsWith("o3", StringComparison.OrdinalIgnoreCase) ||
             model.StartsWith("o4", StringComparison.OrdinalIgnoreCase))
             return AzureOpenAiModelType.Reasoning;
 
-        return AzureOpenAiModelType.Legacy;
+        return null;
+    }
+
+    internal static AzureOpenAiModelType DetectModelType(string? model)
+    {
+        return TryDetectModelType(model) ?? AzureOpenAiModelType.Legacy;
     }
 }
