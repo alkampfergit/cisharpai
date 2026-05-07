@@ -1,0 +1,6 @@
+{
+    "sonarlint.connectedMode.project": {
+        "connectionId": "alkampfergit-github",
+        "projectKey": "alkampfergit_cisharpai"
+    }
+}
