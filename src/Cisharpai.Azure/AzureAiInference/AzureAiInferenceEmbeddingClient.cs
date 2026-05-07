@@ -5,6 +5,7 @@ using Cisharpai.Features.Embeddings;
 using Cisharpai.Models;
 using Cisharpai.Azure.AzureAiInference.Models;
 using Cisharpai.Azure.Common;
+using Cisharpai;
 using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
 
@@ -111,16 +112,15 @@ public sealed class AzureAiInferenceEmbeddingClient : IEmbeddingClient, IImageEm
 
         try
         {
-            var imageBytes = await File.ReadAllBytesAsync(imagePath, cancellationToken);
-            var base64Image = Convert.ToBase64String(imageBytes);
+            var imageDataUri = await ImageDataUriHelper.ToDataUriAsync(imagePath, cancellationToken);
 
             var providerRequest = new AzureAiInferenceImageEmbeddingRequest
             {
                 Model = !string.IsNullOrWhiteSpace(model) ? model : _options.ModelId,
-                Input = [new AzureAiInferenceImageInput { Image = base64Image }]
+                Input = [new AzureAiInferenceImageInput { Image = imageDataUri }]
             };
 
-            var uri = $"models/embeddings?api-version={_options.ApiVersion}";
+            var uri = $"models/images/embeddings?api-version={_options.ApiVersion}";
 
             var raw = await _client.PostAsync<
                 AzureAiInferenceImageEmbeddingRequest,

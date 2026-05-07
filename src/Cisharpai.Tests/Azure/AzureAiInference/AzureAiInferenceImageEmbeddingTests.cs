@@ -34,7 +34,9 @@ public sealed class AzureAiInferenceImageEmbeddingTests
             {
                 Assert.That(doc.RootElement.GetProperty("model").GetString(), Is.EqualTo("clip-model"));
                 Assert.That(doc.RootElement.GetProperty("input").GetArrayLength(), Is.EqualTo(1));
-                Assert.That(doc.RootElement.GetProperty("input")[0].GetProperty("image").GetString(), Is.Not.Null.And.Not.Empty);
+                Assert.That(
+                    doc.RootElement.GetProperty("input")[0].GetProperty("image").GetString(),
+                    Does.StartWith("data:image/png;base64,"));
             });
         }
         finally
@@ -165,7 +167,7 @@ public sealed class AzureAiInferenceImageEmbeddingTests
         {
             await client.GetImageEmbeddingAsync(imagePath, "clip-model");
 
-            Assert.That(handler.LastRequest!.RequestUri!.PathAndQuery, Does.Contain("models/embeddings"));
+            Assert.That(handler.LastRequest!.RequestUri!.PathAndQuery, Does.Contain("models/images/embeddings"));
         }
         finally
         {
@@ -175,7 +177,7 @@ public sealed class AzureAiInferenceImageEmbeddingTests
 
     private static string CreateTestImage()
     {
-        var path = Path.GetTempFileName();
+        var path = Path.Combine(Path.GetTempPath(), $"test-image-{Guid.NewGuid()}.png");
         File.WriteAllBytes(path, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
         return path;
     }
