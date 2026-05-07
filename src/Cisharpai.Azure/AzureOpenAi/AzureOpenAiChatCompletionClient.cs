@@ -484,11 +484,7 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         var isIncomplete = raw.Status == "incomplete";
         var incompleteReason = raw.IncompleteDetails?.Reason;
         var isError = raw.Status is "incomplete" or "failed";
-        var errorMessage = isError
-            ? (incompleteReason is not null
-                ? $"Azure OpenAI Responses API response was {raw.Status}: {incompleteReason}"
-                : $"Azure OpenAI Responses API response status: {raw.Status}")
-            : null;
+        var errorMessage = BuildResponsesErrorMessage(isError, raw.Status, incompleteReason);
 
         return new ChatCompletionResponse(
             Content: content,
@@ -790,6 +786,21 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
 
     private static bool IsIncompleteFinishReason(string? finishReason) =>
         string.Equals(finishReason, "length", StringComparison.Ordinal);
+
+    private static string? BuildResponsesErrorMessage(bool isError, string? status, string? incompleteReason)
+    {
+        if (!isError)
+        {
+            return null;
+        }
+
+        if (incompleteReason is not null)
+        {
+            return $"Azure OpenAI Responses API response was {status}: {incompleteReason}";
+        }
+
+        return $"Azure OpenAI Responses API response status: {status}";
+    }
 
     private static List<AzureOpenAiToolDefinition> MapToolDefinitions(IReadOnlyList<ToolDefinition> tools)
     {
