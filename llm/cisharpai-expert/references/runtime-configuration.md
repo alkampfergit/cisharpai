@@ -97,4 +97,5 @@ All clients created via `Create` are **thread-safe for concurrent calls** — ea
 
 - **Resilience**: `Create` does not auto-wire resilience handlers. Add `.AddCisharpaiResilienceHandler()` to the named client registration at startup.
 - **Caching instances**: Client construction is cheap. Caching per `(provider, apiKey, endpoint)` is fine but not required.
+- **Azure OpenAI learned routing cache**: chat clients share route-shape discoveries in-process per `(Endpoint, DeploymentName, ApiVersion)`, so creating a new Azure OpenAI client after a fallback does not repeat the same route-mismatch probe.
 - **Azure AD at runtime**: Pass a `TokenCredential` (e.g. `ClientSecretCredential`) resolved at request time to `Create`.

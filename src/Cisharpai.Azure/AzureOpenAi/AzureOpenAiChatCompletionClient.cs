@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Net;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
@@ -24,14 +25,23 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         PropertyNameCaseInsensitive = true
     };
 
+    private static readonly ConcurrentDictionary<AzureOpenAiRoutingCacheKey, AzureOpenAiRoutingCacheEntry> RoutingCache = new();
+
     private readonly LlmHttpClient _client;
     private readonly AzureOpenAiClientOptions _options;
+    private readonly AzureOpenAiRoutingCacheKey _routingCacheKey;
     private AzureOpenAiRoutingMode _routingMode = AzureOpenAiRoutingMode.Auto;
     private AzureOpenAiModelType? _chatCompletionsModelOverride;
 
     internal enum AzureOpenAiModelType { Legacy, Reasoning, Gpt5 }
 
     private enum AzureOpenAiRoutingMode { Auto, ChatCompletions, ResponsesApi }
+
+    private readonly record struct AzureOpenAiRoutingCacheKey(string Endpoint, string DeploymentName, string ApiVersion);
+
+    private readonly record struct AzureOpenAiRoutingCacheEntry(
+        AzureOpenAiRoutingMode RoutingMode,
+        AzureOpenAiModelType? ChatCompletionsModelOverride);
 
     public IFeatureCollection Features { get; }
 
@@ -42,6 +52,10 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
     {
         _client = new LlmHttpClient(httpClient, logger: loggerFactory?.CreateLogger<LlmHttpClient>());
         _options = options;
+        _routingCacheKey = CreateRoutingCacheKey(options);
+
+        if (!HasExplicitModelName())
+            RestoreSharedRoutingState();
 
         var features = new FeatureCollection();
         features.Set<IJsonOutputFeature>(this);
@@ -245,7 +259,7 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         try
         {
             var response = await ExecuteRequestAsync(providerRequest, request, cancellationToken);
-            _chatCompletionsModelOverride = modelType;
+            SetChatCompletionsModelOverride(modelType);
             return response;
         }
         catch (LlmHttpRequestException ex) when (CanRetryWithAlternateChatCompletionsModel(ex, modelType))
@@ -256,7 +270,7 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
                 fallbackModelType,
                 cancellationToken);
             var response = await ExecuteRequestAsync(fallbackRequest, request, cancellationToken);
-            _chatCompletionsModelOverride = fallbackModelType;
+            SetChatCompletionsModelOverride(fallbackModelType, persistToSharedCache: true);
             return response;
         }
     }
@@ -276,7 +290,7 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         try
         {
             var response = await ExecuteRequestAsync(providerRequest, request, cancellationToken);
-            _chatCompletionsModelOverride = modelType;
+            SetChatCompletionsModelOverride(modelType);
             return response;
         }
         catch (LlmHttpRequestException ex) when (CanRetryWithAlternateChatCompletionsModel(ex, modelType))
@@ -288,7 +302,7 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
                 fallbackModelType,
                 cancellationToken);
             var response = await ExecuteRequestAsync(fallbackRequest, request, cancellationToken);
-            _chatCompletionsModelOverride = fallbackModelType;
+            SetChatCompletionsModelOverride(fallbackModelType, persistToSharedCache: true);
             return response;
         }
     }
@@ -304,7 +318,7 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         try
         {
             var response = await ExecuteToolCallingRequestAsync(providerRequest, request, cancellationToken);
-            _chatCompletionsModelOverride = modelType;
+            SetChatCompletionsModelOverride(modelType);
             return response;
         }
         catch (LlmHttpRequestException ex) when (CanRetryWithAlternateChatCompletionsModel(ex, modelType))
@@ -316,7 +330,7 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
                 fallbackModelType,
                 cancellationToken);
             var response = await ExecuteToolCallingRequestAsync(fallbackRequest, request, cancellationToken);
-            _chatCompletionsModelOverride = fallbackModelType;
+            SetChatCompletionsModelOverride(fallbackModelType, persistToSharedCache: true);
             return response;
         }
     }
@@ -610,15 +624,78 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         try
         {
             var response = await primaryAction();
-            _routingMode = primaryRoute;
+            SetRoutingMode(primaryRoute);
             return response;
         }
         catch (LlmHttpRequestException ex) when (CanRetryWithAlternateRoute(ex))
         {
             var response = await fallbackAction();
-            _routingMode = fallbackRoute;
+            SetRoutingMode(fallbackRoute, persistToSharedCache: true);
             return response;
         }
+    }
+
+    private bool HasExplicitModelName() =>
+        !string.IsNullOrWhiteSpace(_options.ModelName);
+
+    private void RestoreSharedRoutingState()
+    {
+        if (!RoutingCache.TryGetValue(_routingCacheKey, out var cached))
+            return;
+
+        _routingMode = cached.RoutingMode;
+        _chatCompletionsModelOverride = cached.ChatCompletionsModelOverride;
+    }
+
+    private void SetRoutingMode(AzureOpenAiRoutingMode routingMode, bool persistToSharedCache = false)
+    {
+        _routingMode = routingMode;
+
+        if (persistToSharedCache)
+            PersistSharedRoutingState();
+    }
+
+    private void SetChatCompletionsModelOverride(
+        AzureOpenAiModelType? modelType,
+        bool persistToSharedCache = false)
+    {
+        _chatCompletionsModelOverride = modelType;
+
+        if (persistToSharedCache)
+            PersistSharedRoutingState();
+    }
+
+    private void PersistSharedRoutingState()
+    {
+        RoutingCache[_routingCacheKey] = new AzureOpenAiRoutingCacheEntry(
+            _routingMode,
+            _chatCompletionsModelOverride);
+    }
+
+    private static AzureOpenAiRoutingCacheKey CreateRoutingCacheKey(AzureOpenAiClientOptions options)
+    {
+        return new AzureOpenAiRoutingCacheKey(
+            NormalizeEndpoint(options.Endpoint),
+            NormalizeCacheComponent(options.DeploymentName),
+            NormalizeCacheComponent(options.ApiVersion));
+    }
+
+    private static string NormalizeEndpoint(string? endpoint)
+    {
+        if (string.IsNullOrWhiteSpace(endpoint))
+            return string.Empty;
+
+        if (Uri.TryCreate(endpoint, UriKind.Absolute, out var uri))
+            return uri.GetLeftPart(UriPartial.Path).TrimEnd('/').ToUpperInvariant();
+
+        return endpoint.Trim().TrimEnd('/').ToUpperInvariant();
+    }
+
+    private static string NormalizeCacheComponent(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? string.Empty
+            : value.Trim().ToUpperInvariant();
     }
 
     private static bool CanRetryWithAlternateRoute(LlmHttpRequestException exception)

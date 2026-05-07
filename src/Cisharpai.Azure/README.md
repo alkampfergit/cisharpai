@@ -51,7 +51,7 @@ var response = await client.GetChatCompletionAsync(
         Messages: [new LlmMessage(LlmRole.User, "Hello!")]));
 ```
 
-`ReasoningEffort` is sent only for reasoning deployments. If Azure rejects the initially selected endpoint or chat-completions token shape, the client retries the alternate route once and keeps using the working route for that client instance. For provider parameters that are not typed yet, or to override a typed value per request, use `ChatCompletionRequest.ExtraParameters`; it deep-merges into the final JSON request.
+`ReasoningEffort` is sent only for reasoning deployments. If Azure rejects the initially selected endpoint or chat-completions token shape, the client retries the alternate route once and stores the learned route in a shared in-process cache keyed by `(Endpoint, DeploymentName, ApiVersion)` so later client instances reuse it. For provider parameters that are not typed yet, or to override a typed value per request, use `ChatCompletionRequest.ExtraParameters`; it deep-merges into the final JSON request.
 
 ## Quick Start — Azure AI Inference
 

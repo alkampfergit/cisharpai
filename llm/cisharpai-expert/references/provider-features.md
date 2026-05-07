@@ -45,6 +45,7 @@ if (feature is not null)
 
 ### Azure OpenAI
 - Deployment-based routing, API key + Azure AD auth
+- `ModelName` can describe the underlying OpenAI model when `DeploymentName` is opaque; learned route mismatches are cached in-process per `(Endpoint, DeploymentName, ApiVersion)`
 - Same feature set as OpenAI
 
 ### Azure AI Inference

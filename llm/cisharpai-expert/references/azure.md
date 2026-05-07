@@ -12,14 +12,14 @@ services.AddAzureOpenAiClient(options =>
     options.Endpoint = "https://myresource.openai.azure.com";
     options.DeploymentName = "gpt-4o";
     options.ApiKey = "...";         // API key auth
-    // OR
-    options.TokenCredential = new DefaultAzureCredential(); // Azure AD
     options.DefaultModel = "gpt-4o";    // optional fallback when request omits Model
-    options.ModelFamily = "gpt-5";       // optional, only when DeploymentName is opaque
+    options.ModelName = "gpt-5";         // optional, only when DeploymentName is opaque
     options.ReasoningEffort = "medium";  // optional, o-series and gpt-5
     options.TextVerbosity = "high";      // optional, gpt-5 only
 });
 ```
+
+For Azure AD auth, pass a `TokenCredential` to the `AddAzureOpenAiClient(..., credential)` overload or to `AzureOpenAiChatCompletionClient.Create(...)`.
 
 **Options:**
 - `Endpoint` (required) — Azure resource endpoint
@@ -27,7 +27,7 @@ services.AddAzureOpenAiClient(options =>
 - `ApiKey` — For API key authentication
 - `TokenCredential` — For Azure AD authentication (Azure.Identity)
 - `DefaultModel` — Fallback model name when `request.Model` is null
-- `ModelFamily` — Optional explicit routing hint when `DeploymentName` is opaque (see [Model Routing](#model-routing))
+- `ModelName` — Optional explicit underlying OpenAI model name when `DeploymentName` is opaque (see [Model Routing](#model-routing))
 - `ReasoningEffort` — `"low"` / `"medium"` / `"high"` for o-series and gpt-5
 - `TextVerbosity` — `"low"` / `"high"` for gpt-5 (Responses API)
 
@@ -41,11 +41,11 @@ The client automatically picks the API surface based on the model family:
 | `o1*`, `o3*`, `o4*` | Chat Completions (reasoning) | `/openai/deployments/{DeploymentName}/chat/completions?api-version=...` |
 | Everything else | Chat Completions (standard) | `/openai/deployments/{DeploymentName}/chat/completions?api-version=...` |
 
-**Resolution order for the routing hint:** `options.ModelFamily` → `request.Model` → `options.DefaultModel` → standard Chat Completions for unknown prefixes.
+**Resolution order for the routing hint:** `options.ModelName` → `request.Model` → `options.DefaultModel` → `options.DeploymentName`.
 
-#### Opaque Deployment Names (`ModelFamily`)
+#### Opaque Deployment Names (`ModelName`)
 
-Azure deployment names are arbitrary — `DeploymentName = "foo"` may host gpt-5 underneath. Set `ModelFamily` to make routing explicit:
+Azure deployment names are arbitrary — `DeploymentName = "foo"` may host gpt-5 underneath. Set `ModelName` to make routing explicit:
 
 ```csharp
 services.AddAzureOpenAiClient(o =>
@@ -53,11 +53,11 @@ services.AddAzureOpenAiClient(o =>
     o.Endpoint = "...";
     o.DeploymentName = "foo";   // opaque name; URL uses this verbatim
     o.ApiKey = "...";
-    o.ModelFamily = "gpt-5";    // routes via Responses API regardless of deployment name
+    o.ModelName = "gpt-5";      // routes via Responses API regardless of deployment name
 });
 ```
 
-If `ModelFamily` is left empty and the deployment name does not match a known prefix, the client falls back to the standard Chat Completions API.
+If `ModelName` is left empty, the client ultimately falls back to `DeploymentName` as the routing hint. If Azure rejects the first guess, the client retries once and caches the learned mismatch in-process per `(Endpoint, DeploymentName, ApiVersion)` for future Azure OpenAI client instances.
 
 ### Responses API (GPT-5)
 

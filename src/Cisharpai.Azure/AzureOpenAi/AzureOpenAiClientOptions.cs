@@ -7,8 +7,6 @@ namespace Cisharpai.Azure.AzureOpenAi;
 /// </summary>
 public sealed class AzureOpenAiClientOptions : AzureClientOptionsBase
 {
-    private string? _modelName;
-
     /// <summary>
     /// The deployment name for the Azure OpenAI model.
     /// </summary>
@@ -30,21 +28,7 @@ public sealed class AzureOpenAiClientOptions : AzureClientOptionsBase
     /// deployment / request model name; if neither indicates a known family the
     /// standard Chat Completions API is used.
     /// </summary>
-    public string? ModelName
-    {
-        get => _modelName;
-        set => _modelName = value;
-    }
-
-    /// <summary>
-    /// Backward-compatible alias for <see cref="ModelName"/>.
-    /// </summary>
-    [Obsolete("Use ModelName instead. Pass the same OpenAI model name you would use with the OpenAI client.")]
-    public string? ModelFamily
-    {
-        get => _modelName;
-        set => _modelName = value;
-    }
+    public string? ModelName { get; set; }
 
     /// <summary>
     /// Optional reasoning effort for Azure OpenAI reasoning models when the API version/model supports it.

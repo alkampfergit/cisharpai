@@ -52,6 +52,8 @@ services.AddAzureOpenAiClient(o => {
     o.Endpoint = "https://myresource.openai.azure.com";
     o.DeploymentName = "gpt-4o";
     o.ApiKey = "...";
+    // Optional when the deployment name is opaque:
+    // o.ModelName = "gpt-5";
 });
 
 // Anthropic
@@ -98,6 +100,7 @@ All 9 clients support `Create`. Azure providers add an optional `TokenCredential
 **Key notes:**
 - Client instances are cheap; TCP connections are pooled in the handler.
 - `Create` bypasses DI resilience handlers — add `services.AddHttpClient("cisharpai").AddCisharpaiResilienceHandler()` at startup if needed.
+- Azure OpenAI chat clients share learned routing fallbacks in-process per `(Endpoint, DeploymentName, ApiVersion)`, so later dynamically created clients reuse the working route after the first mismatch is discovered.
 
 ## Core Interfaces
 

@@ -433,6 +433,85 @@ public sealed class AzureOpenAiChatCompletionClientTests
     }
 
     [Test]
+    public async Task GetChatCompletionAsync_FallbackRoute_IsSharedAcrossClientInstances()
+    {
+        const string notFoundJson = """{"error":{"code":"404","message":"Resource not found"}}""";
+        var options = new AzureOpenAiClientOptions
+        {
+            Endpoint = "https://myresource.openai.azure.com/",
+            DeploymentName = "shared-route-cache",
+            ApiVersion = "2025-04-01-preview",
+            ApiKey = "test-key"
+        };
+        var request = new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "Hello")],
+            Model: "shared-route-cache");
+
+        var firstUris = new List<string>();
+        var firstHandler = new MockHttpMessageHandler((req, _) =>
+        {
+            firstUris.Add(req.RequestUri!.PathAndQuery);
+
+            if (req.RequestUri.AbsolutePath.EndsWith("/chat/completions", StringComparison.Ordinal))
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)
+                {
+                    Content = new StringContent(notFoundJson, Encoding.UTF8, "application/json")
+                });
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(Gpt5ResponseJson, Encoding.UTF8, "application/json")
+            });
+        });
+
+        using var firstHttpClient = new HttpClient(firstHandler) { BaseAddress = new Uri("https://myresource.openai.azure.com/") };
+        var firstClient = new AzureOpenAiChatCompletionClient(firstHttpClient, options);
+
+        var firstResponse = await firstClient.GetChatCompletionAsync(request);
+
+        var secondUris = new List<string>();
+        var secondHandler = new MockHttpMessageHandler((req, _) =>
+        {
+            secondUris.Add(req.RequestUri!.PathAndQuery);
+
+            if (req.RequestUri.AbsolutePath.EndsWith("/chat/completions", StringComparison.Ordinal))
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)
+                {
+                    Content = new StringContent(notFoundJson, Encoding.UTF8, "application/json")
+                });
+            }
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(Gpt5ResponseJson, Encoding.UTF8, "application/json")
+            });
+        });
+
+        using var secondHttpClient = new HttpClient(secondHandler) { BaseAddress = new Uri("https://myresource.openai.azure.com/") };
+        var secondClient = new AzureOpenAiChatCompletionClient(secondHttpClient, options);
+
+        var secondResponse = await secondClient.GetChatCompletionAsync(request);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(firstResponse.IsSuccess, Is.True);
+            Assert.That(secondResponse.IsSuccess, Is.True);
+            Assert.That(firstUris, Is.EqualTo(new[]
+            {
+                "/openai/deployments/shared-route-cache/chat/completions?api-version=2025-04-01-preview",
+                "/openai/deployments/shared-route-cache/responses?api-version=2025-04-01-preview"
+            }));
+            Assert.That(secondUris, Is.EqualTo(new[]
+            {
+                "/openai/deployments/shared-route-cache/responses?api-version=2025-04-01-preview"
+            }));
+        });
+    }
+
+    [Test]
     public async Task GetChatCompletionWithToolsAsync_LegacyPayloadRejected_RetriesReasoningFormat()
     {
         const string unsupportedParameterJson = """
@@ -528,6 +607,130 @@ public sealed class AzureOpenAiChatCompletionClientTests
             Assert.That(capturedBodies[1], Does.Contain("max_completion_tokens"));
         });
     }
+
+        [Test]
+        public async Task GetChatCompletionWithToolsAsync_FallbackShape_IsSharedAcrossClientInstances()
+        {
+                const string unsupportedParameterJson = """
+                        {
+                            "error": {
+                                "message": "Unsupported parameter: 'max_tokens' is not supported with this model. Use 'max_completion_tokens' instead.",
+                                "type": "invalid_request_error",
+                                "param": "max_tokens",
+                                "code": "unsupported_parameter"
+                            }
+                        }
+                        """;
+                const string toolCallResponseJson = """
+                        {
+                            "model": "o3-mini",
+                            "choices": [
+                                {
+                                    "message": {
+                                        "role": "assistant",
+                                        "tool_calls": [
+                                            {
+                                                "id": "call_1",
+                                                "type": "function",
+                                                "function": {
+                                                    "name": "get_weather",
+                                                    "arguments": "{\"city\":\"Paris\"}"
+                                                }
+                                            }
+                                        ]
+                                    },
+                                    "finish_reason": "tool_calls"
+                                }
+                            ],
+                            "usage": {
+                                "prompt_tokens": 10,
+                                "completion_tokens": 5
+                            }
+                        }
+                        """;
+
+                var options = new AzureOpenAiClientOptions
+                {
+                        Endpoint = "https://myresource.openai.azure.com/",
+                        DeploymentName = "shared-shape-cache",
+                        ApiVersion = "2024-10-21",
+                        ApiKey = "test-key"
+                };
+                var toolOptions = new ToolCallingOptions(
+                        Tools:
+                        [
+                                new ToolDefinition(
+                                        "get_weather",
+                                        "Get the weather for a city",
+                                        JsonDocument.Parse("""{"type":"object","properties":{"city":{"type":"string"}},"required":["city"]}""").RootElement.Clone())
+                        ]);
+                var request = new ChatCompletionRequest(
+                        Messages: [new LlmMessage(LlmRole.User, "What is the weather in Paris?")],
+                        Model: "shared-shape-cache",
+                        MaxTokens: 128);
+
+                var firstBodies = new List<string>();
+                var firstHandler = new MockHttpMessageHandler(async (req, _) =>
+                {
+                        var body = await req.Content!.ReadAsStringAsync(CancellationToken.None);
+                        firstBodies.Add(body);
+
+                        if (body.Contains("\"max_tokens\"", StringComparison.Ordinal))
+                        {
+                                return new HttpResponseMessage(HttpStatusCode.BadRequest)
+                                {
+                                        Content = new StringContent(unsupportedParameterJson, Encoding.UTF8, "application/json")
+                                };
+                        }
+
+                        return new HttpResponseMessage(HttpStatusCode.OK)
+                        {
+                                Content = new StringContent(toolCallResponseJson, Encoding.UTF8, "application/json")
+                        };
+                });
+
+                using var firstHttpClient = new HttpClient(firstHandler) { BaseAddress = new Uri("https://myresource.openai.azure.com/") };
+                var firstClient = new AzureOpenAiChatCompletionClient(firstHttpClient, options);
+
+                var firstResponse = await firstClient.GetChatCompletionWithToolsAsync(request, toolOptions);
+
+                var secondBodies = new List<string>();
+                var secondHandler = new MockHttpMessageHandler(async (req, _) =>
+                {
+                        var body = await req.Content!.ReadAsStringAsync(CancellationToken.None);
+                        secondBodies.Add(body);
+
+                        if (body.Contains("\"max_tokens\"", StringComparison.Ordinal))
+                        {
+                                return new HttpResponseMessage(HttpStatusCode.BadRequest)
+                                {
+                                        Content = new StringContent(unsupportedParameterJson, Encoding.UTF8, "application/json")
+                                };
+                        }
+
+                        return new HttpResponseMessage(HttpStatusCode.OK)
+                        {
+                                Content = new StringContent(toolCallResponseJson, Encoding.UTF8, "application/json")
+                        };
+                });
+
+                using var secondHttpClient = new HttpClient(secondHandler) { BaseAddress = new Uri("https://myresource.openai.azure.com/") };
+                var secondClient = new AzureOpenAiChatCompletionClient(secondHttpClient, options);
+
+                var secondResponse = await secondClient.GetChatCompletionWithToolsAsync(request, toolOptions);
+
+                Assert.Multiple(() =>
+                {
+                        Assert.That(firstResponse.IsSuccess, Is.True, firstResponse.ErrorMessage);
+                        Assert.That(secondResponse.IsSuccess, Is.True, secondResponse.ErrorMessage);
+                        Assert.That(firstBodies, Has.Count.EqualTo(2));
+                        Assert.That(firstBodies[0], Does.Contain("\"max_tokens\""));
+                        Assert.That(firstBodies[1], Does.Contain("max_completion_tokens"));
+                        Assert.That(secondBodies, Has.Count.EqualTo(1));
+                        Assert.That(secondBodies[0], Does.Contain("max_completion_tokens"));
+                        Assert.That(secondBodies[0], Does.Not.Contain("\"max_tokens\""));
+                });
+        }
 
     [Test]
     public async Task GetChatCompletionAsync_Gpt5Model_RequestUsesInputField()
