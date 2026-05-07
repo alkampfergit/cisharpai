@@ -370,12 +370,7 @@ public sealed class AzureOpenAiChatCompletionClientTests
             Assert.That(firstResponse.IsSuccess, Is.True);
             Assert.That(firstResponse.Content, Is.EqualTo("Hello there!"));
             Assert.That(secondResponse.IsSuccess, Is.True);
-            Assert.That(requestedUris, Is.EqualTo(new[]
-            {
-                "/openai/deployments/opaque-deployment/chat/completions?api-version=2025-04-01-preview",
-                "/openai/deployments/opaque-deployment/responses?api-version=2025-04-01-preview",
-                "/openai/deployments/opaque-deployment/responses?api-version=2025-04-01-preview"
-            }));
+            Assert.That(requestedUris, Is.EqualTo(ChatToResponsesFallbackUris));
         });
     }
 
@@ -423,12 +418,7 @@ public sealed class AzureOpenAiChatCompletionClientTests
             Assert.That(firstResponse.IsSuccess, Is.True);
             Assert.That(firstResponse.Content, Is.EqualTo("Hello there!"));
             Assert.That(secondResponse.IsSuccess, Is.True);
-            Assert.That(requestedUris, Is.EqualTo(new[]
-            {
-                "/openai/deployments/gpt-5-misleading/responses?api-version=2025-04-01-preview",
-                "/openai/deployments/gpt-5-misleading/chat/completions?api-version=2025-04-01-preview",
-                "/openai/deployments/gpt-5-misleading/chat/completions?api-version=2025-04-01-preview"
-            }));
+            Assert.That(requestedUris, Is.EqualTo(ResponsesToChatFallbackUris));
         });
     }
 
@@ -499,15 +489,8 @@ public sealed class AzureOpenAiChatCompletionClientTests
         {
             Assert.That(firstResponse.IsSuccess, Is.True);
             Assert.That(secondResponse.IsSuccess, Is.True);
-            Assert.That(firstUris, Is.EqualTo(new[]
-            {
-                "/openai/deployments/shared-route-cache/chat/completions?api-version=2025-04-01-preview",
-                "/openai/deployments/shared-route-cache/responses?api-version=2025-04-01-preview"
-            }));
-            Assert.That(secondUris, Is.EqualTo(new[]
-            {
-                "/openai/deployments/shared-route-cache/responses?api-version=2025-04-01-preview"
-            }));
+            Assert.That(firstUris, Is.EqualTo(SharedRouteCacheFirstClientUris));
+            Assert.That(secondUris, Is.EqualTo(SharedRouteCacheSecondClientUris));
         });
     }
 
@@ -1080,6 +1063,31 @@ public sealed class AzureOpenAiChatCompletionClientTests
             Assert.That(doc.RootElement.GetProperty("reasoning").GetProperty("effort").GetString(), Is.EqualTo("medium"));
         });
     }
+
+    private static readonly string[] ChatToResponsesFallbackUris =
+    [
+        "/openai/deployments/opaque-deployment/chat/completions?api-version=2025-04-01-preview",
+        "/openai/deployments/opaque-deployment/responses?api-version=2025-04-01-preview",
+        "/openai/deployments/opaque-deployment/responses?api-version=2025-04-01-preview"
+    ];
+
+    private static readonly string[] ResponsesToChatFallbackUris =
+    [
+        "/openai/deployments/gpt-5-misleading/responses?api-version=2025-04-01-preview",
+        "/openai/deployments/gpt-5-misleading/chat/completions?api-version=2025-04-01-preview",
+        "/openai/deployments/gpt-5-misleading/chat/completions?api-version=2025-04-01-preview"
+    ];
+
+    private static readonly string[] SharedRouteCacheFirstClientUris =
+    [
+        "/openai/deployments/shared-route-cache/chat/completions?api-version=2025-04-01-preview",
+        "/openai/deployments/shared-route-cache/responses?api-version=2025-04-01-preview"
+    ];
+
+    private static readonly string[] SharedRouteCacheSecondClientUris =
+    [
+        "/openai/deployments/shared-route-cache/responses?api-version=2025-04-01-preview"
+    ];
 
     private const string PersonJsonSchema =
         """{"type":"object","properties":{"name":{"type":"string"}},"required":["name"],"additionalProperties":false}""";
