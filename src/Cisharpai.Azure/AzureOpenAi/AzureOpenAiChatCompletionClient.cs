@@ -483,6 +483,12 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
 
         var isIncomplete = raw.Status == "incomplete";
         var incompleteReason = raw.IncompleteDetails?.Reason;
+        var isError = raw.Status is "incomplete" or "failed";
+        var errorMessage = isError
+            ? (incompleteReason is not null
+                ? $"Azure OpenAI Responses API response was {raw.Status}: {incompleteReason}"
+                : $"Azure OpenAI Responses API response status: {raw.Status}")
+            : null;
 
         return new ChatCompletionResponse(
             Content: content,
@@ -493,10 +499,8 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
             RawRequestJson: rawRequestJson,
             Status: raw.Status,
             IncompleteReason: isIncomplete ? incompleteReason : null,
-            IsSuccess: !isIncomplete,
-            ErrorMessage: isIncomplete
-                ? $"Azure OpenAI Responses API response was incomplete: {incompleteReason}"
-                : null,
+            IsSuccess: !isError,
+            ErrorMessage: errorMessage,
             Refusal: refusal);
     }
 
