@@ -10,9 +10,12 @@ public sealed record GroundedChatOptions(
     IReadOnlyList<DocumentChunk> Documents,
 
     /// <summary>
-    /// The citation generation mode. Defaults to <see cref="CitationMode.Accurate"/>.
+    /// The citation generation mode. Defaults to <see cref="CitationMode.Fast"/>, which is
+    /// supported by every Cohere model that exposes citations (both the <c>command-r</c> and
+    /// <c>command-a</c> families). <see cref="CitationMode.Accurate"/> is rejected by
+    /// <c>command-a</c> models, so it is not safe as a cross-model default.
     /// </summary>
-    CitationMode CitationMode = CitationMode.Accurate)
+    CitationMode CitationMode = CitationMode.Fast)
 {
     /// <summary>
     /// Validates the options. Throws <see cref="ArgumentException"/> if Documents is null or empty,

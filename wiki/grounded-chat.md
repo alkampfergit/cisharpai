@@ -73,14 +73,14 @@ var response = await groundedFeature.GetGroundedChatCompletionAsync(request, opt
 
 | Mode | Description |
 |------|-------------|
-| `CitationMode.Accurate` (default) | Model generates the full response first, then produces fine-grained citations. Higher latency, more precise. |
-| `CitationMode.Fast` | Citations generated inline as the response is produced. Lower latency, slightly less precise. |
+| `CitationMode.Accurate` | Model generates the full response first, then produces fine-grained citations. Higher latency, more precise. **Only supported by Cohere's `command-r` family** — `command-a` models reject this value. When the requested model is `command-a*`, the provider logs a warning and silently downgrades to `Fast`. |
+| `CitationMode.Fast` (default) | Citations generated inline as the response is produced. Lower latency, slightly less precise. Supported by both `command-r` and `command-a` families, which is why it is the cross-model default. |
 | `CitationMode.Enabled` | Provider-default citation behavior. |
 
 ```csharp
 var options = new GroundedChatOptions(
     Documents: documents,
-    CitationMode: CitationMode.Accurate);
+    CitationMode: CitationMode.Fast);
 ```
 
 ## Document Formats
@@ -185,5 +185,5 @@ Currently, `IGroundedChatFeature` is registered on:
 |---------|----------|
 | No citations returned | The model may not find relevant information in the provided documents. Ensure documents contain relevant content. |
 | Empty response | Check `response.IsSuccess` and `response.ErrorMessage` for API errors. |
-| Citation offsets incorrect | Verify you're using `CitationMode.Accurate` for the most precise offsets. |
+| Citation offsets incorrect | For the most precise offsets request `CitationMode.Accurate` against a `command-r` model. `command-a` models do not support `Accurate`; the provider downgrades to `Fast` and logs a warning. |
 | "documents not supported" error | Check that you're using a supported model (Command-R, Command-R+, Command-A). |

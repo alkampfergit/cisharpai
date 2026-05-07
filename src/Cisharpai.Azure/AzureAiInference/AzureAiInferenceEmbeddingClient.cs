@@ -60,7 +60,7 @@ public sealed class AzureAiInferenceEmbeddingClient : IEmbeddingClient, IImageEm
                 Model = !string.IsNullOrWhiteSpace(request.Model)
                     ? request.Model
                     : _options.ModelId,
-                Input = request.Input.Count == 1 ? request.Input[0] : request.Input,
+                Input = request.Input,
                 Dimensions = request.Dimensions,
                 EncodingFormat = request.EncodingFormat,
                 InputType = MapInputType(request.InputType)
