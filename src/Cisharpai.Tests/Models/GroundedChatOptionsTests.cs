@@ -32,12 +32,12 @@ public sealed class GroundedChatOptionsTests
     }
 
     [Test]
-    public void DefaultCitationMode_IsAccurate()
+    public void DefaultCitationMode_IsFast()
     {
         var options = new GroundedChatOptions(
             Documents: [new DocumentChunk(Text: "Some text")]);
 
-        Assert.That(options.CitationMode, Is.EqualTo(CitationMode.Accurate));
+        Assert.That(options.CitationMode, Is.EqualTo(CitationMode.Fast));
     }
 
     [Test]

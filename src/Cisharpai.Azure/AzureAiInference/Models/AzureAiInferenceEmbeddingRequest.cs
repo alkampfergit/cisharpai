@@ -7,9 +7,9 @@ public sealed class AzureAiInferenceEmbeddingRequest
     public string? Model { get; set; }
 
     /// <summary>
-    /// The input text(s) to embed. Can be a single string or array of strings.
+    /// The input text(s) to embed.
     /// </summary>
-    public object Input { get; set; } = string.Empty;
+    public IReadOnlyList<string> Input { get; set; } = [];
 
     public int? Dimensions { get; set; }
 

@@ -32,6 +32,35 @@ public sealed class AzureAiInferenceJsonOutputTests
         }
         """;
 
+    private const string StructuredJsonResponseFixture = """
+        {
+            "id": "chatcmpl-structured-123",
+            "object": "chat.completion",
+            "created": 1700000000,
+            "model": "Phi-3-mini-4k-instruct",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {
+                        "role": "assistant",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "{\"name\":\"John\",\"age\":30}"
+                            }
+                        ]
+                    },
+                    "finish_reason": "stop"
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 15,
+                "completion_tokens": 10,
+                "total_tokens": 25
+            }
+        }
+        """;
+
     private const string TestSchema =
         """{"type":"object","properties":{"name":{"type":"string"},"age":{"type":"integer"}},"required":["name","age"],"additionalProperties":false}""";
 
@@ -248,6 +277,37 @@ public sealed class AzureAiInferenceJsonOutputTests
                 Is.EqualTo("integer"));
             Assert.That(schema.GetProperty("additionalProperties").GetBoolean(), Is.False);
         });
+    }
+
+    [Test]
+    public async Task JsonMode_StructuredContentResponse_ExtractsJsonText()
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(StructuredJsonResponseFixture, System.Text.Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler)
+        {
+            BaseAddress = new Uri("https://test.inference.azure.com/")
+        };
+        var client = new AzureAiInferenceChatCompletionClient(httpClient,
+            new AzureAiInferenceClientOptions { ModelId = "Phi-3-mini", ApiKey = "key" });
+
+        var jsonFeature = client.Features.Get<IJsonOutputFeature>()!;
+        var response = await jsonFeature.GetChatCompletionWithJsonOutputAsync(
+            new ChatCompletionRequest(
+                Messages: [new LlmMessage(LlmRole.User, "Give me a person")],
+                Model: "Phi-3-mini"),
+            new JsonOutputOptions(Mode: JsonOutputMode.JsonMode));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.True);
+            Assert.That(response.Content, Is.EqualTo("{\"name\":\"John\",\"age\":30}"));
+        });
+        Assert.DoesNotThrow(() => JsonDocument.Parse(response.Content));
     }
 
     #endregion

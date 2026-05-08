@@ -19,7 +19,8 @@
         "ms-dotnettools.csharp",
         "github.copilot",
         "planet57.vscode-beads",
-        "anthropic.claude-code"
+        "anthropic.claude-code",
+        "sonarsource.sonarlint-vscode"
       ],
       "settings": {
         "dotnet.defaultSolution": "Cisharpai.sln",

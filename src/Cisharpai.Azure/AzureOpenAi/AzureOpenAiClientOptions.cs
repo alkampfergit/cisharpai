@@ -19,10 +19,28 @@ public sealed class AzureOpenAiClientOptions : AzureClientOptionsBase
     public string? DefaultModel { get; set; }
 
     /// <summary>
+    /// Optional explicit underlying model name used for routing decisions.
+    /// Use the same OpenAI model name you would pass to the OpenAI client,
+    /// for example "gpt-5", "o3-mini", or "gpt-4o".
+    /// (e.g. whether to use Chat Completions vs the Responses API for GPT-5).
+    /// Set this when <see cref="DeploymentName"/> is opaque (e.g. "foo") and does not
+    /// carry the model name in its name. When null, routing falls back to the
+    /// deployment / request model name; if neither indicates a known family the
+    /// standard Chat Completions API is used.
+    /// </summary>
+    public string? ModelName { get; set; }
+
+    /// <summary>
     /// Optional reasoning effort for Azure OpenAI reasoning models when the API version/model supports it.
     /// Values are provider-defined, commonly "low", "medium", or "high".
     /// </summary>
     public string? ReasoningEffort { get; set; }
+
+    /// <summary>
+    /// Optional text verbosity for GPT-5 models via the Responses API.
+    /// Values: "low" or "high". Only applied when the model is detected as GPT-5.
+    /// </summary>
+    public string? TextVerbosity { get; set; }
 
     /// <summary>
     /// Initializes a new instance with the default API version.

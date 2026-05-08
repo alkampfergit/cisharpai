@@ -27,7 +27,7 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Image Embeddings | -- | -- | Yes | -- | Yes |
 | Multimodal Embeddings | -- | -- | -- | -- | Yes |
 | Reasoning Models | Yes | Yes | Yes | -- | -- |
-| Responses API (GPT-5) | Yes | -- | -- | -- | -- |
+| Responses API (GPT-5) | Yes | Yes | -- | -- | -- |
 | Grounded Chat (RAG) | -- | -- | -- | -- | Yes |
 | Tool Calling | Yes | Yes | Yes | Yes | Yes |
 | Vision (Image Input) | Yes | Yes | Yes | Yes | Partial* |
@@ -62,17 +62,19 @@ This page lists every feature supported by each provider integration in Cisharpa
 
 | Capability | Details |
 |------------|---------|
-| Chat Completions | Deployment-based routing; reasoning-model detection (o1/o3/o4/gpt-5) |
+| Chat Completions | Deployment-based routing; three-way model detection (Legacy GPT-4 / Reasoning o1-o3-o4 / GPT-5) with one-shot recovery when Azure rejects the first route guess |
 | Text Embeddings | text-embedding-ada-002, text-embedding-3-small, text-embedding-3-large |
-| JSON Mode | Via `response_format` (requires api-version 2024-08-01-preview+ for json_schema) |
-| Structured Outputs | Via `response_format.json_schema`; refusal extraction supported |
-| Reasoning Models | Detected automatically; uses `max_completion_tokens` instead of `max_tokens`; `AzureOpenAiClientOptions.ReasoningEffort` sends `reasoning_effort` for o1/o3/o4/gpt-5 deployments |
-| Tool Calling | All deployments; identical JSON shape to OpenAI (`tools` array, `tool_choice` parameter); all `ToolChoice` variants supported |
+| JSON Mode | Via `response_format` (Chat Completions, requires api-version 2024-08-01-preview+ for json_schema) or `text.format` (Responses API for GPT-5) |
+| Structured Outputs | Via `response_format.json_schema` (Chat Completions) or `text.format` with `json_schema` (Responses API); refusal extraction supported |
+| Reasoning Models | o1/o3/o4 detected automatically; uses `max_completion_tokens` instead of `max_tokens`; `AzureOpenAiClientOptions.ReasoningEffort` sends `reasoning_effort` for o-series and gpt-5 deployments |
+| Responses API (GPT-5) | gpt-5 deployments route to `openai/deployments/{name}/responses?api-version=...`; `AzureOpenAiClientOptions.TextVerbosity` maps to `text.verbosity`; if Azure returns `404 Resource not found`, the client retries Chat Completions once and shares the learned route across later client instances with the same endpoint, deployment, and API version |
+| Model Name Override | `AzureOpenAiClientOptions.ModelName` forces routing for opaque deployment names (e.g. `DeploymentName="foo"` + `ModelName="gpt-5"` routes to the Responses API) |
+| Tool Calling | All deployments; identical JSON shape to OpenAI (`tools` array, `tool_choice` parameter); all `ToolChoice` variants supported. GPT-5 tool calling uses Chat Completions (matches OpenAI client). |
 | Vision | Same data URI format as OpenAI; images sent as content parts in messages |
-| Streaming | `IStreamingChatFeature`; supports both legacy and reasoning request formats; `[DONE]` terminates the stream |
+| Streaming | `IStreamingChatFeature`; supports legacy, reasoning, and Responses API streams; `[DONE]` terminates Chat Completions streams; gpt-5 uses `response.completed` |
 | Authentication | API key (`api-key` header) or Azure AD (Bearer token) |
 
-`ReasoningEffort` is omitted for non-reasoning Azure OpenAI deployments to avoid unsupported-parameter errors. `ExtraParameters` still deep-merges into the final request and can override `reasoning_effort` or add newer Azure/OpenAI parameters before the typed options are updated.
+`ReasoningEffort` is omitted for non-reasoning Azure OpenAI deployments to avoid unsupported-parameter errors. `TextVerbosity` is sent only when the model is detected as gpt-5. When Azure rejects `max_tokens` for a reasoning deployment, the client retries once with `max_completion_tokens`; when the initially selected endpoint is wrong, it retries the alternate endpoint once. Learned mismatches are cached in-process per `(Endpoint, DeploymentName, ApiVersion)` for future Azure OpenAI client instances. `ExtraParameters` still deep-merges into the final request and can override either typed option or add newer Azure/OpenAI parameters before the typed options are updated.
 
 Azure OpenAI truncation is surfaced as a failed unified response when the provider returns `finish_reason: "length"`: `IsSuccess=false`, `Status="length"`, and `IncompleteReason="length"`. Some reasoning deployments may instead return an Azure HTTP error when the output limit is too low; those remain `IsSuccess=false` with the provider error in `ErrorMessage`/`RawResponseJson`.
 

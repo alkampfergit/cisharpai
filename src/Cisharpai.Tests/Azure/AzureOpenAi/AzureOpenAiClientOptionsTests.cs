@@ -106,4 +106,15 @@ public sealed class AzureOpenAiClientOptionsTests
 
         Assert.That(options.ApiVersion, Is.EqualTo("2024-10-21"));
     }
+
+    [Test]
+    public void ModelName_CanBeSet()
+    {
+        var options = new AzureOpenAiClientOptions
+        {
+            ModelName = "gpt-5"
+        };
+
+        Assert.That(options.ModelName, Is.EqualTo("gpt-5"));
+    }
 }

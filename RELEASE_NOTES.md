@@ -4,6 +4,11 @@ This file is included in the NuGet packages. Keep a single line for each user-fa
 
 ## Unreleased
 
+- Azure OpenAI chat/json/tool-calling requests now recover from Azure routing mismatches by retrying the alternate endpoint or chat-completions token shape when the first guess is rejected, and learned mismatches are cached per `(Endpoint, DeploymentName, ApiVersion)` so later client instances reuse the working route.
+- Cohere grounded chat: default `CitationMode` is now `Fast` (works on both `command-r` and `command-a` families); when `Accurate` is requested against a `command-a` model the provider logs a warning and silently downgrades to `Fast` instead of letting the API return HTTP 400.
+- Azure OpenAI GPT-5 models now automatically route to the Responses API (same as OpenAI), with first-class `TextVerbosity` option on `AzureOpenAiClientOptions`.
+- Azure OpenAI gains optional `ModelName` on `AzureOpenAiClientOptions` to drive routing when the deployment name is opaque (e.g. set `ModelName="gpt-5"` for a deployment named "foo"); when unset, routing falls back to the deployment/request model name and finally to standard Chat Completions.
+- Azure OpenAI removes the temporary `ModelFamily` alias; use `ModelName` as the only explicit underlying-model hint.
 - Azure OpenAI reasoning requests now support first-class `ReasoningEffort` configuration while still allowing `ExtraParameters` overrides.
 - Azure OpenAI chat completions now return `IsSuccess=false` with `IncompleteReason="length"` when the provider reports `finish_reason: "length"`.
 - Initial release notes file added to the NuGet package contents.

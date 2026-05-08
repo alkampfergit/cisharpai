@@ -64,8 +64,14 @@ new DocumentChunk("doc-1", "Plain text content of the document...")
 | Mode | Behavior | Latency |
 |------|----------|---------|
 | `CitationMode.Accurate` | Full response first, then citations | Higher, more precise |
-| `CitationMode.Fast` | Inline citations during generation | Lower, less precise |
+| `CitationMode.Fast` (default) | Inline citations during generation | Lower, less precise |
 | `CitationMode.Enabled` | Provider default | Varies |
+
+> **Cohere model compatibility.** `Accurate` is supported only by the `command-r`
+> family (e.g. `command-r-08-2024`, `command-r-plus-08-2024`). `command-a` models
+> (e.g. `command-a-03-2025`) reject it, so the Cohere provider logs a warning and
+> silently downgrades the request to `Fast`. The default is `Fast` so the same
+> options work across both families.
 
 ## Citation Model
 

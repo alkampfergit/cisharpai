@@ -231,15 +231,56 @@ public sealed class CohereGroundedChatTests
     [Test]
     public async Task GroundedChat_SetsCitationOptionsMode_Accurate()
     {
+        // ACCURATE is only supported by the command-r family — use it here so the request goes
+        // through unchanged. command-a downgrade is covered by a separate test below.
+        var request = new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "What is the capital of France?")],
+            Model: "command-r-08-2024");
+
         var (_, capturedBody) = await ExecuteGroundedChat(
             GroundedResponseWithCitations,
             options: new GroundedChatOptions(
                 Documents: [new DocumentChunk(Text: "Some text")],
-                CitationMode: CitationMode.Accurate));
+                CitationMode: CitationMode.Accurate),
+            request: request);
 
         var doc = JsonDocument.Parse(capturedBody!);
         var citationOptions = doc.RootElement.GetProperty("citation_options");
         Assert.That(citationOptions.GetProperty("mode").GetString(), Is.EqualTo("ACCURATE"));
+    }
+
+    [Test]
+    public async Task GroundedChat_DowngradesAccurateToFast_OnCommandAModel()
+    {
+        // command-a-03-2025 rejects ACCURATE. The provider must silently downgrade to FAST
+        // (and log a warning) instead of forwarding the unsupported value.
+        var request = new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "What is the capital of France?")],
+            Model: "command-a-03-2025");
+
+        var (_, capturedBody) = await ExecuteGroundedChat(
+            GroundedResponseWithCitations,
+            options: new GroundedChatOptions(
+                Documents: [new DocumentChunk(Text: "Some text")],
+                CitationMode: CitationMode.Accurate),
+            request: request);
+
+        var doc = JsonDocument.Parse(capturedBody!);
+        var citationOptions = doc.RootElement.GetProperty("citation_options");
+        Assert.That(citationOptions.GetProperty("mode").GetString(), Is.EqualTo("FAST"));
+    }
+
+    [Test]
+    public async Task GroundedChat_DefaultCitationMode_SendsFast()
+    {
+        var (_, capturedBody) = await ExecuteGroundedChat(
+            GroundedResponseWithCitations,
+            options: new GroundedChatOptions(
+                Documents: [new DocumentChunk(Text: "Some text")]));
+
+        var doc = JsonDocument.Parse(capturedBody!);
+        var citationOptions = doc.RootElement.GetProperty("citation_options");
+        Assert.That(citationOptions.GetProperty("mode").GetString(), Is.EqualTo("FAST"));
     }
 
     [Test]

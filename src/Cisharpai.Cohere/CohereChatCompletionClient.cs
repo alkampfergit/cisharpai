@@ -16,6 +16,7 @@ public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOut
     private const string ChatEndpoint = "chat";
     private readonly LlmHttpClient _client;
     private readonly CohereClientOptions _options;
+    private readonly ILogger<CohereChatCompletionClient>? _logger;
 
     private static readonly JsonSerializerOptions StreamJsonOptions = new()
     {
@@ -32,6 +33,7 @@ public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOut
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
         }, loggerFactory?.CreateLogger<LlmHttpClient>());
         _options = options;
+        _logger = loggerFactory?.CreateLogger<CohereChatCompletionClient>();
 
         var features = new FeatureCollection();
         features.Set<IJsonOutputFeature>(this);
@@ -127,9 +129,11 @@ public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOut
 
             var providerRequest = BuildRequest(request);
             providerRequest.Documents = MapDocuments(groundedChatOptions.Documents);
+            var effectiveCitationMode = ResolveCitationModeForModel(
+                groundedChatOptions.CitationMode, request.Model);
             providerRequest.CitationOptions = new CohereCitationOptions
             {
-                Mode = MapCitationMode(groundedChatOptions.CitationMode)
+                Mode = MapCitationMode(effectiveCitationMode)
             };
 
             string? rawResponseJson = null;
@@ -497,4 +501,18 @@ public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOut
         _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, null)
     };
 
+    private CitationMode ResolveCitationModeForModel(CitationMode requested, string? model)
+    {
+        if (requested == CitationMode.Accurate && IsCommandAModel(model))
+        {
+            _logger?.LogWarning(
+                "Cohere model '{Model}' does not support CitationMode.Accurate; falling back to CitationMode.Fast.",
+                model);
+            return CitationMode.Fast;
+        }
+        return requested;
+    }
+
+    private static bool IsCommandAModel(string? model) =>
+        model is not null && model.StartsWith("command-a", StringComparison.OrdinalIgnoreCase);
 }

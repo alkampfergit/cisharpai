@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using Cisharpai.Models;
 
@@ -9,7 +10,8 @@ namespace Cisharpai.Helpers;
 public static class ContentPartHelper
 {
     /// <summary>
-    /// Extracts a string from a content value that may be a raw string or a JsonElement.
+    /// Extracts a string from a content value that may be a raw string, a JsonElement,
+    /// or a structured array/object of text parts.
     /// Used by OpenAI, Azure OpenAI, and Azure AI Inference providers.
     /// </summary>
     public static string ExtractStringContent(object? content)
@@ -17,9 +19,52 @@ public static class ContentPartHelper
         return content switch
         {
             string s => s,
-            JsonElement je when je.ValueKind == JsonValueKind.String => je.GetString() ?? string.Empty,
+            JsonElement je => ExtractStringContent(je),
             _ => string.Empty
         };
+    }
+
+    private static string ExtractStringContent(JsonElement content)
+    {
+        return content.ValueKind switch
+        {
+            JsonValueKind.String => content.GetString() ?? string.Empty,
+            JsonValueKind.Array => ExtractStringContentFromArray(content),
+            JsonValueKind.Object => ExtractStringContentFromObject(content),
+            _ => string.Empty
+        };
+    }
+
+    private static string ExtractStringContentFromArray(JsonElement content)
+    {
+        var builder = new StringBuilder();
+
+        foreach (var item in content.EnumerateArray())
+        {
+            builder.Append(ExtractStringContent(item));
+        }
+
+        return builder.ToString();
+    }
+
+    private static string ExtractStringContentFromObject(JsonElement content)
+    {
+        if (content.TryGetProperty("text", out var text))
+        {
+            return ExtractStringContent(text);
+        }
+
+        if (content.TryGetProperty("refusal", out var refusal))
+        {
+            return ExtractStringContent(refusal);
+        }
+
+        if (content.TryGetProperty("content", out var nestedContent))
+        {
+            return ExtractStringContent(nestedContent);
+        }
+
+        return string.Empty;
     }
 
     /// <summary>

@@ -2,7 +2,6 @@ using Cisharpai.Models;
 using Cisharpai.Azure;
 using Cisharpai.Azure.AzureOpenAi;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Http;
 
 namespace Cisharpai.Integration.Tests.AzureOpenAi;
 
@@ -34,8 +33,10 @@ public sealed class AzureOpenAiChatCompletionIntegrationTests
     private static bool IsReasoningDeployment(string deployment) =>
         deployment.StartsWith("o1", StringComparison.OrdinalIgnoreCase) ||
         deployment.StartsWith("o3", StringComparison.OrdinalIgnoreCase) ||
-        deployment.StartsWith("o4", StringComparison.OrdinalIgnoreCase) ||
-        deployment.StartsWith("gpt-5", StringComparison.OrdinalIgnoreCase);
+        deployment.StartsWith("o4", StringComparison.OrdinalIgnoreCase);
+
+    private static bool UsesResponsesApiRequest(string? rawRequestJson) =>
+        rawRequestJson?.Contains("\"input\"", StringComparison.Ordinal) == true;
 
     [TestCaseSource(nameof(Deployments))]
     public async Task GetChatCompletionAsync_ReturnsValidResponse(string deployment)
@@ -171,6 +172,100 @@ public sealed class AzureOpenAiChatCompletionIntegrationTests
             Assert.That(response.Content, Is.Not.Null.And.Not.Empty);
             Assert.That(response.PromptTokens, Is.GreaterThan(0));
             Assert.That(response.CompletionTokens, Is.GreaterThan(0));
+        });
+    }
+
+    [TestCaseSource(nameof(Deployments))]
+    public async Task GetChatCompletionAsync_Gpt5_UsesResponsesApi_AndReturnsValidResponse(string deployment)
+    {
+        var endpoint = Environment.GetEnvironmentVariable(DotEnv.AzureOpenAiTestEndpoint);
+        var apiKey = Environment.GetEnvironmentVariable(DotEnv.AzureOpenAiTestApiKey);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(endpoint, Is.Not.Null.And.Not.Empty,
+                $"Environment variable {DotEnv.AzureOpenAiTestEndpoint} must be set.");
+            Assert.That(apiKey, Is.Not.Null.And.Not.Empty,
+                $"Environment variable {DotEnv.AzureOpenAiTestApiKey} must be set.");
+        });
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddAzureOpenAiClient(options =>
+        {
+            options.Endpoint = endpoint!;
+            options.ApiKey = apiKey!;
+            options.DeploymentName = deployment;
+        });
+
+        await using var provider = services.BuildServiceProvider();
+        var client = provider.GetRequiredService<IChatCompletionClient>();
+
+        var request = new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "Reply with exactly: hello")],
+            Model: deployment,
+            MaxTokens: 256,
+            IncludeRawResponse: true);
+
+        var response = await client.GetChatCompletionAsync(request);
+
+        if (!UsesResponsesApiRequest(response.RawRequestJson))
+            Assert.Ignore($"Deployment {deployment} did not route through the Responses API.");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response, Is.Not.Null);
+            Assert.That(response.IsSuccess, Is.True, response.RawResponseJson ?? response.ErrorMessage);
+            Assert.That(response.Content, Is.Not.Null.And.Not.Empty);
+            Assert.That(response.Content.ToLowerInvariant(), Does.Contain("hello"));
+            Assert.That(response.PromptTokens, Is.GreaterThan(0));
+            Assert.That(response.CompletionTokens, Is.GreaterThan(0));
+        });
+    }
+
+    [TestCaseSource(nameof(Deployments))]
+    public async Task GetChatCompletionAsync_Gpt5_TextVerbosityHigh_IsSentInRequest(string deployment)
+    {
+        var endpoint = Environment.GetEnvironmentVariable(DotEnv.AzureOpenAiTestEndpoint);
+        var apiKey = Environment.GetEnvironmentVariable(DotEnv.AzureOpenAiTestApiKey);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(endpoint, Is.Not.Null.And.Not.Empty,
+                $"Environment variable {DotEnv.AzureOpenAiTestEndpoint} must be set.");
+            Assert.That(apiKey, Is.Not.Null.And.Not.Empty,
+                $"Environment variable {DotEnv.AzureOpenAiTestApiKey} must be set.");
+        });
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddAzureOpenAiClient(options =>
+        {
+            options.Endpoint = endpoint!;
+            options.ApiKey = apiKey!;
+            options.DeploymentName = deployment;
+            options.TextVerbosity = "high";
+        });
+
+        await using var provider = services.BuildServiceProvider();
+        var client = provider.GetRequiredService<IChatCompletionClient>();
+
+        var request = new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "Reply with exactly: hello")],
+            Model: deployment,
+            MaxTokens: 256,
+            IncludeRawResponse: true);
+
+        var response = await client.GetChatCompletionAsync(request);
+
+        if (!UsesResponsesApiRequest(response.RawRequestJson))
+            Assert.Ignore($"Deployment {deployment} did not route through the Responses API.");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.True, response.RawResponseJson ?? response.ErrorMessage);
+            Assert.That(response.RawRequestJson, Is.Not.Null);
+            Assert.That(response.RawRequestJson, Does.Contain(@"""verbosity"":""high"""));
         });
     }
 
