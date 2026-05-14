@@ -64,6 +64,29 @@ Start here:
 - Interactive console demo: [src/Cisharp.Console/](src/Cisharp.Console/) -- covers all providers and features
 - Logging: every HTTP call emits structured `ILogger` entries (EventIds 1000–1005). Wire any sink via `ILoggerFactory` -- see [wiki/logging.md](wiki/logging.md).
 
+## HTTP Resilience
+
+The provider DI helpers (`AddOpenAiClient`, `AddAzureOpenAiClient`, `AddAzureAiInferenceChatCompletion`, `AddAnthropicClient`, `AddCohereChatClient`, and embedding equivalents) automatically add `AddCisharpaiResilienceHandler()` to their `HttpClient` registrations.
+
+`AddCisharpaiResilienceHandler()` uses `Microsoft.Extensions.Http.Resilience` / Polly standard HTTP resilience with:
+
+- Retries for transient failures, including HTTP `408`, `429`, `5xx`, `HttpRequestException`, and timeout failures
+- `Retry-After` header support for retry delays, including rate-limit responses such as `429 Too Many Requests`
+- 3 retry attempts, 500 ms initial delay, exponential backoff, and jitter
+- 60 second per-attempt timeout and 90 second total request timeout
+- Circuit breaker with 120 second sampling, 20% failure ratio, minimum 10 requests, and 15 second break duration
+
+If all retries fail, provider clients return `IsSuccess = false` and `ErrorMessage` for API errors instead of throwing. Network/configuration failures may still throw.
+
+The static `Create(...)` factory methods do not add DI resilience by themselves. When using `Create(...)`, register the named handler with resilience at startup:
+
+```csharp
+services.AddHttpClient("cisharpai")
+    .AddCisharpaiResilienceHandler();
+```
+
+Streaming calls can run longer than the standard 60s/90s timeouts. For long-running streams, configure a streaming-specific HTTP client with `AddCisharpaiStreamingResilienceHandler()`, which removes those timeouts while keeping retry and circuit-breaker policies.
+
 ## Building Locally
 
 The project includes a PowerShell build script that handles versioning, building, testing, and NuGet packaging.

@@ -28,6 +28,7 @@ change — application code stays the same.
 - **Immutable DTOs** — Request/Response types are immutable records
 - **Feature Collection Pattern** — Optional capabilities via `IHasFeatures.Features.Get<T>()`
 - **Escape Hatch** — `ExtraParameters` deep-merges arbitrary JSON into requests
+- **HTTP Resilience** — DI helpers add retry, timeout, and circuit-breaker policies; `Create(...)` requires explicit named `HttpClient` resilience registration
 
 ## Quick Start
 
@@ -60,7 +61,7 @@ services.AddAzureOpenAiClient(o => {
 services.AddAnthropicClient(o => { o.ApiKey = "sk-ant-..."; });
 
 // Cohere
-services.AddCohereClient(o => { o.ApiKey = "..."; });
+services.AddCohereChatClient(o => { o.ApiKey = "..."; });
 ```
 
 ### 3. Send a Request
@@ -79,6 +80,29 @@ if (response.IsSuccess)
 else
     Console.WriteLine($"Error: {response.ErrorMessage}");
 ```
+
+## HTTP Resilience
+
+Provider DI helpers automatically call `AddCisharpaiResilienceHandler()` on their `HttpClient` registrations. This applies to OpenAI, Azure OpenAI, Azure AI Inference, Anthropic, Cohere, and embedding clients.
+
+The standard handler uses `Microsoft.Extensions.Http.Resilience` / Polly with:
+
+- Retries for transient failures: HTTP `408`, `429`, `5xx`, `HttpRequestException`, and timeout failures.
+- `Retry-After` support, so `429 Too Many Requests` can delay according to the server-provided header.
+- 3 retry attempts, 500 ms initial delay, exponential backoff, and jitter.
+- 60 second per-attempt timeout and 90 second total request timeout.
+- Circuit breaker with 120 second sampling, 20% failure ratio, minimum 10 requests, and 15 second break duration.
+
+After retries are exhausted, API-level HTTP errors become normal response failures (`IsSuccess = false`, `ErrorMessage`, and raw response body when available). Network/configuration problems may still throw.
+
+When using `Create(...)`, resilience is not added automatically. Register the named handler with resilience:
+
+```csharp
+services.AddHttpClient("cisharpai")
+    .AddCisharpaiResilienceHandler();
+```
+
+For long-running streaming workloads, use `AddCisharpaiStreamingResilienceHandler()` on the streaming `HttpClient` registration. It removes the standard 60s/90s timeouts while keeping retry and circuit-breaker behavior.
 
 ## Runtime Client Creation (no DI required)
 
@@ -99,7 +123,7 @@ All 9 clients support `Create`. Azure providers add an optional `TokenCredential
 
 **Key notes:**
 - Client instances are cheap; TCP connections are pooled in the handler.
-- `Create` bypasses DI resilience handlers — add `services.AddHttpClient("cisharpai").AddCisharpaiResilienceHandler()` at startup if needed.
+- `Create` bypasses DI resilience handlers; add `services.AddHttpClient("cisharpai").AddCisharpaiResilienceHandler()` at startup if retries/timeouts/circuit breaking are needed.
 - Azure OpenAI chat clients share learned routing fallbacks in-process per `(Endpoint, DeploymentName, ApiVersion)`, so later dynamically created clients reuse the working route after the first mismatch is discovered.
 
 ## Core Interfaces

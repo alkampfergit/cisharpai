@@ -4,14 +4,15 @@ Use when API keys, endpoints, or model IDs are not known at startup — e.g. mul
 
 ## Pattern: `Create` + `IHttpMessageHandlerFactory`
 
-Register a named HTTP client once (connection pool only — no auth, no base address):
+Register a named HTTP client once (no auth, no base address). Add resilience here if runtime-created clients should retry transient failures:
 
 ```csharp
 // Program.cs
-services.AddHttpClient("cisharpai");
-// With resilience (recommended):
-services.AddHttpClient("cisharpai").AddCisharpaiResilienceHandler();
+services.AddHttpClient("cisharpai")
+    .AddCisharpaiResilienceHandler();
 ```
+
+`Create(...)` uses the named handler from `IHttpMessageHandlerFactory`. Unlike the provider DI helpers, it does not automatically add Cisharpai resilience.
 
 Inject `IHttpMessageHandlerFactory` and call `Create` on demand:
 
@@ -95,7 +96,7 @@ All clients created via `Create` are **thread-safe for concurrent calls** — ea
 
 ## Notes
 
-- **Resilience**: `Create` does not auto-wire resilience handlers. Add `.AddCisharpaiResilienceHandler()` to the named client registration at startup.
+- **Resilience**: `Create` does not auto-wire resilience handlers. Add `.AddCisharpaiResilienceHandler()` to the named client registration at startup. The standard handler retries HTTP `408`, `429`, `5xx`, `HttpRequestException`, and timeout failures, honors `Retry-After`, uses 3 exponential-backoff retry attempts with jitter, applies 60s/90s attempt/total timeouts, and includes a circuit breaker.
 - **Caching instances**: Client construction is cheap. Caching per `(provider, apiKey, endpoint)` is fine but not required.
 - **Azure OpenAI learned routing cache**: chat clients share route-shape discoveries in-process per `(Endpoint, DeploymentName, ApiVersion)`, so creating a new Azure OpenAI client after a fallback does not repeat the same route-mismatch probe.
 - **Azure AD at runtime**: Pass a `TokenCredential` (e.g. `ClientSecretCredential`) resolved at request time to `Create`.

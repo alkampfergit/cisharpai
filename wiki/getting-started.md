@@ -64,7 +64,7 @@ services.AddAnthropicClient(o =>
 });
 
 // Cohere
-services.AddCohereClient(o =>
+services.AddCohereChatClient(o =>
 {
     o.ApiKey = "...";
     o.DefaultModel = "command-a-08-2025";

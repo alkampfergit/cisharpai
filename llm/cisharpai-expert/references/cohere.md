@@ -3,7 +3,7 @@
 ## Setup
 
 ```csharp
-services.AddCohereClient(options =>
+services.AddCohereChatClient(options =>
 {
     options.ApiKey = "...";
     options.BaseUrl = "https://api.cohere.com/v2";  // default
