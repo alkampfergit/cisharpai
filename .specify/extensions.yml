@@ -147,3 +147,19 @@ hooks:
     prompt: Commit after syncing issues?
     description: Auto-commit after tasks-to-issues conversion
     condition: null
+  before_retrospec:
+  - extension: git
+    command: speckit.git.commit
+    enabled: true
+    optional: true
+    prompt: Commit outstanding changes before retrospec?
+    description: Auto-commit before reverse-engineering specs
+    condition: null
+  after_retrospec:
+  - extension: git
+    command: speckit.git.commit
+    enabled: true
+    optional: true
+    prompt: Commit retrospec artifacts?
+    description: Auto-commit after reverse-engineering specs
+    condition: null
