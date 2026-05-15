@@ -101,19 +101,17 @@ function Get-HighestNumberFromRemoteRefs {
     [long]$highest = 0
     try {
         $remotes = git remote 2>$null
-        if ($remotes) {
-            foreach ($remote in $remotes) {
-                $env:GIT_TERMINAL_PROMPT = '0'
-                $refs = git ls-remote --heads $remote 2>$null
-                $env:GIT_TERMINAL_PROMPT = $null
-                if ($LASTEXITCODE -eq 0 -and $refs) {
-                    $refNames = $refs | ForEach-Object {
-                        if ($_ -match 'refs/heads/(.+)$') { $matches[1] }
-                    } | Where-Object { $_ }
-                    $remoteHighest = Get-HighestNumberFromNames -Names $refNames
-                    if ($remoteHighest -gt $highest) { $highest = $remoteHighest }
-                }
-            }
+        if (-not $remotes) { return $highest }
+        foreach ($remote in $remotes) {
+            $env:GIT_TERMINAL_PROMPT = '0'
+            $refs = git ls-remote --heads $remote 2>$null
+            $env:GIT_TERMINAL_PROMPT = $null
+            if ($LASTEXITCODE -ne 0 -or -not $refs) { continue }
+            $refNames = $refs | ForEach-Object {
+                if ($_ -match 'refs/heads/(.+)$') { $matches[1] }
+            } | Where-Object { $_ }
+            $remoteHighest = Get-HighestNumberFromNames -Names $refNames
+            if ($remoteHighest -gt $highest) { $highest = $remoteHighest }
         }
     } catch {
         Write-Verbose "Could not query remote refs: $_"
@@ -134,7 +132,7 @@ function Get-NextBranchNumber {
     } else {
         try {
             git fetch --all --prune 2>$null | Out-Null
-        } catch { }
+        } catch { Write-Verbose "git fetch failed: $_" }
         $highestBranch = Get-HighestNumberFromBranches
     }
 
@@ -339,7 +337,7 @@ if (-not $DryRun) {
 
         if (-not $branchCreated) {
             $currentBranch = ''
-            try { $currentBranch = (git rev-parse --abbrev-ref HEAD 2>$null).Trim() } catch {}
+            try { $currentBranch = (git rev-parse --abbrev-ref HEAD 2>$null).Trim() } catch { Write-Verbose "Could not detect current branch: $_" }
             $existingBranch = git branch --list $branchName 2>$null
             if ($existingBranch) {
                 if ($AllowExistingBranch) {

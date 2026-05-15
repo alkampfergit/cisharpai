@@ -51,7 +51,7 @@ try {
         Write-Warning "[specify] Git repository already initialized; skipping"
         exit 0
     }
-} catch { }
+} catch { Write-Verbose "Git check failed: $_" }
 
 # Initialize
 try {
