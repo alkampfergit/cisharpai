@@ -34,11 +34,16 @@ await foreach (var chunk in streamFeature.GetChatCompletionStreamAsync(request, 
 
 ## Streaming Resilience
 
-For long-running streams, remove the default HTTP timeout:
+The standard `AddCisharpaiResilienceHandler()` uses 60 second per-attempt and 90 second total timeouts. Those limits can cut off long-running SSE streams.
+
+For long-running streams, configure the streaming `HttpClient` registration with infinite resilience timeouts:
 
 ```csharp
-services.AddCisharpaiStreamingResilienceHandler();
+services.AddHttpClient("cisharpai-streaming")
+    .AddCisharpaiStreamingResilienceHandler();
 ```
+
+`AddCisharpaiStreamingResilienceHandler()` keeps retry and circuit-breaker behavior while removing the standard request timeout limits.
 
 ## Collecting Full Response
 
