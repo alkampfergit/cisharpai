@@ -1,4 +1,4 @@
-# Data Model: DI Client Factory
+# Data Model: DI Client Factory (v2 — per-provider configuration hierarchy)
 
 ## Entities
 
@@ -14,32 +14,71 @@ Identifies a supported LLM provider. Lives in `Cisharpai` core.
 | `Anthropic` | Anthropic (Claude) |
 | `Cohere` | Cohere |
 
-### RuntimeClientConfiguration (immutable record)
+### CisharpaiClientConfiguration (abstract record — base)
 
-Provider-agnostic configuration for creating a client at runtime. Lives in `Cisharpai` core.
+Base configuration with only two fields: provider identity and API key. Lives in `Cisharpai` core. Each provider defines a concrete subclass with provider-specific settings.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `Provider` | `CisharpaiProvider` | Yes | Target provider |
 | `ApiKey` | `string` | Yes | Authentication key |
-| `Model` | `string?` | No | Default model name |
-| `Endpoint` | `string?` | No | Custom endpoint URL (overrides provider default) |
-| `ExtraSettings` | `IReadOnlyDictionary<string, string>?` | No | Provider-specific settings |
 
-**ExtraSettings known keys per provider:**
+The factory routes on `Provider` enum; the concrete subclass is consumed only by the matching `IClientFactoryProvider` implementation.
 
-| Provider | Key | Maps to |
-|----------|-----|---------|
-| OpenAi | `Organization` | `OpenAiClientOptions.Organization` |
-| OpenAi | `ReasoningEffort` | `OpenAiClientOptions.ReasoningEffort` |
-| OpenAi | `TextVerbosity` | `OpenAiClientOptions.TextVerbosity` |
-| AzureOpenAi | `DeploymentName` | `AzureOpenAiClientOptions.DeploymentName` |
-| AzureOpenAi | `ApiVersion` | `AzureOpenAiClientOptions.ApiVersion` |
-| AzureOpenAi | `ModelName` | `AzureOpenAiClientOptions.ModelName` |
-| AzureOpenAi | `ReasoningEffort` | `AzureOpenAiClientOptions.ReasoningEffort` |
-| AzureOpenAi | `TextVerbosity` | `AzureOpenAiClientOptions.TextVerbosity` |
-| AzureAiInference | `ApiVersion` | `AzureAiInferenceClientOptions.ApiVersion` |
-| Anthropic | `ApiVersion` | `AnthropicClientOptions.ApiVersion` |
+### OpenAiClientConfiguration (record, extends CisharpaiClientConfiguration)
+
+Lives in `Cisharpai.OpenAi`. Mirrors `OpenAiClientOptions`.
+
+| Field | Type | Required | Default | Maps to |
+|-------|------|----------|---------|---------|
+| `BaseUrl` | `string` | No | `https://api.openai.com/v1/` | `OpenAiClientOptions.BaseUrl` |
+| `DefaultModel` | `string?` | No | `null` | `OpenAiClientOptions.DefaultModel` |
+| `Organization` | `string?` | No | `null` | `OpenAiClientOptions.Organization` |
+| `ReasoningEffort` | `string?` | No | `null` | `OpenAiClientOptions.ReasoningEffort` |
+| `TextVerbosity` | `string?` | No | `null` | `OpenAiClientOptions.TextVerbosity` |
+
+### AnthropicClientConfiguration (record, extends CisharpaiClientConfiguration)
+
+Lives in `Cisharpai.Anthropic`. Mirrors `AnthropicClientOptions`.
+
+| Field | Type | Required | Default | Maps to |
+|-------|------|----------|---------|---------|
+| `BaseUrl` | `string` | No | `https://api.anthropic.com/v1/` | `AnthropicClientOptions.BaseUrl` |
+| `ApiVersion` | `string` | No | `2023-06-01` | `AnthropicClientOptions.ApiVersion` |
+| `DefaultModel` | `string?` | No | `null` | `AnthropicClientOptions.DefaultModel` |
+
+### AzureOpenAiClientConfiguration (record, extends CisharpaiClientConfiguration)
+
+Lives in `Cisharpai.Azure`. Mirrors `AzureOpenAiClientOptions`.
+
+| Field | Type | Required | Default | Maps to |
+|-------|------|----------|---------|---------|
+| `Endpoint` | `string` | Yes | — | `AzureOpenAiClientOptions.Endpoint` |
+| `DeploymentName` | `string` | Yes | — | `AzureOpenAiClientOptions.DeploymentName` |
+| `ApiVersion` | `string` | No | `""` | `AzureOpenAiClientOptions.ApiVersion` |
+| `DefaultModel` | `string?` | No | `null` | `AzureOpenAiClientOptions.DefaultModel` |
+| `ModelName` | `string?` | No | `null` | `AzureOpenAiClientOptions.ModelName` |
+| `ReasoningEffort` | `string?` | No | `null` | `AzureOpenAiClientOptions.ReasoningEffort` |
+| `TextVerbosity` | `string?` | No | `null` | `AzureOpenAiClientOptions.TextVerbosity` |
+
+### AzureAiInferenceClientConfiguration (record, extends CisharpaiClientConfiguration)
+
+Lives in `Cisharpai.Azure`. Mirrors `AzureAiInferenceClientOptions`.
+
+| Field | Type | Required | Default | Maps to |
+|-------|------|----------|---------|---------|
+| `Endpoint` | `string` | Yes | — | `AzureAiInferenceClientOptions.Endpoint` |
+| `ApiVersion` | `string` | No | `""` | `AzureAiInferenceClientOptions.ApiVersion` |
+| `ModelId` | `string` | No | `""` | `AzureAiInferenceClientOptions.ModelId` |
+
+### CohereClientConfiguration (record, extends CisharpaiClientConfiguration)
+
+Lives in `Cisharpai.Cohere`. Mirrors `CohereClientOptions`.
+
+| Field | Type | Required | Default | Maps to |
+|-------|------|----------|---------|---------|
+| `BaseUrl` | `string` | No | `https://api.cohere.com/v2/` | `CohereClientOptions.BaseUrl` |
+| `DefaultModel` | `string?` | No | `null` | `CohereClientOptions.DefaultModel` |
 
 ### CisharpaiClientFactoryResult\<T\> (immutable record)
 
@@ -67,7 +106,7 @@ Provider descriptor that knows how to create clients from a `RuntimeClientConfig
 | `CreateChatCompletionClient` | `CisharpaiClientFactoryResult<IChatCompletionClient>` | Create a chat client from config |
 | `CreateEmbeddingClient` | `CisharpaiClientFactoryResult<IEmbeddingClient>` | Create an embedding client from config |
 
-Both `Create*` methods receive `(IServiceProvider serviceProvider, RuntimeClientConfiguration configuration)`.
+Both `Create*` methods receive `(IServiceProvider serviceProvider, CisharpaiClientConfiguration configuration)`. Each provider implementation casts to its concrete subclass.
 
 ### ICisharpaiClientFactory (interface)
 
@@ -79,7 +118,7 @@ The consumer-facing factory. Lives in `Cisharpai` core.
 | `CreateEmbeddingClient` | `CisharpaiClientFactoryResult<IEmbeddingClient>` | Create an embedding client |
 | `GetRegisteredProviders` | `IReadOnlyCollection<CisharpaiProvider>` | List available providers |
 
-Both `Create*` methods receive `(RuntimeClientConfiguration configuration)`.
+Both `Create*` methods receive `(CisharpaiClientConfiguration configuration)`.
 
 ### ICisharpaiClientFactoryBuilder (interface)
 
@@ -93,10 +132,17 @@ Fluent builder returned by `services.AddCisharpaiClientFactory()`. Used by provi
 ## Relationships
 
 ```
-RuntimeClientConfiguration ──uses──> CisharpaiProvider (enum value)
+CisharpaiClientConfiguration (base) ──uses──> CisharpaiProvider (enum value)
+  ├── OpenAiClientConfiguration
+  ├── AnthropicClientConfiguration
+  ├── AzureOpenAiClientConfiguration
+  ├── AzureAiInferenceClientConfiguration
+  └── CohereClientConfiguration
+
 ICisharpaiClientFactory ──holds──> Dictionary<CisharpaiProvider, IClientFactoryProvider>
+ICisharpaiClientFactory ──accepts──> CisharpaiClientConfiguration (base)
 ICisharpaiClientFactory ──returns──> CisharpaiClientFactoryResult<T>
-IClientFactoryProvider ──reads──> RuntimeClientConfiguration
+IClientFactoryProvider ──casts──> concrete configuration subclass
 IClientFactoryProvider ──uses──> IServiceProvider (for IHttpClientFactory, ILoggerFactory)
 ICisharpaiClientFactoryBuilder ──builds──> ICisharpaiClientFactory
 ```

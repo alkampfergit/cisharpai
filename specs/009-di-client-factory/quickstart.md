@@ -1,4 +1,4 @@
-# Quickstart: DI Client Factory
+# Quickstart: DI Client Factory (v2 — strongly-typed configuration)
 
 ## 1. Register the factory and providers at startup
 
@@ -15,17 +15,18 @@ services.AddCisharpaiClientFactory()
 var provider = services.BuildServiceProvider();
 ```
 
-## 2. Create clients at runtime
+## 2. Create clients at runtime (strongly-typed per-provider config)
 
 ```csharp
 var factory = provider.GetRequiredService<ICisharpaiClientFactory>();
 
-// Switch provider by changing only the configuration
-var config = new RuntimeClientConfiguration(
-    Provider: CisharpaiProvider.OpenAi,
-    ApiKey: "sk-your-key",
-    Model: "gpt-4o"
-);
+// Each provider has its own configuration class with IntelliSense support
+var config = new OpenAiClientConfiguration
+{
+    ApiKey = "sk-your-key",
+    DefaultModel = "gpt-4o",
+    Organization = "org-..."   // provider-specific — compile-time safe
+};
 
 var result = factory.CreateChatCompletionClient(config);
 if (!result.IsSuccess)
@@ -38,20 +39,16 @@ var response = await result.Client!.GetChatCompletionAsync(
     new ChatCompletionRequest { Model = "gpt-4o", Messages = [...] });
 ```
 
-## 3. Azure providers with extra settings
+## 3. Azure providers (required fields enforced at compile time)
 
 ```csharp
-var azureConfig = new RuntimeClientConfiguration(
-    Provider: CisharpaiProvider.AzureOpenAi,
-    ApiKey: "your-azure-key",
-    Model: "gpt-4o",
-    Endpoint: "https://your-resource.openai.azure.com/",
-    ExtraSettings: new Dictionary<string, string>
-    {
-        ["DeploymentName"] = "my-gpt4o-deployment",
-        ["ApiVersion"] = "2024-10-21"
-    }
-);
+var azureConfig = new AzureOpenAiClientConfiguration
+{
+    ApiKey = "your-azure-key",
+    Endpoint = "https://your-resource.openai.azure.com/",   // required
+    DeploymentName = "my-gpt4o-deployment",                  // required
+    ApiVersion = "2024-10-21"
+};
 
 var azureResult = factory.CreateChatCompletionClient(azureConfig);
 ```
@@ -59,11 +56,11 @@ var azureResult = factory.CreateChatCompletionClient(azureConfig);
 ## 4. Embedding clients
 
 ```csharp
-var embeddingConfig = new RuntimeClientConfiguration(
-    Provider: CisharpaiProvider.OpenAi,
-    ApiKey: "sk-your-key",
-    Model: "text-embedding-3-small"
-);
+var embeddingConfig = new OpenAiClientConfiguration
+{
+    ApiKey = "sk-your-key",
+    DefaultModel = "text-embedding-3-small"
+};
 
 var embResult = factory.CreateEmbeddingClient(embeddingConfig);
 if (embResult.IsSuccess)

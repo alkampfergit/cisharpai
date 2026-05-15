@@ -6,7 +6,7 @@
 
 ## Summary
 
-Add a core `ICisharpaiClientFactory` interface and `RuntimeClientConfiguration` record to `Cisharpai/` that lets consumers create `IChatCompletionClient` and `IEmbeddingClient` instances at runtime from a provider-agnostic configuration. Each provider project registers a factory descriptor via `ICisharpaiClientFactoryBuilder` fluent API. Factory-created clients use `IHttpClientFactory` with the standard resilience handler, identical to the existing `Add*Client` DI registrations.
+Add a core `ICisharpaiClientFactory` interface and `CisharpaiClientConfiguration` abstract base record (Provider + ApiKey only) to `Cisharpai/`. Each provider project defines a concrete configuration subclass with strongly-typed provider-specific settings (mirroring existing `*ClientOptions`), plus a factory descriptor registered via `ICisharpaiClientFactoryBuilder` fluent API. The factory routes on the `Provider` enum; provider implementations cast to their concrete configuration type for type-safe access. Factory-created clients use `IHttpClientFactory` with the standard resilience handler, identical to the existing `Add*Client` DI registrations.
 
 ## Technical Context
 
@@ -37,7 +37,7 @@ Add a core `ICisharpaiClientFactory` interface and `RuntimeClientConfiguration` 
 | I. Unified Abstraction | PASS | Factory returns `IChatCompletionClient` / `IEmbeddingClient` — same interfaces |
 | II. No Exceptions for API Errors | PASS | Factory returns result wrapper with `IsSuccess`/`ErrorMessage` for unregistered providers |
 | III. Debuggability First | PASS | No change to response objects; factory delegates to existing clients |
-| IV. Immutability | PASS | `RuntimeClientConfiguration` is an immutable record |
+| IV. Immutability | PASS | `CisharpaiClientConfiguration` hierarchy are immutable records |
 | V. Test-Driven Quality | PASS | Full test coverage planned for all providers |
 | VI. Multi-Target Compatibility | PASS | No new projects, existing multi-target applies |
 | VII. Documentation as Deliverable | PASS | Wiki, RELEASE_NOTES.md, project_overview.md updates planned |
@@ -68,28 +68,33 @@ src/
 │   ├── ICisharpaiClientFactoryBuilder.cs # NEW — fluent registration builder
 │   ├── CisharpaiClientFactory.cs       # NEW — default implementation
 │   ├── CisharpaiClientFactoryResult.cs # NEW — result wrapper
-│   ├── RuntimeClientConfiguration.cs   # NEW — runtime config record
+│   ├── CisharpaiClientConfiguration.cs # NEW — abstract base record (Provider + ApiKey)
 │   ├── CisharpaiProvider.cs            # NEW — provider enum
 │   ├── IClientFactoryProvider.cs       # NEW — provider descriptor interface
 │   └── CisharpaiClientFactoryExtensions.cs # NEW — IServiceCollection extension
 │
 ├── Cisharpai.OpenAi/
+│   └── OpenAiClientConfiguration.cs    # NEW — concrete config (BaseUrl, Model, Org, etc.)
 │   └── OpenAiClientFactoryProvider.cs  # NEW — OpenAI factory descriptor
 │   └── OpenAiFactoryBuilderExtensions.cs # NEW — builder.AddOpenAiSupport()
 │
 ├── Cisharpai.Azure/
 │   ├── AzureOpenAi/
+│   │   └── AzureOpenAiClientConfiguration.cs    # NEW — concrete config (Endpoint, Deployment, etc.)
 │   │   └── AzureOpenAiClientFactoryProvider.cs  # NEW
 │   ├── AzureAiInference/
+│   │   └── AzureAiInferenceClientConfiguration.cs # NEW — concrete config (Endpoint, ModelId, etc.)
 │   │   └── AzureAiInferenceClientFactoryProvider.cs # NEW
 │   └── Extensions/
 │       └── AzureFactoryBuilderExtensions.cs # NEW — builder.AddAzureOpenAiSupport() + AddAzureAiInferenceSupport()
 │
 ├── Cisharpai.Anthropic/
+│   └── AnthropicClientConfiguration.cs  # NEW — concrete config (BaseUrl, ApiVersion, Model)
 │   └── AnthropicClientFactoryProvider.cs # NEW
 │   └── AnthropicFactoryBuilderExtensions.cs # NEW
 │
 ├── Cisharpai.Cohere/
+│   └── CohereClientConfiguration.cs    # NEW — concrete config (BaseUrl, Model)
 │   └── CohereClientFactoryProvider.cs  # NEW
 │   └── CohereFactoryBuilderExtensions.cs # NEW
 │
@@ -99,7 +104,7 @@ src/
 │
 └── Cisharpai.Tests/
     └── Factory/                        # NEW test folder
-        ├── RuntimeClientConfigurationTests.cs
+        ├── ClientConfigurationTests.cs
         ├── CisharpaiClientFactoryTests.cs
         ├── OpenAiFactoryTests.cs
         ├── AnthropicFactoryTests.cs
