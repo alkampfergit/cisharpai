@@ -491,3 +491,33 @@ public async Task ConversationAgent_HandlesMultipleTurns()
 | `ReceivedImageRequests` | `IReadOnlyList<(ImagePath, Model)>` | Captured image embedding requests |
 | `ReceivedMultimodalRequests` | `IReadOnlyList<IReadOnlyList<MultimodalEmbeddingInput>>` | Captured multimodal requests |
 | `Reset()` | `void` | Clears all queues and captured requests |
+
+### FakeClientFactoryProvider
+
+A fake `IClientFactoryProvider` for testing code that depends on `ICisharpaiClientFactory`.
+
+```csharp
+var fakeProvider = new FakeClientFactoryProvider()
+    .WithDefaultChatClient(new FakeChatCompletionClient
+    {
+        DefaultResponse = FakeResponses.Chat("Hello!")
+    });
+
+var services = new ServiceCollection();
+services.AddCisharpaiClientFactory()
+    .AddFakeSupport(fakeProvider);
+
+using var sp = services.BuildServiceProvider();
+var factory = sp.GetRequiredService<ICisharpaiClientFactory>();
+
+var config = new OpenAiClientConfiguration { ApiKey = "fake" };
+var result = factory.CreateChatCompletionClient(config);
+Assert.That(result.IsSuccess, Is.True);
+```
+
+| Member | Type | Description |
+|--------|------|-------------|
+| `EnqueueChatClient(client)` | `FakeClientFactoryProvider` | Queue a chat client (FIFO) |
+| `EnqueueEmbeddingClient(client)` | `FakeClientFactoryProvider` | Queue an embedding client (FIFO) |
+| `WithDefaultChatClient(client)` | `FakeClientFactoryProvider` | Set default chat client (used when queue empty) |
+| `WithDefaultEmbeddingClient(client)` | `FakeClientFactoryProvider` | Set default embedding client (used when queue empty) |

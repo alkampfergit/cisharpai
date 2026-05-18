@@ -31,6 +31,15 @@ The only dependency needed by consuming applications.
 - **`JsonDeepMerge.cs`** — Deep-merges ExtraParameters JSON into request payloads.
 - **`ImageDataUriHelper.cs`** — Converts image files to data URIs (PNG, JPEG, WebP, GIF).
 - **`LlmHttpClient.cs`** — Internal HTTP helper with deep merge, raw request/response capture, SSE streaming.
+- **Client Factory**:
+  - `CisharpaiProvider.cs` — Enum identifying supported providers (OpenAi, AzureOpenAi, AzureAiInference, Anthropic, Cohere).
+  - `CisharpaiClientConfiguration.cs` — Abstract base record (Provider + ApiKey); each provider defines a concrete subclass.
+  - `CisharpaiClientFactoryResult<T>.cs` — Result wrapper (IsSuccess, Client, ErrorMessage) with static Success/Failure factories.
+  - `IClientFactoryProvider.cs` — Provider descriptor interface; implemented per provider.
+  - `ICisharpaiClientFactory.cs` — Consumer-facing factory interface (CreateChatCompletionClient, CreateEmbeddingClient, GetRegisteredProviders).
+  - `ICisharpaiClientFactoryBuilder.cs` — Fluent builder for registering providers.
+  - `CisharpaiClientFactory.cs` — Default implementation; routes on Provider enum.
+  - `CisharpaiClientFactoryExtensions.cs` — `services.AddCisharpaiClientFactory()` extension method.
 
 ## Providers
 
@@ -39,6 +48,8 @@ The only dependency needed by consuming applications.
 - `OpenAiEmbeddingClient` — Text embeddings. Static `Create(IHttpMessageHandlerFactory, options, ...)` for runtime construction.
 - `OpenAiModels` — Constants: `Chat.Gpt4_1`, `Chat.O3`, `Chat.O4Mini`, `Embedding.TextEmbedding3Small`, etc.
 - `OpenAiClientOptions` — BaseUrl, ApiKey, Organization, ReasoningEffort, TextVerbosity, DefaultModel.
+- `OpenAiClientConfiguration` — Factory config record (extends CisharpaiClientConfiguration).
+- `OpenAiClientFactoryProvider` / `OpenAiFactoryBuilderExtensions` — Factory support.
 
 ### `src/Cisharpai.Azure/`
 Consolidated package for all Azure AI services. Uses HttpClient directly (no SDK deps except Azure.Identity).
@@ -46,18 +57,23 @@ Consolidated package for all Azure AI services. Uses HttpClient directly (no SDK
 - **`Common/`** — `AzureClientOptionsBase`, `AzureAuthenticationHandler` (API key + Azure AD), `AzureErrorMapper`.
 - **`AzureOpenAi/`** — `AzureOpenAiChatCompletionClient` (chat + JSON + tools + streaming), `AzureOpenAiEmbeddingClient`. Endpoint: `openai/deployments/{deployment}/...`. Three-way model routing (Legacy / Reasoning / Gpt5): gpt-5 deployments use the Responses API at `.../responses?api-version=...`; o-series uses Chat Completions with `reasoning_effort`; everything else is standard Chat Completions. Options: `DeploymentName`, `DefaultModel`, `ReasoningEffort`, `TextVerbosity` (gpt-5 Responses API), `ModelName` (explicit routing hint when the deployment name is opaque). Learned route mismatches are cached in-process per `(Endpoint, DeploymentName, ApiVersion)` so new client instances reuse the discovered route. Both have static `Create(IHttpMessageHandlerFactory, options, TokenCredential?, ...)`.
 - **`AzureAiInference/`** — `AzureAiInferenceChatCompletionClient` (chat + JSON + tools + streaming), `AzureAiInferenceEmbeddingClient` (+ `IImageEmbeddingFeature`). Endpoint: `models/...`. Options: `ModelId`. Both have static `Create(IHttpMessageHandlerFactory, options, TokenCredential?, ...)`.
-- **`Extensions/`** — DI registration with keyed service overloads.
+- **`Extensions/`** — DI registration with keyed service overloads. `AzureFactoryBuilderExtensions` for factory support.
+- **Factory configs**: `AzureOpenAiClientConfiguration`, `AzureAiInferenceClientConfiguration` + corresponding factory providers.
 
 ### `src/Cisharpai.Anthropic/`
 - `AnthropicChatCompletionClient` — Chat + JSON output (via `output_config.format`) + tool calling (`tool_use`/`tool_result` blocks) + streaming (event-based SSE). Vision uses raw base64 (NOT data URIs). Static `Create(IHttpMessageHandlerFactory, options, ...)` for runtime construction.
 - `AnthropicModels` — Constants: `Chat.ClaudeOpus4_5`, `Chat.ClaudeSonnet4_5`, `Chat.ClaudeHaiku4_5`, etc.
 - `AnthropicClientOptions` — BaseUrl, ApiKey, ApiVersion, DefaultModel.
+- `AnthropicClientConfiguration` — Factory config record (chat only, no embedding).
+- `AnthropicClientFactoryProvider` / `AnthropicFactoryBuilderExtensions` — Factory support.
 
 ### `src/Cisharpai.Cohere/`
 - `CohereChatCompletionClient` — Chat + JSON + grounded chat (RAG) + tool calling + streaming. Vision: image parts silently skipped. Static `Create(IHttpMessageHandlerFactory, options, ...)` for runtime construction.
 - `CohereEmbeddingClient` — Text + image + multimodal (Embed v4) embeddings. Images sent as data URIs. Static `Create(IHttpMessageHandlerFactory, options, ...)` for runtime construction.
 - `CohereModels` — Constants: `Chat.CommandA`, `Embedding.EmbedV4`, etc.
 - `CohereClientOptions` — BaseUrl, ApiKey, DefaultModel.
+- `CohereClientConfiguration` — Factory config record.
+- `CohereClientFactoryProvider` / `CohereFactoryBuilderExtensions` — Factory support.
 - `CohereServiceCollectionExtensions` — DI with keyed overloads.
 
 ## Testing Package — `src/Cisharpai.Testing/`

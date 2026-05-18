@@ -126,6 +126,33 @@ All 9 clients support `Create`. Azure providers add an optional `TokenCredential
 - `Create` bypasses DI resilience handlers; add `services.AddHttpClient("cisharpai").AddCisharpaiResilienceHandler()` at startup if retries/timeouts/circuit breaking are needed.
 - Azure OpenAI chat clients share learned routing fallbacks in-process per `(Endpoint, DeploymentName, ApiVersion)`, so later dynamically created clients reuse the working route after the first mismatch is discovered.
 
+## DI Client Factory (runtime creation with resilience)
+
+When providers are chosen at runtime AND you want full DI benefits (resilience handlers, HttpClient pooling), use `ICisharpaiClientFactory`. Each provider has a strongly-typed configuration class.
+
+```csharp
+// Startup — register factory with desired providers
+services.AddCisharpaiClientFactory()
+    .AddOpenAiSupport()
+    .AddAnthropicSupport()
+    .AddAzureOpenAiSupport()
+    .AddAzureAiInferenceSupport()
+    .AddCohereSupport();
+
+// Runtime — create clients from configuration
+var factory = serviceProvider.GetRequiredService<ICisharpaiClientFactory>();
+var config = new OpenAiClientConfiguration { ApiKey = "sk-...", DefaultModel = "gpt-4o" };
+var result = factory.CreateChatCompletionClient(config);
+if (result.IsSuccess) { /* use result.Client */ }
+else { /* result.ErrorMessage explains why */ }
+```
+
+**Configuration classes:** `OpenAiClientConfiguration`, `AnthropicClientConfiguration`, `AzureOpenAiClientConfiguration` (requires Endpoint + DeploymentName), `AzureAiInferenceClientConfiguration` (requires Endpoint), `CohereClientConfiguration`.
+
+**Error handling:** Returns `CisharpaiClientFactoryResult<T>` with `IsSuccess`/`ErrorMessage` — no exceptions for unregistered providers or unsupported capabilities.
+
+**Testing:** Use `FakeClientFactoryProvider` from `Cisharpai.Testing` with `builder.AddFakeSupport()`.
+
 ## Core Interfaces
 
 ### IChatCompletionClient
