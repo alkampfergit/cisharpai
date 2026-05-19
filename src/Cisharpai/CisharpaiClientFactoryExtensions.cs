@@ -33,5 +33,10 @@ public static class CisharpaiClientFactoryExtensions
             Services.AddSingleton(provider);
             return this;
         }
+
+        public bool IsProviderRegistered(CisharpaiProvider provider)
+        {
+            return _registeredProviders.Contains(provider);
+        }
     }
 }

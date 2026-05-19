@@ -1,4 +1,3 @@
-using System.Linq;
 using Cisharpai.Azure.AzureAiInference;
 using Cisharpai.Azure.AzureOpenAi;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,9 +9,7 @@ public static class AzureFactoryBuilderExtensions
     public static ICisharpaiClientFactoryBuilder AddAzureOpenAiSupport(
         this ICisharpaiClientFactoryBuilder builder)
     {
-        if (builder.Services.Any(descriptor =>
-                descriptor.ServiceType == typeof(IClientFactoryProvider) &&
-                descriptor.ImplementationInstance is AzureOpenAiClientFactoryProvider))
+        if (builder.IsProviderRegistered(CisharpaiProvider.AzureOpenAi))
         {
             return builder;
         }
@@ -29,9 +26,7 @@ public static class AzureFactoryBuilderExtensions
     public static ICisharpaiClientFactoryBuilder AddAzureAiInferenceSupport(
         this ICisharpaiClientFactoryBuilder builder)
     {
-        if (builder.Services.Any(descriptor =>
-                descriptor.ServiceType == typeof(IClientFactoryProvider) &&
-                descriptor.ImplementationInstance is AzureAiInferenceClientFactoryProvider))
+        if (builder.IsProviderRegistered(CisharpaiProvider.AzureAiInference))
         {
             return builder;
         }
