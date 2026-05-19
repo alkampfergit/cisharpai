@@ -1,3 +1,4 @@
+using Cisharpai.Anthropic;
 using Cisharpai.OpenAi;
 using Cisharpai.Testing;
 using Microsoft.Extensions.DependencyInjection;
@@ -92,5 +93,32 @@ public sealed class FakeClientFactoryTests
         var result = factory.CreateChatCompletionClient(config);
 
         Assert.That(result.Client, Is.SameAs(defaultClient));
+    }
+
+    [Test]
+    public void FakeProvider_DefaultProvider_IsOpenAi()
+    {
+        var fakeProvider = new FakeClientFactoryProvider();
+        Assert.That(fakeProvider.Provider, Is.EqualTo(CisharpaiProvider.OpenAi));
+    }
+
+    [Test]
+    public void FakeProvider_ConfigurableProvider()
+    {
+        var fakeProvider = new FakeClientFactoryProvider(CisharpaiProvider.Anthropic);
+
+        var services = new ServiceCollection();
+        services.AddCisharpaiClientFactory()
+            .AddFakeSupport(fakeProvider);
+
+        using var provider = services.BuildServiceProvider();
+        var factory = provider.GetRequiredService<ICisharpaiClientFactory>();
+
+        Assert.That(factory.GetRegisteredProviders(), Does.Contain(CisharpaiProvider.Anthropic));
+
+        var config = new AnthropicClientConfiguration { ApiKey = "fake" };
+        var result = factory.CreateChatCompletionClient(config);
+
+        Assert.That(result.IsSuccess, Is.True);
     }
 }

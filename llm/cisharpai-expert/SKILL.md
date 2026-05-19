@@ -147,7 +147,7 @@ if (result.IsSuccess) { /* use result.Client */ }
 else { /* result.ErrorMessage explains why */ }
 ```
 
-**Configuration classes:** `OpenAiClientConfiguration`, `AnthropicClientConfiguration`, `AzureOpenAiClientConfiguration` (requires Endpoint + DeploymentName), `AzureAiInferenceClientConfiguration` (requires Endpoint), `CohereClientConfiguration`.
+**Configuration classes:** `OpenAiClientConfiguration`, `AnthropicClientConfiguration`, `AzureOpenAiClientConfiguration` (requires Endpoint + DeploymentName), `AzureAiInferenceClientConfiguration` (requires Endpoint + ModelId), `CohereClientConfiguration`.
 
 **Error handling:** Returns `CisharpaiClientFactoryResult<T>` with `IsSuccess`/`ErrorMessage` — no exceptions for unregistered providers or unsupported capabilities.
 

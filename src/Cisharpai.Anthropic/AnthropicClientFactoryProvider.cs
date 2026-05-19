@@ -24,11 +24,7 @@ public sealed class AnthropicClientFactoryProvider : IClientFactoryProvider
         }
 
         var options = MapToOptions(config);
-        var httpClientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
-        var httpClient = httpClientFactory.CreateClient(ChatHttpClientName);
-        httpClient.BaseAddress = new Uri(config.BaseUrl);
-        httpClient.DefaultRequestHeaders.Add("x-api-key", config.ApiKey);
-        httpClient.DefaultRequestHeaders.Add("anthropic-version", config.ApiVersion);
+        var httpClient = CreateHttpClient(serviceProvider, config);
         var loggerFactory = serviceProvider.GetService<ILoggerFactory>();
 
         var client = new AnthropicChatCompletionClient(httpClient, options, loggerFactory);
@@ -40,7 +36,20 @@ public sealed class AnthropicClientFactoryProvider : IClientFactoryProvider
         CisharpaiClientConfiguration configuration)
     {
         return CisharpaiClientFactoryResult<IEmbeddingClient>.Failure(
-            "Provider 'Anthropic' does not support embedding clients.");
+            $"Provider '{Provider}' does not support embedding clients.");
+    }
+
+    private static HttpClient CreateHttpClient(
+        IServiceProvider serviceProvider,
+        AnthropicClientConfiguration config)
+    {
+        var httpClientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
+        var httpClient = httpClientFactory.CreateClient(ChatHttpClientName);
+        httpClient.BaseAddress = new Uri(config.BaseUrl);
+        httpClient.Timeout = TimeSpan.FromMinutes(2);
+        httpClient.DefaultRequestHeaders.Add("x-api-key", config.ApiKey);
+        httpClient.DefaultRequestHeaders.Add("anthropic-version", config.ApiVersion);
+        return httpClient;
     }
 
     private static AnthropicClientOptions MapToOptions(AnthropicClientConfiguration config) =>

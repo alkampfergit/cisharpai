@@ -8,5 +8,5 @@ public sealed record AzureAiInferenceClientConfiguration : CisharpaiClientConfig
 
     public string ApiVersion { get; init; } = "2024-05-01-preview";
 
-    public string ModelId { get; init; } = string.Empty;
+    public required string ModelId { get; init; }
 }

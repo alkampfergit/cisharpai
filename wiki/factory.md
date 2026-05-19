@@ -56,7 +56,7 @@ Each provider has a strongly-typed configuration record inheriting from `Cisharp
 | OpenAI | `OpenAiClientConfiguration` | `ApiKey` |
 | Anthropic | `AnthropicClientConfiguration` | `ApiKey` |
 | Azure OpenAI | `AzureOpenAiClientConfiguration` | `ApiKey`, `Endpoint`, `DeploymentName` |
-| Azure AI Inference | `AzureAiInferenceClientConfiguration` | `ApiKey`, `Endpoint` |
+| Azure AI Inference | `AzureAiInferenceClientConfiguration` | `ApiKey`, `Endpoint`, `ModelId` |
 | Cohere | `CohereClientConfiguration` | `ApiKey` |
 
 The factory routes on the `Provider` enum (derived from the concrete configuration type).
@@ -92,6 +92,10 @@ The factory follows the library's **no-exceptions-for-API-errors** pattern:
 var registered = factory.GetRegisteredProviders();
 // IReadOnlyCollection<CisharpaiProvider>
 ```
+
+## Azure AD / TokenCredential
+
+Factory-created Azure clients authenticate with API keys only. The existing DI registrations (`AddAzureOpenAiClient`, `AddAzureAiInferenceClient`) support Azure AD via `TokenCredential`, but the factory path does not — there is no way to pass a `TokenCredential` through the configuration records. If you need Azure AD authentication, use the standard DI registration instead of the factory.
 
 ## Thread Safety
 

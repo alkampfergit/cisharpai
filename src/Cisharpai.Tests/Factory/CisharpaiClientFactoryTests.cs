@@ -93,19 +93,33 @@ public sealed class CisharpaiClientFactoryTests
     [Test]
     public void CreateChatClient_WrongConfigType_ReturnsFailure()
     {
-        var services = new ServiceCollection();
-        services.AddCisharpaiClientFactory()
-            .AddOpenAiSupport()
-            .AddAnthropicSupport();
+        var openAiProvider = new OpenAiClientFactoryProvider();
+        var wrongConfig = new AnthropicClientConfiguration { ApiKey = "test" };
 
-        using var provider = services.BuildServiceProvider();
-        var factory = provider.GetRequiredService<ICisharpaiClientFactory>();
+        var result = openAiProvider.CreateChatCompletionClient(null!, wrongConfig);
 
-        var wrongConfig = new OpenAiClientConfiguration { ApiKey = "test" } as CisharpaiClientConfiguration;
-        var result = factory.CreateChatCompletionClient(
-            new AnthropicClientConfiguration { ApiKey = "test" });
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.IsSuccess, Is.False);
+            Assert.That(result.ErrorMessage, Does.Contain("Expected OpenAiClientConfiguration"));
+            Assert.That(result.ErrorMessage, Does.Contain("AnthropicClientConfiguration"));
+        });
+    }
 
-        Assert.That(result.IsSuccess, Is.True);
+    [Test]
+    public void CreateEmbeddingClient_WrongConfigType_ReturnsFailure()
+    {
+        var openAiProvider = new OpenAiClientFactoryProvider();
+        var wrongConfig = new AnthropicClientConfiguration { ApiKey = "test" };
+
+        var result = openAiProvider.CreateEmbeddingClient(null!, wrongConfig);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.IsSuccess, Is.False);
+            Assert.That(result.ErrorMessage, Does.Contain("Expected OpenAiClientConfiguration"));
+            Assert.That(result.ErrorMessage, Does.Contain("AnthropicClientConfiguration"));
+        });
     }
 
     [Test]

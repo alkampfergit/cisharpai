@@ -494,7 +494,7 @@ public async Task ConversationAgent_HandlesMultipleTurns()
 
 ### FakeClientFactoryProvider
 
-A fake `IClientFactoryProvider` for testing code that depends on `ICisharpaiClientFactory`.
+A fake `IClientFactoryProvider` for testing code that depends on `ICisharpaiClientFactory`. By default it registers as the OpenAI provider; pass a different `CisharpaiProvider` to the constructor to fake any provider.
 
 ```csharp
 var fakeProvider = new FakeClientFactoryProvider()
@@ -513,6 +513,15 @@ var factory = sp.GetRequiredService<ICisharpaiClientFactory>();
 var config = new OpenAiClientConfiguration { ApiKey = "fake" };
 var result = factory.CreateChatCompletionClient(config);
 Assert.That(result.IsSuccess, Is.True);
+```
+
+To fake a different provider:
+
+```csharp
+var fakeAnthropic = new FakeClientFactoryProvider(CisharpaiProvider.Anthropic)
+    .WithDefaultChatClient(myFakeClient);
+services.AddCisharpaiClientFactory()
+    .AddFakeSupport(fakeAnthropic);
 ```
 
 | Member | Type | Description |

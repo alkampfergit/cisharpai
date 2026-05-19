@@ -70,14 +70,15 @@ public sealed class AzureAiInferenceFactoryTests
         var config = new AzureAiInferenceClientConfiguration
         {
             ApiKey = "k",
-            Endpoint = "https://test.inference.ai.azure.com/"
+            Endpoint = "https://test.inference.ai.azure.com/",
+            ModelId = "test-model"
         };
 
         Assert.Multiple(() =>
         {
             Assert.That(config.Provider, Is.EqualTo(CisharpaiProvider.AzureAiInference));
             Assert.That(config.ApiVersion, Is.EqualTo("2024-05-01-preview"));
-            Assert.That(config.ModelId, Is.EqualTo(string.Empty));
+            Assert.That(config.ModelId, Is.EqualTo("test-model"));
         });
     }
 

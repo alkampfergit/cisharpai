@@ -1,18 +1,25 @@
+using System.Collections.Concurrent;
+
 namespace Cisharpai.Testing;
 
 public sealed class FakeClientFactoryProvider : IClientFactoryProvider
 {
-    private readonly Queue<IChatCompletionClient> _chatClients = new();
-    private readonly Queue<IEmbeddingClient> _embeddingClients = new();
+    private readonly ConcurrentQueue<IChatCompletionClient> _chatClients = new();
+    private readonly ConcurrentQueue<IEmbeddingClient> _embeddingClients = new();
 
     private IChatCompletionClient? _defaultChatClient;
     private IEmbeddingClient? _defaultEmbeddingClient;
 
-    public CisharpaiProvider Provider => CisharpaiProvider.OpenAi;
+    public CisharpaiProvider Provider { get; }
 
     public bool SupportsChatCompletion => true;
 
     public bool SupportsEmbedding => true;
+
+    public FakeClientFactoryProvider(CisharpaiProvider provider = CisharpaiProvider.OpenAi)
+    {
+        Provider = provider;
+    }
 
     public FakeClientFactoryProvider EnqueueChatClient(IChatCompletionClient client)
     {
@@ -42,8 +49,8 @@ public sealed class FakeClientFactoryProvider : IClientFactoryProvider
         IServiceProvider serviceProvider,
         CisharpaiClientConfiguration configuration)
     {
-        if (_chatClients.Count > 0)
-            return CisharpaiClientFactoryResult<IChatCompletionClient>.Success(_chatClients.Dequeue());
+        if (_chatClients.TryDequeue(out var client))
+            return CisharpaiClientFactoryResult<IChatCompletionClient>.Success(client);
 
         if (_defaultChatClient is not null)
             return CisharpaiClientFactoryResult<IChatCompletionClient>.Success(_defaultChatClient);
@@ -55,8 +62,8 @@ public sealed class FakeClientFactoryProvider : IClientFactoryProvider
         IServiceProvider serviceProvider,
         CisharpaiClientConfiguration configuration)
     {
-        if (_embeddingClients.Count > 0)
-            return CisharpaiClientFactoryResult<IEmbeddingClient>.Success(_embeddingClients.Dequeue());
+        if (_embeddingClients.TryDequeue(out var client))
+            return CisharpaiClientFactoryResult<IEmbeddingClient>.Success(client);
 
         if (_defaultEmbeddingClient is not null)
             return CisharpaiClientFactoryResult<IEmbeddingClient>.Success(_defaultEmbeddingClient);

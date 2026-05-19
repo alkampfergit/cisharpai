@@ -58,6 +58,7 @@ public sealed class AzureAiInferenceClientFactoryProvider : IClientFactoryProvid
         var httpClientFactory = serviceProvider.GetRequiredService<IHttpClientFactory>();
         var httpClient = httpClientFactory.CreateClient(clientName);
         httpClient.BaseAddress = new Uri(config.Endpoint);
+        httpClient.Timeout = TimeSpan.FromMinutes(2);
         httpClient.DefaultRequestHeaders.Add("api-key", config.ApiKey);
         return httpClient;
     }
