@@ -148,13 +148,15 @@ public sealed class CisharpaiClientFactoryTests
     public void AddProvider_Idempotent_NoDuplicates()
     {
         var services = new ServiceCollection();
-        services.AddCisharpaiClientFactory()
-            .AddOpenAiSupport()
-            .AddOpenAiSupport();
+        var builder = services.AddCisharpaiClientFactory();
+        builder.AddOpenAiSupport();
+        var descriptorCountAfterFirstRegistration = services.Count;
+        builder.AddOpenAiSupport();
 
         using var provider = services.BuildServiceProvider();
         var factory = provider.GetRequiredService<ICisharpaiClientFactory>();
 
+        Assert.That(services.Count, Is.EqualTo(descriptorCountAfterFirstRegistration));
         Assert.That(factory.GetRegisteredProviders(), Has.Count.EqualTo(1));
     }
 }
