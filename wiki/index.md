@@ -44,6 +44,7 @@ Cisharpai is a unified .NET client library providing a single `IChatCompletionCl
 
 - [Logging](logging.md) — structured `ILogger` output and distributed tracing with `ActivitySource`
 - [Runtime Configuration](runtime-configuration.md) — creating clients dynamically at request time (multi-tenant, runtime API keys)
+- [Client Factory](factory.md) — `ICisharpaiClientFactory` for runtime client creation with full DI benefits (resilience, HttpClient management)
 
 ### Testing
 
