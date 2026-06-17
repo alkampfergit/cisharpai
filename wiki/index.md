@@ -49,3 +49,7 @@ Cisharpai is a unified .NET client library providing a single `IChatCompletionCl
 ### Testing
 
 - [Testing with Cisharpai](testing.md) — fake clients, response factories, request capture, DI helpers
+
+### Reference
+
+- [FAQ](qa.md) — frequently asked questions and verified answers
