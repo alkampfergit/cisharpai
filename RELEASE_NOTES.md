@@ -4,6 +4,8 @@ This file is included in the NuGet packages. Keep a single line for each user-fa
 
 ## Unreleased
 
+## 0.3.0
+
 - DI Client Factory: new `ICisharpaiClientFactory` interface for creating `IChatCompletionClient` / `IEmbeddingClient` at runtime from provider-agnostic configuration, with full resilience pipeline — register via `services.AddCisharpaiClientFactory().AddOpenAiSupport().AddAnthropicSupport()...`
 - Azure OpenAI chat/json/tool-calling requests now recover from Azure routing mismatches by retrying the alternate endpoint or chat-completions token shape when the first guess is rejected, and learned mismatches are cached per `(Endpoint, DeploymentName, ApiVersion)` so later client instances reuse the working route.
 - Cohere grounded chat: default `CitationMode` is now `Fast` (works on both `command-r` and `command-a` families); when `Accurate` is requested against a `command-a` model the provider logs a warning and silently downgrades to `Fast` instead of letting the API return HTTP 400.
