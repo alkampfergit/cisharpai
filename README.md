@@ -46,6 +46,42 @@ var response = await client.GetChatCompletionAsync(request);
 Console.WriteLine(response.Content);
 ```
 
+## Dynamic Provider Selection
+
+When you don't know the provider at startup — multi-tenant apps, user-configurable backends, or A/B testing across models — use the **Client Factory**:
+
+```csharp
+using Cisharpai;
+using Cisharpai.Anthropic;
+using Cisharpai.Azure;
+using Microsoft.Extensions.DependencyInjection;
+
+var services = new ServiceCollection();
+
+services.AddCisharpaiClientFactory()
+    .AddAnthropicSupport()
+    .AddAzureAiInferenceSupport();
+
+var sp = services.BuildServiceProvider();
+var factory = sp.GetRequiredService<ICisharpaiClientFactory>();
+
+// Create clients at runtime with provider-specific configuration
+var result = factory.CreateChatCompletionClient(new AnthropicClientConfiguration
+{
+    ApiKey = "sk-ant-...",
+    DefaultModel = "claude-sonnet-4-5-20250514"
+});
+
+if (result.IsSuccess)
+{
+    var response = await result.Client!.GetChatCompletionAsync(request);
+}
+```
+
+Each provider has a strongly-typed configuration record (`OpenAiClientConfiguration`, `AnthropicClientConfiguration`, `AzureOpenAiClientConfiguration`, `AzureAiInferenceClientConfiguration`, `CohereClientConfiguration`). The factory routes to the correct provider automatically.
+
+See the [Client Factory guide](wiki/factory.md) for the full configuration hierarchy, error handling, and embedding client support.
+
 ## Documentation
 
 Start here:
@@ -57,6 +93,7 @@ Start here:
 - [JSON Output](wiki/json-output.md) -- JSON Mode and Structured Outputs
 - [Tool Calling](wiki/tool-calling.md) -- function calling across providers
 - [Grounded Chat (RAG)](wiki/grounded-chat.md) -- document grounding with citations
+- [Client Factory](wiki/factory.md) -- runtime provider selection for multi-tenant / dynamic scenarios
 - [Feature Extensions](wiki/feature-extensions.md) -- Feature Collection pattern
 
 ## Samples
