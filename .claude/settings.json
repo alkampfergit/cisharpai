@@ -1,6 +1,6 @@
 {
-  "enabledPlugins": {
-
-  },
-  "model" : "claude-opus-4-6"
+  "enabledPlugins": [
+    "https://github.com/alkampfergit/agent-plugins-base"
+  ],
+  "model": "claude-opus-4-6"
 }
