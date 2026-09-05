@@ -4,6 +4,8 @@ This file is included in the NuGet packages. Keep a single line for each user-fa
 
 ## Unreleased
 
+- New `Cisharpai.Rag` package: Unicode-aware fixed-size chunking, bounded sequential bulk float embeddings and document ingestion, with validated options, direct/DI/keyed-provider configuration, cancellation and explicit partial batch results.
+
 ## 0.3.0
 
 - DI Client Factory: new `ICisharpaiClientFactory` interface for creating `IChatCompletionClient` / `IEmbeddingClient` at runtime from provider-agnostic configuration, with full resilience pipeline — register via `services.AddCisharpaiClientFactory().AddOpenAiSupport().AddAnthropicSupport()...`

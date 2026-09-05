@@ -37,6 +37,7 @@ Cisharpai is a unified .NET client library providing a single `IChatCompletionCl
 - [Tool Calling](tool-calling.md) — function calling via `IToolCallingFeature`
 - [JSON Output](json-output.md) — JSON Mode and Structured Outputs via `IJsonOutputFeature`
 - [Vision](vision.md) — sending images in chat messages
+- [RAG Ingestion](rag.md) — fixed-size chunking, bounded bulk embeddings, host configuration and keyed providers
 - [Embeddings](embeddings.md) — text, image, and multimodal embeddings
 - [Grounded Chat (RAG)](grounded-chat.md) — document grounding with citations via `IGroundedChatFeature` (Cohere)
 

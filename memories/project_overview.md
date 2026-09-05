@@ -76,6 +76,17 @@ Consolidated package for all Azure AI services. Uses HttpClient directly (no SDK
 - `CohereClientFactoryProvider` / `CohereFactoryBuilderExtensions` — Factory support.
 - `CohereServiceCollectionExtensions` — DI with keyed overloads.
 
+## RAG Ingestion — `src/Cisharpai.Rag/`
+
+- Independently consumable library targeting .NET 8 and .NET 10; depends on core abstractions, not a specific provider.
+- `Models/` — `RagDocument`, `TextChunk`, `ChunkEmbedding`, `EmbeddingBatchResult`; chunk identities and UTF-16 source offsets survive embedding.
+- `Chunking/` — `ITextChunker`, `FixedSizeChunker`, `FixedSizeChunkerOptions`; lazy scalar-aware chunks (size 1024, overlap 128).
+- `Embeddings/` — `IBulkEmbeddingProcessor`, `BulkEmbeddingProcessor`, `BulkEmbeddingOptions`; sequential float requests (batch size 32), bounded buffering and validation of provider vectors.
+- `IRagIngestionPipeline` / `RagIngestionPipeline` — compose document chunking with bulk embedding; collection and async-stream overloads, cancellation and fail-fast batch results.
+- `RagOptions` and `AddCisharpaiRag` — validated option snapshots, callback configuration and embedding-client factory for keyed DI; scoped processors/pipelines.
+- No storage, retrieval, tokenization or ingestion-level retries. Existing embedding fakes support offline tests without core interface changes.
+- Consumer guide: `wiki/rag.md`; unit tests: `src/Cisharpai.Tests/Rag/`.
+
 ## Testing Package — `src/Cisharpai.Testing/`
 
 - `FakeChatCompletionClient` — Fake for `IChatCompletionClient` + all chat features. Response queues, defaults, request capture.
@@ -92,7 +103,7 @@ Interactive Spectre.Console demo with scenarios for each provider/capability. En
 
 ### `src/Cisharpai.Tests/` (Unit)
 Organized by provider folder: `OpenAi/`, `Anthropic/`, `Cohere/`, `Azure/AzureOpenAi/`, `Azure/AzureAiInference/`, `Azure/Common/`.
-Also: `Models/`, `Features/`, `DependencyInjection/`, `Core/`, `Testing/`.
+Also: `Models/`, `Features/`, `DependencyInjection/`, `Core/`, `Testing/`, `Rag/`.
 
 ### `src/Cisharpai.Tests.Common/`
 - `DotEnvLoader` — Loads `.env` files.
@@ -103,12 +114,12 @@ Real API tests organized by provider folder. `EnvironmentConfigurationTests` val
 
 ## Wiki — `wiki/`
 
-Pages: `index.md`, `getting-started.md`, `openai.md`, `embeddings.md`, `feature-extensions.md`, `json-output.md`, `grounded-chat.md`, `provider-features.md`, `tool-calling.md`, `vision.md`, `streaming.md`, `testing.md`.
+Pages: `index.md`, `getting-started.md`, `openai.md`, `embeddings.md`, `rag.md`, `feature-extensions.md`, `json-output.md`, `grounded-chat.md`, `provider-features.md`, `tool-calling.md`, `vision.md`, `streaming.md`, `testing.md`.
 
 ## CI/CD
 
 - `.github/workflows/ci.yml` — Build + unit tests + integration tests. .NET 8 & 10.
 - `.github/workflows/pipeline.yml` — Versioned build + NuGet publish on tags.
 - `.github/workflows/codeql.yml` — CodeQL security scanning.
-- `scripts/build.ps1` — PowerShell build script: restore, build, test, pack 6 projects.
+- `scripts/build.ps1` — PowerShell build script: restore, build, test, pack 7 projects.
 - `GitVersion.yml` — ContinuousDeployment mode.

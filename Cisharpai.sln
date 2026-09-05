@@ -1,4 +1,4 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
@@ -24,6 +24,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cisharpai.Testing", "src\Cisharpai.Testing\Cisharpai.Testing.csproj", "{61939F5E-FDEA-4DAC-BC16-5213731122AC}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cisharpai.Tests.Common", "src\Cisharpai.Tests.Common\Cisharpai.Tests.Common.csproj", "{AD509961-7C29-4A26-8908-37E436734631}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cisharpai.Rag", "src\Cisharpai.Rag\Cisharpai.Rag.csproj", "{8458811B-8E66-443D-9767-73315C7BD579}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -155,6 +157,18 @@ Global
 		{AD509961-7C29-4A26-8908-37E436734631}.Release|x64.Build.0 = Release|Any CPU
 		{AD509961-7C29-4A26-8908-37E436734631}.Release|x86.ActiveCfg = Release|Any CPU
 		{AD509961-7C29-4A26-8908-37E436734631}.Release|x86.Build.0 = Release|Any CPU
+		{8458811B-8E66-443D-9767-73315C7BD579}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8458811B-8E66-443D-9767-73315C7BD579}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8458811B-8E66-443D-9767-73315C7BD579}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{8458811B-8E66-443D-9767-73315C7BD579}.Debug|x64.Build.0 = Debug|Any CPU
+		{8458811B-8E66-443D-9767-73315C7BD579}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{8458811B-8E66-443D-9767-73315C7BD579}.Debug|x86.Build.0 = Debug|Any CPU
+		{8458811B-8E66-443D-9767-73315C7BD579}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8458811B-8E66-443D-9767-73315C7BD579}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8458811B-8E66-443D-9767-73315C7BD579}.Release|x64.ActiveCfg = Release|Any CPU
+		{8458811B-8E66-443D-9767-73315C7BD579}.Release|x64.Build.0 = Release|Any CPU
+		{8458811B-8E66-443D-9767-73315C7BD579}.Release|x86.ActiveCfg = Release|Any CPU
+		{8458811B-8E66-443D-9767-73315C7BD579}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -170,5 +184,6 @@ Global
 		{E48EF4AD-D4D8-4575-BDB7-66C0370F2D8B} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{61939F5E-FDEA-4DAC-BC16-5213731122AC} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{AD509961-7C29-4A26-8908-37E436734631} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{8458811B-8E66-443D-9767-73315C7BD579} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal

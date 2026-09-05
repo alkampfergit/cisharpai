@@ -14,3 +14,5 @@ Namespace root `Cisharpai.Rag`; models in `.Models`, chunker in `.Chunking`, bul
 DI uses scoped processors/pipelines to avoid capturing scoped providers in singletons; chunker is stateless after options snapshot. Configuration callbacks may bind from the host configuration package. Invalid options fail at resolution/construction before API traffic. Registration preserves custom interfaces using TryAdd where appropriate.
 
 Batch outputs preserve input order and source associations; failures return no Items. Validate successful vector count, nonempty consistent lengths, requested dimensions and finite values. Retain raw payloads and provider metadata on validation failure. Do not change a provider's existing error message. Source enumeration is lazy and disposed on completion, failure, cancellation or consumer break.
+
+Caller-provided chunks require a nonblank document ID, nonnull text and nonnegative index/offset. Invalid input throws ArgumentException (or a subclass) before submitting that batch. Empty text is permitted but may be rejected by the chosen provider.

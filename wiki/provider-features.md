@@ -8,6 +8,7 @@ This page lists every feature supported by each provider integration in Cisharpa
 |---------|-----------|-------------|
 | Chat Completions | `IChatCompletionClient` | Send messages and receive model-generated replies |
 | Text Embeddings | `IEmbeddingClient` | Generate vector embeddings from text |
+| RAG Ingestion | `IRagIngestionPipeline` (`Cisharpai.Rag`) | Fixed-size chunking and sequential bulk float embeddings |
 | JSON Output | `IJsonOutputFeature` | Force JSON Mode or Structured Outputs on chat responses |
 | Image Embeddings | `IImageEmbeddingFeature` | Generate vector embeddings from a single image |
 | Multimodal Embeddings | `IMultimodalEmbeddingFeature` | Embed mixed text + image inputs in a single request |
@@ -23,6 +24,7 @@ This page lists every feature supported by each provider integration in Cisharpa
 |---------|--------|--------------|-------------------|-----------|--------|
 | Chat Completions | Yes | Yes | Yes | Yes | Yes |
 | Text Embeddings | Yes | Yes | Yes | -- | Yes |
+| RAG Ingestion | Yes | Yes | Yes | -- | Yes |
 | JSON Mode | Yes | Yes | Yes | Yes | Yes |
 | Structured Outputs | Yes | Yes | Yes | Yes | Yes |
 | Image Embeddings | -- | -- | Yes | -- | Yes |
@@ -39,6 +41,8 @@ This page lists every feature supported by each provider integration in Cisharpa
 \* Cohere Vision: image content parts are silently skipped (only text extracted). Cohere chat API does not support visual inputs.
 
 **Logging & Tracing:** every provider client routes through `LlmHttpClient`, which emits structured `ILogger` entries (EventIds 1000–1005) and `System.Diagnostics.Activity` spans from the `Cisharpai` source (constant: `Cisharpai.CisharpaiTelemetry.ActivitySourceName`). See [Logging](logging.md) for the property/tag set and subscription options.
+
+**RAG ingestion:** `Cisharpai.Rag` composes any `IEmbeddingClient`; it is a separate library, not a discovered provider feature. Provider model, dimensions and request limits still apply. It provides no vector storage or retrieval. See [RAG Ingestion](rag.md).
 
 ## Provider Details
 
