@@ -17,6 +17,10 @@ A unified .NET client library providing a common HttpClient-based interface for 
 
 ## General Rules
 
+- Claude skills can be shared with Codex by running `python3 .agents/link_claude_skills.py`.
+  Read the relevant `.agents/skills/<name>/SKILL.md` before use. See
+  `.agents/README.md` for setup and `.agents/claude-skills-summary.md` for compatibility notes.
+
 - Source code is in `src/` folder, both projects and tests.
 - Projects multitarget .NET 8.0 and .NET 10.
 - Single test project multitargets .NET 8.0 and .NET 10.
