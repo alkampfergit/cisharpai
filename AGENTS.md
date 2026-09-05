@@ -88,6 +88,5 @@ When adding/modifying env vars for integration tests, update:
 5. `memories/project_overview.md`
 
 <!-- SPECKIT START -->
-For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan
+Current RAG implementation plan: [specs/010-rag-foundations/plan.md](specs/010-rag-foundations/plan.md).
 <!-- SPECKIT END -->
