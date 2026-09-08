@@ -49,7 +49,7 @@ public static class StringEncryptionHelper
         byte[] cipherText = new byte[plainBytes.Length];
         byte[] tag = new byte[TagSize];
 
-        using (var aesGcm = new AesGcm(key))
+        using (var aesGcm = new AesGcm(key, TagSize))
         {
             aesGcm.Encrypt(nonce, plainBytes, cipherText, tag);
         }
@@ -96,7 +96,7 @@ public static class StringEncryptionHelper
         byte[] key = DeriveKey(password, salt);
         byte[] decrypted = new byte[encrypted.Length];
 
-        using (var aesGcm = new AesGcm(key))
+        using (var aesGcm = new AesGcm(key, TagSize))
         {
             try
             {
@@ -113,7 +113,6 @@ public static class StringEncryptionHelper
 
     private static byte[] DeriveKey(string password, byte[] salt)
     {
-        using var deriveBytes = new Rfc2898DeriveBytes(password, salt, Pbkdf2Iterations, HashAlgorithmName.SHA256);
-        return deriveBytes.GetBytes(KeySize);
+        return Rfc2898DeriveBytes.Pbkdf2(password, salt, Pbkdf2Iterations, HashAlgorithmName.SHA256, KeySize);
     }
 }
