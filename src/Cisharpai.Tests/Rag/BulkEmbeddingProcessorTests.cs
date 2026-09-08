@@ -9,6 +9,8 @@ namespace Cisharpai.Tests.Rag;
 [TestFixture]
 public class BulkEmbeddingProcessorTests
 {
+    private static readonly float[] SingleOneVector = [1f];
+    private static readonly int[] ExpectedDefaultBatchSizes = [32, 1];
     private static TextChunk Chunk(int index) => new("document", index, index, index.ToString());
     private static EmbeddingResponse Response(params float[][] vectors) =>
         new(vectors, null, "model", 42, RawResponseJson: "response", RawRequestJson: "request");
@@ -47,7 +49,7 @@ public class BulkEmbeddingProcessorTests
         await foreach (var batch in processor.EmbedAsync(Source()))
         {
             Assert.That(batch.BatchIndex, Is.EqualTo(index++));
-            Assert.That(batch.Chunks.Count, Is.LessThanOrEqualTo(32));
+            Assert.That(batch.Chunks, Has.Count.LessThanOrEqualTo(32));
             foreach (var item in batch.Items)
             {
                 Assert.That(item.Chunk.Index, Is.EqualTo(emitted));
@@ -156,10 +158,10 @@ public class BulkEmbeddingProcessorTests
         var processor = new BulkEmbeddingProcessor(Client(request =>
         {
             requests.Add(request);
-            return Response(request.Input.Select(_ => new[] { 1f }).ToArray());
+            return Response(request.Input.Select(_ => SingleOneVector).ToArray());
         }));
         await Collect(processor.EmbedAsync(Enumerable.Range(0, 33).Select(Chunk)));
-        Assert.That(requests.Select(request => request.Input.Count), Is.EqualTo(new[] { 32, 1 }));
+        Assert.That(requests.Select(request => request.Input.Count), Is.EqualTo(ExpectedDefaultBatchSizes));
         Assert.That(requests[0].InputType, Is.EqualTo(EmbeddingInputType.Document));
         Assert.That(requests[0].IncludeRawResponse, Is.False);
         Assert.That(requests[0].EncodingFormat, Is.EqualTo("float"));

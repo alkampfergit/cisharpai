@@ -6,11 +6,13 @@ public sealed class FixedSizeChunkerOptions
     public int ChunkSize { get; set; } = 1024;
     public int Overlap { get; set; } = 128;
 
-    internal FixedSizeChunkerOptions Snapshot()
+    internal FixedSizeChunkerOptions Snapshot() => ValidateAndClone(ChunkSize, Overlap);
+
+    private static FixedSizeChunkerOptions ValidateAndClone(int chunkSize, int overlap)
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(ChunkSize);
-        if (Overlap < 0 || Overlap >= ChunkSize)
-            throw new ArgumentOutOfRangeException(nameof(Overlap), "Overlap must be nonnegative and smaller than ChunkSize.");
-        return new() { ChunkSize = ChunkSize, Overlap = Overlap };
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(chunkSize);
+        ArgumentOutOfRangeException.ThrowIfNegative(overlap);
+        ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(overlap, chunkSize);
+        return new() { ChunkSize = chunkSize, Overlap = overlap };
     }
 }

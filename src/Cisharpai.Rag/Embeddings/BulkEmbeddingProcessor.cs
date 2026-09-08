@@ -24,7 +24,7 @@ public sealed class BulkEmbeddingProcessor : IBulkEmbeddingProcessor
         IEnumerable<TextChunk> chunks, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(chunks);
-        return EmbedCoreAsync(AsAsync(chunks), cancellationToken);
+        return EmbedCoreAsync(AsAsync(chunks, cancellationToken), cancellationToken);
     }
 
     public IAsyncEnumerable<EmbeddingBatchResult> EmbedAsync(
@@ -44,21 +44,7 @@ public sealed class BulkEmbeddingProcessor : IBulkEmbeddingProcessor
         int? expectedDimensions = _options.Dimensions;
         while (true)
         {
-            var batch = new List<TextChunk>();
-            while (batch.Count < _options.BatchSize)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                if (!await enumerator.MoveNextAsync().ConfigureAwait(false)) break;
-                cancellationToken.ThrowIfCancellationRequested();
-                ArgumentNullException.ThrowIfNull(enumerator.Current);
-                var chunk = enumerator.Current;
-                ArgumentException.ThrowIfNullOrWhiteSpace(chunk.DocumentId);
-                ArgumentNullException.ThrowIfNull(chunk.Text);
-                ArgumentOutOfRangeException.ThrowIfNegative(chunk.Index);
-                ArgumentOutOfRangeException.ThrowIfNegative(chunk.StartOffset);
-                batch.Add(chunk);
-            }
-
+            var batch = await CollectBatchAsync(enumerator, _options.BatchSize, cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
             if (batch.Count == 0) yield break;
             var request = new EmbeddingRequest(
@@ -86,6 +72,30 @@ public sealed class BulkEmbeddingProcessor : IBulkEmbeddingProcessor
             yield return new EmbeddingBatchResult(batchIndex++, batch.AsReadOnly(), items, response);
             if (!response.IsSuccess) yield break;
         }
+    }
+
+    private static async Task<List<TextChunk>> CollectBatchAsync(
+        IAsyncEnumerator<TextChunk> enumerator, int batchSize, CancellationToken cancellationToken)
+    {
+        var batch = new List<TextChunk>();
+        while (batch.Count < batchSize)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!await enumerator.MoveNextAsync().ConfigureAwait(false)) break;
+            cancellationToken.ThrowIfCancellationRequested();
+            ValidateChunk(enumerator.Current);
+            batch.Add(enumerator.Current);
+        }
+        return batch;
+    }
+
+    private static void ValidateChunk(TextChunk chunk)
+    {
+        ArgumentNullException.ThrowIfNull(chunk);
+        ArgumentException.ThrowIfNullOrWhiteSpace(chunk.DocumentId);
+        ArgumentNullException.ThrowIfNull(chunk.Text);
+        ArgumentOutOfRangeException.ThrowIfNegative(chunk.Index);
+        ArgumentOutOfRangeException.ThrowIfNegative(chunk.StartOffset);
     }
 
     private static string? Validate(EmbeddingResponse response, int count, int? expectedDimensions)

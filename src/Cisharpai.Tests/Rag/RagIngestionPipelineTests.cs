@@ -14,6 +14,11 @@ namespace Cisharpai.Tests.Rag;
 [TestFixture]
 public class RagIngestionPipelineTests
 {
+    private static readonly int[] ExpectedBatchItemCounts = [3, 1];
+    private static readonly string[] ExpectedChunkTexts = ["ab", "cd", "ef", "gh"];
+    private static readonly string[] ExpectedDocumentIds = ["a", "a", "b", "b"];
+    private static readonly int[] ExpectedChunkIndices = [0, 1, 0, 1];
+    private static readonly string[] ExpectedBoundInput = ["ab", "cd"];
     [Test]
     public async Task Ingest_BatchesAcrossDocumentsAndPreservesIdentity()
     {
@@ -31,10 +36,10 @@ public class RagIngestionPipelineTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(batches.Select(b => b.Items.Count), Is.EqualTo(new[] { 3, 1 }));
-            Assert.That(batches.SelectMany(b => b.Chunks).Select(c => c.Text), Is.EqualTo(new[] { "ab", "cd", "ef", "gh" }));
-            Assert.That(batches.SelectMany(b => b.Chunks).Select(c => c.DocumentId), Is.EqualTo(new[] { "a", "a", "b", "b" }));
-            Assert.That(batches.SelectMany(b => b.Chunks).Select(c => c.Index), Is.EqualTo(new[] { 0, 1, 0, 1 }));
+            Assert.That(batches.Select(b => b.Items.Count), Is.EqualTo(ExpectedBatchItemCounts));
+            Assert.That(batches.SelectMany(b => b.Chunks).Select(c => c.Text), Is.EqualTo(ExpectedChunkTexts));
+            Assert.That(batches.SelectMany(b => b.Chunks).Select(c => c.DocumentId), Is.EqualTo(ExpectedDocumentIds));
+            Assert.That(batches.SelectMany(b => b.Chunks).Select(c => c.Index), Is.EqualTo(ExpectedChunkIndices));
         });
     }
 
@@ -106,7 +111,7 @@ public class RagIngestionPipelineTests
         var request = fake.ReceivedRequests.Single();
         Assert.Multiple(() =>
         {
-            Assert.That(request.Input, Is.EqualTo(new[] { "ab", "cd" }));
+            Assert.That(request.Input, Is.EqualTo(ExpectedBoundInput));
             Assert.That(request.Model, Is.EqualTo("bound-model"));
             Assert.That(request.Dimensions, Is.EqualTo(2));
             Assert.That(request.InputType, Is.EqualTo(EmbeddingInputType.Document));

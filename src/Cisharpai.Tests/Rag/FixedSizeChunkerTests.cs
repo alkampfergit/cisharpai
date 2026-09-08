@@ -6,6 +6,13 @@ namespace Cisharpai.Tests.Rag;
 [TestFixture]
 public class FixedSizeChunkerTests
 {
+    private static readonly string[] UnicodeChunks3Overlap1 = ["A😀B", "B🚀C"];
+    private static readonly int[] UnicodeOffsets3Overlap1 = [0, 3];
+    private static readonly string[] SurrogatePairChunks = ["😀", "🚀"];
+    private static readonly int[] SurrogatePairOffsets = [0, 2];
+    private static readonly string[] TwoCharChunks = ["ab", "cd"];
+    private static readonly int[] DefaultOffsets = [0, 896];
+    private static readonly int[] DefaultLengths = [1024, 129];
     [TestCase("", 4, 1, new string[0], new int[0])]
     [TestCase("abc", 4, 1, new[] { "abc" }, new[] { 0 })]
     [TestCase("abcd", 4, 1, new[] { "abcd" }, new[] { 0 })]
@@ -38,8 +45,8 @@ public class FixedSizeChunkerTests
             .Chunk(new("unicode", text)).ToList();
         Assert.Multiple(() =>
         {
-            Assert.That(chunks.Select(c => c.Text), Is.EqualTo(new[] { "A😀B", "B🚀C" }));
-            Assert.That(chunks.Select(c => c.StartOffset), Is.EqualTo(new[] { 0, 3 }));
+            Assert.That(chunks.Select(c => c.Text), Is.EqualTo(UnicodeChunks3Overlap1));
+            Assert.That(chunks.Select(c => c.StartOffset), Is.EqualTo(UnicodeOffsets3Overlap1));
         });
     }
 
@@ -48,8 +55,8 @@ public class FixedSizeChunkerTests
     {
         var chunks = new FixedSizeChunker(new() { ChunkSize = 1, Overlap = 0 })
             .Chunk(new("doc", "😀🚀")).ToList();
-        Assert.That(chunks.Select(c => c.Text), Is.EqualTo(new[] { "😀", "🚀" }));
-        Assert.That(chunks.Select(c => c.StartOffset), Is.EqualTo(new[] { 0, 2 }));
+        Assert.That(chunks.Select(c => c.Text), Is.EqualTo(SurrogatePairChunks));
+        Assert.That(chunks.Select(c => c.StartOffset), Is.EqualTo(SurrogatePairOffsets));
     }
 
     [Test]
@@ -79,7 +86,7 @@ public class FixedSizeChunkerTests
         var chunker = new FixedSizeChunker(options);
         options.ChunkSize = 0;
         var result = chunker.Chunk(new("doc", "abcd"));
-        Assert.That(result.Select(c => c.Text), Is.EqualTo(new[] { "ab", "cd" }));
+        Assert.That(result.Select(c => c.Text), Is.EqualTo(TwoCharChunks));
     }
 
     [Test]
@@ -100,8 +107,8 @@ public class FixedSizeChunkerTests
     public void DefaultOptions_AreUsable()
     {
         var chunks = new FixedSizeChunker().Chunk(new("doc", new string('x', 1025))).ToList();
-        Assert.That(chunks.Select(c => c.StartOffset), Is.EqualTo(new[] { 0, 896 }));
-        Assert.That(chunks.Select(c => c.Text.Length), Is.EqualTo(new[] { 1024, 129 }));
+        Assert.That(chunks.Select(c => c.StartOffset), Is.EqualTo(DefaultOffsets));
+        Assert.That(chunks.Select(c => c.Text.Length), Is.EqualTo(DefaultLengths));
     }
 
     [Test]

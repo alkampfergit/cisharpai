@@ -13,17 +13,21 @@ public sealed class BulkEmbeddingOptions
     public bool IncludeRawResponse { get; set; }
     public JsonElement? ExtraParameters { get; set; }
 
-    internal BulkEmbeddingOptions Snapshot()
+    internal BulkEmbeddingOptions Snapshot() => ValidateAndClone(BatchSize, Dimensions, InputType);
+
+    private BulkEmbeddingOptions ValidateAndClone(int batchSize, int? dimensions, EmbeddingInputType inputType)
     {
-        if (BatchSize <= 0) throw new ArgumentOutOfRangeException(nameof(BatchSize), "Batch size must be positive.");
-        if (Dimensions is <= 0) throw new ArgumentOutOfRangeException(nameof(Dimensions), "Dimensions must be positive when specified.");
-        if (!Enum.IsDefined(InputType)) throw new ArgumentOutOfRangeException(nameof(InputType), "Unknown embedding input type.");
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(batchSize);
+        if (dimensions is <= 0)
+            throw new ArgumentOutOfRangeException(nameof(dimensions), dimensions, "Dimensions must be positive when specified.");
+        if (!Enum.IsDefined(inputType))
+            throw new ArgumentOutOfRangeException(nameof(inputType), inputType, "Unknown embedding input type.");
         return new BulkEmbeddingOptions
         {
-            BatchSize = BatchSize,
+            BatchSize = batchSize,
             Model = Model,
-            InputType = InputType,
-            Dimensions = Dimensions,
+            InputType = inputType,
+            Dimensions = dimensions,
             IncludeRawResponse = IncludeRawResponse,
             ExtraParameters = ExtraParameters?.Clone()
         };

@@ -22,14 +22,14 @@ public sealed class RagIngestionPipeline : IRagIngestionPipeline
         IEnumerable<RagDocument> documents, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(documents);
-        return _processor.EmbedAsync(ChunkDocumentsAsync(AsAsync(documents)), cancellationToken);
+        return _processor.EmbedAsync(ChunkDocumentsAsync(AsAsync(documents, cancellationToken), cancellationToken), cancellationToken);
     }
 
     public IAsyncEnumerable<EmbeddingBatchResult> IngestAsync(
         IAsyncEnumerable<RagDocument> documents, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(documents);
-        return _processor.EmbedAsync(ChunkDocumentsAsync(documents), cancellationToken);
+        return _processor.EmbedAsync(ChunkDocumentsAsync(documents, cancellationToken), cancellationToken);
     }
 
     private static async IAsyncEnumerable<RagDocument> AsAsync(
