@@ -1,4 +1,5 @@
 using System.Security.Cryptography;
+using Cisharpai.Helpers;
 
 namespace Cisharpai.Tests.Core;
 
@@ -14,7 +15,7 @@ public sealed class StringEncryptionHelperTests
 
         Assert.That(result, Is.Not.Null);
         Assert.That(result, Is.Not.Empty);
-        Assert.That(() => Convert.FromBase64String(result), Throws.NoException);
+        Assert.DoesNotThrow(() => Convert.FromBase64String(result));
     }
 
     [Test]
@@ -45,12 +46,12 @@ public sealed class StringEncryptionHelperTests
     }
 
     [Test]
-    public void Decrypt_EmptyString()
+    public void RoundTrip_SingleCharacter()
     {
-        string encrypted = StringEncryptionHelper.Encrypt(string.Empty, TestPassword);
+        string encrypted = StringEncryptionHelper.Encrypt("a", TestPassword);
         string decrypted = StringEncryptionHelper.Decrypt(encrypted, TestPassword);
 
-        Assert.That(decrypted, Is.Empty);
+        Assert.That(decrypted, Is.EqualTo("a"));
     }
 
     [Test]
