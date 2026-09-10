@@ -168,6 +168,16 @@ pwsh scripts/build.ps1 -nugetApiKey "YOUR_KEY" -nugetPublish $true
 
 Integration tests require environment variables to be set. Create a `.env` file in the repository root or set them in your environment.
 
+### Downloading secrets from Azure Key Vault
+
+If you have access to the team's Azure Key Vault, you can download the `.env` file with:
+
+```bash
+./scripts/get-secret.sh
+```
+
+This requires the [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) and the **Key Vault Secrets User** role on the `alk-agent-vault` vault. The script will prompt you to log in if needed.
+
 ### Environment Variables Format
 
 | Variable | Format | Example |
