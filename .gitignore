@@ -428,4 +428,9 @@ FodyWeavers.xsd
 *.msix
 *.msm
 *.msp
+<<<<<<< Updated upstream
 .claude/scheduled_tasks.lock
+=======
+**/*.lscache
+.DS_Store
+>>>>>>> Stashed changes
