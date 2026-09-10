@@ -124,6 +124,41 @@ services.AddHttpClient("cisharpai")
 
 Streaming calls can run longer than the standard 60s/90s timeouts. For long-running streams, configure a streaming-specific HTTP client with `AddCisharpaiStreamingResilienceHandler()`, which removes those timeouts while keeping retry and circuit-breaker policies.
 
+## AI Agent Plugins
+
+This repository's agent tooling is distributed through the shared
+[agent-plugins-base](https://github.com/alkampfergit/agent-plugins-base) marketplace, which works with
+both Claude Code and Codex.
+
+### Claude Code
+
+```bash
+claude plugin marketplace add https://github.com/alkampfergit/agent-plugins-base.git
+claude plugin install github-alk@agent-plugins-base
+```
+
+Update later with `claude plugin marketplace update agent-plugins-base`.
+Adding the marketplace writes to your user settings, so it is available in every project;
+`plugin install` is scoped to the current project by default.
+
+### Codex
+
+```bash
+codex plugin marketplace add https://github.com/alkampfergit/agent-plugins-base.git
+codex plugin add github-alk@agent-plugins-base
+```
+
+Update later with `codex plugin marketplace upgrade`. The marketplace is recorded in
+`~/.codex/config.toml` under `[marketplaces.agent-plugins-base]`.
+
+Use `claude plugin list` / `codex plugin list` to verify what is installed and enabled.
+
+### Devcontainer
+
+`.devcontainer/postcreate.sh` already performs both registrations (and installs the
+`github-alk` plugin) after the container is created, so no manual step is needed when working
+inside the devcontainer.
+
 ## Building Locally
 
 The project includes a PowerShell build script that handles versioning, building, testing, and NuGet packaging.

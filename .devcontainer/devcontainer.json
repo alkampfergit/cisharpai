@@ -1,10 +1,13 @@
 {
-  "name": "AI Document Manager (.NET 10 + SQL Server 2025)",
+  "name": "Cisharpai (.NET 8 + .NET 10)",
   "build": {
     "dockerfile": "./Dockerfile"
   },
   "features": {
-    "ghcr.io/devcontainers/features/dotnet:2": {},
+    "ghcr.io/devcontainers/features/dotnet:2": {
+      "version": "10.0",
+      "additionalVersions": "8.0"
+    },
     "ghcr.io/devcontainers/features/azure-cli:1": { "version": "latest" },
     "ghcr.io/devcontainers/features/node:1": {
       "version": "lts"

@@ -11,7 +11,7 @@ on `master`, merges back into `develop`, all pushed to origin. Uses the
 `git flow` AVH CLI (`git flow release start/finish`) rather than hand-rolled
 merges.
 
-**Sibling skills:** `gh-cli-guide` (if an accompanying GitHub Release is
+**Sibling skills:** `github-alk:gh-cli-guide` (if an accompanying GitHub Release is
 requested — otherwise stay out of GitHub).
 
 ## What this skill does (and does NOT do)

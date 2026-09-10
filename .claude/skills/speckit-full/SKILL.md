@@ -15,7 +15,7 @@ human-in-the-loop.**
 
 **Sibling skills used by this one:**
 - `speckit-gh/SKILL.md` — the per-issue speckit driver
-- `gh-cli-guide/SKILL.md` — canonical `gh` command patterns
+- `github-alk:gh-cli-guide` (plugin skill) — canonical `gh` command patterns
 - `gitflow/SKILL.md` — release-issue handler (see *Release issues* below)
 - `fixer/SKILL.md` — auto-heal common "repo is not clean" precondition
   failures (see *Precondition repair* below)
@@ -387,7 +387,7 @@ orchestrator level:
 - **Once the PR is open, this orchestrator stops touching it.** PR-side
   work (CI fixing, reviewer comments, closure) is owned by `speckit-gh`
   itself and, ultimately, the primary owner. This skill MUST NOT
-  auto-invoke `github-pr-fixer`; that skill is manual-slash-only.
+  auto-invoke `github-alk:github-pr-manager`; that skill is manual-slash-only.
 - **The PR is closed only when the user says so explicitly** — typically as
   a comment on the PR/issue or a chat instruction like "close PR #456" or
   "merge PR #456". `speckit-full` must not close PRs unattended. Even when

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Post-creation setup script for AI Document Management devcontainer
+# Post-creation setup script for the Cisharpai devcontainer
 # This script runs after the container is created to install dependencies and configure the environment
 
 set -euo pipefail
@@ -29,6 +29,8 @@ curl --proto '=https' --tlsv1.2 -fsSL https://claude.ai/install.sh | bash || tru
 if command -v npm >/dev/null 2>&1; then
     echo "Installing OpenAI Codex..."
     npm install -g @openai/codex --ignore-scripts || true
+    echo "Installing automata-cli..."
+    npm install -g automata-cli || true
 else
     echo "npm not available, skipping npm-based CLI installs."
 fi
@@ -136,4 +138,24 @@ if [[ -n "$BREW_BIN" ]]; then
     fi
 else
     echo "Homebrew install did not expose brew on a known path, skipping rtk."
+fi
+
+# Register the shared agent plugin marketplace for Claude Code and Codex
+AGENT_PLUGINS_MARKETPLACE="https://github.com/alkampfergit/agent-plugins-base.git"
+export PATH="$HOME/.local/bin:$PATH"
+
+if command -v claude >/dev/null 2>&1; then
+    echo "Registering agent-plugins-base marketplace for Claude Code..."
+    claude plugin marketplace add "$AGENT_PLUGINS_MARKETPLACE" || true
+    claude plugin install github-alk@agent-plugins-base || true
+else
+    echo "claude CLI not available, skipping Claude Code marketplace setup."
+fi
+
+if command -v codex >/dev/null 2>&1; then
+    echo "Registering agent-plugins-base marketplace for Codex..."
+    codex plugin marketplace add "$AGENT_PLUGINS_MARKETPLACE" || true
+    codex plugin add github-alk@agent-plugins-base || true
+else
+    echo "codex CLI not available, skipping Codex marketplace setup."
 fi
