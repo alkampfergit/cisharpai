@@ -40,4 +40,4 @@ Register a provider separately, then use `services.AddCisharpaiRag(options => ..
 
 Defaults: chunk size 1024 Unicode scalar values, overlap 128, batch size 32, document input type, float vectors. Chunk positions use UTF-16 offsets. Options are validated and snapshotted at construction/resolution. Batching buffers one batch plus the current document and stops after a failed batch; prior successes remain available. Token limits, parsing, vector storage, retrieval, generation, and ingestion-level retries are outside this package.
 
-See the [RAG usage guide](https://github.com/alkampfergit/cisharpai/blob/rag101/wiki/rag.md) for host configuration, keyed providers, option tables, streaming, and failure handling.
+See the [RAG usage guide](https://github.com/alkampfergit/cisharpai/blob/main/wiki/rag.md) for host configuration, keyed providers, option tables, streaming, and failure handling.
