@@ -1,6 +1,4 @@
 {
-  "enabledPlugins": {
-
-  },
-  "model" : "claude-opus-4-6"
+  "enabledPlugins": {},
+  "model": "claude-opus-4-6"
 }
