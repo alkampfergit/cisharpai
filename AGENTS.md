@@ -17,6 +17,10 @@ A unified .NET client library providing a common HttpClient-based interface for 
 
 ## General Rules
 
+- Claude skills can be shared with Codex by running `python3 .agents/link_claude_skills.py`.
+  Read the relevant `.agents/skills/<name>/SKILL.md` before use. See
+  `.agents/README.md` for setup and `.agents/claude-skills-summary.md` for compatibility notes.
+
 - Source code is in `src/` folder, both projects and tests.
 - Projects multitarget .NET 8.0 and .NET 10.
 - Single test project multitargets .NET 8.0 and .NET 10.
@@ -40,6 +44,7 @@ Detailed structure: [project_overview.md](memories/project_overview.md)
 | `src/Cisharpai.Anthropic/` | Anthropic (Claude) provider |
 | `src/Cisharpai.Cohere/` | Cohere provider (chat, embeddings v3/v4, grounded chat) |
 | `src/Cisharpai.Testing/` | Fake clients for unit testing (`FakeChatCompletionClient`, `FakeEmbeddingClient`, `FakeResponses`) |
+| `src/Cisharpai.Rag/` | Fixed-size chunking, streaming bulk embeddings, and configurable document ingestion |
 | `src/Cisharp.Console/` | Interactive demo app with Spectre.Console menu |
 
 ### Feature Interfaces (all in `src/Cisharpai/Features/`)
@@ -63,7 +68,7 @@ Detailed structure: [project_overview.md](memories/project_overview.md)
 
 ### Build & CI
 
-- `scripts/build.ps1` — Build, test, pack (6 NuGet packages). Outputs to `artifacts/`.
+- `scripts/build.ps1` — Build, test, pack (7 NuGet packages). Outputs to `artifacts/`.
 - `.github/workflows/ci.yml` — Main CI: build + unit tests + integration tests.
 - `GitVersion.yml` — ContinuousDeployment mode. Labels: `alpha` (develop/feature), `beta` (release/hotfix).
 
@@ -88,6 +93,5 @@ When adding/modifying env vars for integration tests, update:
 5. `memories/project_overview.md`
 
 <!-- SPECKIT START -->
-For additional context about technologies to be used, project structure,
-shell commands, and other important information, read the current plan
+Current RAG implementation plan: [specs/010-rag-foundations/plan.md](specs/010-rag-foundations/plan.md).
 <!-- SPECKIT END -->

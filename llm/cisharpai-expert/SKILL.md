@@ -7,8 +7,8 @@ description: >
   Cisharpai clients, features, DTOs, DI registration, or provider-specific
   integrations. Activates on mentions of "Cisharpai", "IChatCompletionClient",
   "IEmbeddingClient", "IRerankerClient", provider setup, tool calling, streaming,
-  JSON output, grounded chat, vision, embeddings, reranking, or fake clients for
-  testing.
+  JSON output, grounded chat, vision, embeddings, reranking, RAG ingestion, or
+  fake clients for testing.
 ---
 
 # Cisharpai Expert
@@ -286,6 +286,22 @@ All feature interfaces live in the `Cisharpai.Features.Chat` namespace (not `Cis
 
 Reranking is not a feature interface — it is its own top-level client (`IRerankerClient`),
 implemented by Cohere only.
+## RAG Ingestion (`Cisharpai.Rag`)
+
+Use the separate `Cisharpai.Rag` package for ingestion with any `IEmbeddingClient`. This is independent of Cohere's `IGroundedChatFeature`; it does not provide storage, retrieval or generation.
+
+- Root namespace `Cisharpai.Rag`: `IRagIngestionPipeline`, `RagIngestionPipeline`, `RagOptions`, `AddCisharpaiRag`.
+- `.Chunking`: `ITextChunker.Chunk(RagDocument)`, `FixedSizeChunker`, `FixedSizeChunkerOptions`.
+- `.Embeddings`: `IBulkEmbeddingProcessor.EmbedAsync(...)`, `BulkEmbeddingProcessor`, `BulkEmbeddingOptions`.
+- `.Models`: `RagDocument(Id, Text)`, `TextChunk(DocumentId, Index, StartOffset, Text)`, `ChunkEmbedding(Chunk, Vector)`, `EmbeddingBatchResult`.
+- Chunk defaults: 1024 Unicode scalar values and 128 overlap; require positive size and `0 <= overlap < size`. `StartOffset` uses UTF-16 units. Preserve whitespace and valid surrogate pairs; empty text yields no chunks. Callers own document ID uniqueness.
+- Embedding defaults: batch size 32, `InputType = EmbeddingInputType.Document`, float encoding. Options include `Model`, `Dimensions`, `IncludeRawResponse`, `ExtraParameters`. Size is not a token limit.
+- Direct composition: `new RagIngestionPipeline(new FixedSizeChunker(chunkOptions), new BulkEmbeddingProcessor(client, embeddingOptions))`.
+- Register provider first, then `services.AddCisharpaiRag(o => { o.Chunking.ChunkSize = 1024; o.Embedding.BatchSize = 32; })`. Host configuration binding is the application's responsibility: `configuration.GetSection("Rag").Bind(o)` inside the callback.
+- Keyed selection: `services.AddCisharpaiRag(sp => sp.GetRequiredKeyedService<IEmbeddingClient>("documents"), o => o.Embedding.Model = "text-embedding-3-small")`. Processors/pipelines are scoped; resolve within a service scope. Options are validated and snapshotted at construction/resolution; no live reload.
+- `IngestAsync` accepts collections or async streams of documents; `EmbedAsync` accepts collections or async streams of chunks. Both take cancellation tokens and return async batch streams. Processing is sequential and buffers one batch plus the current document.
+- Check `batch.IsSuccess` before reading `batch.Items`; each item has `Chunk` and `Vector`. `batch.Chunks`, zero-based `BatchIndex` and `Response` retain input identity and provider metadata/raw payloads. The first failed or malformed batch has empty items and stops processing; earlier successes remain available. No rollback/checkpoints or ingestion-level retries. Provider HTTP resilience remains independent.
+- Cancellation and network/configuration exceptions propagate. Fake with existing `FakeEmbeddingClient`, queuing one float vector per expected chunk; a default single-vector response fails validation for multi-chunk batches.
 
 ## Provider-Specific Guides
 
@@ -363,6 +379,7 @@ var request = new ChatCompletionRequest(
 - `src/Cisharpai.Azure/` — Azure OpenAI + Azure AI Inference
 - `src/Cisharpai.Anthropic/` — Anthropic provider
 - `src/Cisharpai.Cohere/` — Cohere provider
+- `src/Cisharpai.Rag/` — Fixed-size chunking, bulk embeddings, document ingestion and configuration
 - `src/Cisharpai.Testing/` — Fake clients for unit testing
 - `src/Cisharpai.Tests/` — Unit tests (all providers)
 - `src/Cisharpai.Integration.Tests/` — Integration tests (.NET 10 only)
