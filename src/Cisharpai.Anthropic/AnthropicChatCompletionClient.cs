@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.Anthropic;
 
-public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature, IStreamingChatFeature
+public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature, IStreamingChatFeature, IGroundedChatFeature
 {
     private const string MessagesEndpoint = "messages";
 
@@ -21,6 +21,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
 
     private readonly LlmHttpClient _client;
     private readonly AnthropicClientOptions _options;
+    private readonly ILogger<AnthropicChatCompletionClient>? _logger;
 
     public IFeatureCollection Features { get; }
 
@@ -28,11 +29,13 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
     {
         _client = new LlmHttpClient(httpClient, logger: loggerFactory?.CreateLogger<LlmHttpClient>());
         _options = options;
+        _logger = loggerFactory?.CreateLogger<AnthropicChatCompletionClient>();
 
         var features = new FeatureCollection();
         features.Set<IJsonOutputFeature>(this);
         features.Set<IToolCallingFeature>(this);
         features.Set<IStreamingChatFeature>(this);
+        features.Set<IGroundedChatFeature>(this);
         Features = features;
     }
 
@@ -207,6 +210,178 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
                 // Ignore: ping, content_block_start, content_block_stop, message_stop
             }
         }
+    }
+
+    public async Task<GroundedChatCompletionResponse> GetGroundedChatCompletionAsync(
+        ChatCompletionRequest request,
+        GroundedChatOptions groundedChatOptions,
+        CancellationToken cancellationToken = default)
+    {
+        request = request with { Model = ResolveModel(request.Model) };
+
+        try
+        {
+            groundedChatOptions.Validate();
+            foreach (var doc in groundedChatOptions.Documents)
+                doc.Validate();
+
+            if (groundedChatOptions.CitationMode is CitationMode.Accurate or CitationMode.Fast
+                && groundedChatOptions.CitationMode != CitationMode.Enabled)
+            {
+                _logger?.LogWarning(
+                    "Anthropic does not distinguish citation modes; CitationMode.{Mode} is treated as Enabled.",
+                    groundedChatOptions.CitationMode);
+            }
+
+            var providerRequest = await BuildRequestAsync(request, cancellationToken);
+            InjectDocumentBlocks(providerRequest, groundedChatOptions.Documents);
+
+            string? rawResponseJson = null;
+            string? rawRequestJson = null;
+            AnthropicChatResponse raw;
+
+            if (request.IncludeRawResponse)
+            {
+                (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<AnthropicChatRequest, AnthropicChatResponse>(
+                    MessagesEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
+            }
+            else
+            {
+                raw = await _client.PostAsync<AnthropicChatRequest, AnthropicChatResponse>(
+                    MessagesEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
+            }
+
+            var (content, citations) = ExtractContentAndCitations(raw.Content, groundedChatOptions.Documents);
+
+            var chatCompletion = new ChatCompletionResponse(
+                Content: content,
+                Model: raw.Model,
+                PromptTokens: raw.Usage.InputTokens,
+                CompletionTokens: raw.Usage.OutputTokens,
+                RawResponseJson: rawResponseJson,
+                RawRequestJson: rawRequestJson,
+                Status: raw.StopReason);
+
+            return new GroundedChatCompletionResponse(chatCompletion, citations);
+        }
+        catch (LlmHttpRequestException ex)
+        {
+            return GroundedChatCompletionResponse.Error(ex.Message, ex.ResponseBody);
+        }
+        catch (Exception ex)
+        {
+            return GroundedChatCompletionResponse.Error(ex.Message);
+        }
+    }
+
+    private static void InjectDocumentBlocks(
+        AnthropicChatRequest providerRequest,
+        IReadOnlyList<DocumentChunk> documents)
+    {
+        var lastUserMessage = providerRequest.Messages.LastOrDefault(m => m.Role == "user");
+        if (lastUserMessage is null)
+            return;
+
+        var documentBlocks = documents.Select(MapDocumentChunkToBlock).ToList<object>();
+
+        if (lastUserMessage.Content is List<AnthropicContentBlock> existingBlocks)
+        {
+            var mixed = new List<object>();
+            mixed.AddRange(documentBlocks);
+            mixed.AddRange(existingBlocks);
+            lastUserMessage.Content = mixed;
+        }
+        else if (lastUserMessage.Content is string textContent)
+        {
+            var mixed = new List<object>();
+            mixed.AddRange(documentBlocks);
+            mixed.Add(new AnthropicContentBlock { Type = "text", Text = textContent });
+            lastUserMessage.Content = mixed;
+        }
+    }
+
+    private static AnthropicDocumentBlock MapDocumentChunkToBlock(DocumentChunk chunk)
+    {
+        AnthropicDocumentSource source;
+
+        if (chunk.Data is not null)
+        {
+            source = new AnthropicDocumentSource
+            {
+                Type = "custom_content",
+                Content = chunk.Data.Select(kvp => new AnthropicCustomContentBlock
+                {
+                    Type = "text",
+                    Text = $"{kvp.Key}: {kvp.Value}"
+                }).ToList()
+            };
+        }
+        else
+        {
+            source = new AnthropicDocumentSource
+            {
+                Type = "text",
+                MediaType = "text/plain",
+                Data = chunk.Text!
+            };
+        }
+
+        return new AnthropicDocumentBlock
+        {
+            Source = source,
+            Title = chunk.Id,
+            Citations = new AnthropicCitationConfig { Enabled = true }
+        };
+    }
+
+    private static (string content, List<Citation> citations) ExtractContentAndCitations(
+        List<AnthropicContentBlock> contentBlocks,
+        IReadOnlyList<DocumentChunk> documents)
+    {
+        var textBuilder = new System.Text.StringBuilder();
+        var citations = new List<Citation>();
+
+        foreach (var block in contentBlocks.Where(b => b.Type == "text"))
+        {
+            var blockStart = textBuilder.Length;
+            var blockText = block.Text ?? string.Empty;
+            textBuilder.Append(blockText);
+
+            if (block.Citations is null || block.Citations.Count == 0)
+                continue;
+
+            foreach (var cite in block.Citations)
+            {
+                var citedText = cite.CitedText ?? string.Empty;
+
+                var responseStart = blockStart;
+                var responseEnd = blockStart + blockText.Length;
+
+                string? sourceId = cite.DocumentTitle;
+                IReadOnlyDictionary<string, string>? sourceData = null;
+
+                if (cite.DocumentIndex is not null && cite.DocumentIndex.Value < documents.Count)
+                {
+                    var doc = documents[cite.DocumentIndex.Value];
+                    sourceId ??= doc.Id;
+                    sourceData = doc.Data;
+                }
+
+                var citationSource = new CitationSource(
+                    Id: sourceId ?? $"doc-{cite.DocumentIndex}",
+                    Data: sourceData,
+                    CitedText: citedText);
+
+                citations.Add(new Citation(
+                    Start: responseStart,
+                    End: responseEnd,
+                    Text: blockText,
+                    Sources: [citationSource],
+                    Type: cite.Type));
+            }
+        }
+
+        return (textBuilder.ToString(), citations);
     }
 
     private string ResolveModel(string? model)
