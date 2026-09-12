@@ -19,7 +19,7 @@ public static class GroundedChatHelper
         List<TAnnotation> annotations,
         string content,
         IReadOnlyList<DocumentChunk> documents,
-        Func<TAnnotation, (string Type, string? FileId, string? Filename, int StartIndex, int EndIndex)> extractor)
+        Func<TAnnotation, (string Type, string? FileId, string? Filename, int? Index, int StartIndex, int EndIndex)> extractor)
     {
         if (annotations.Count == 0)
             return [];
@@ -37,17 +37,25 @@ public static class GroundedChatHelper
             .Where(a => a.Type == "file_citation")
             .Select(a =>
             {
-                var citedText = a.StartIndex >= 0 && a.EndIndex <= content.Length && a.StartIndex < a.EndIndex
+                var hasOffsets = a.StartIndex >= 0 && a.EndIndex > a.StartIndex && a.EndIndex <= content.Length;
+                var citedText = hasOffsets
                     ? content[a.StartIndex..a.EndIndex]
                     : string.Empty;
 
-                var sourceId = a.Filename is not null && filenameToDocId.TryGetValue(a.Filename, out var docId)
-                    ? docId
-                    : a.FileId ?? a.Filename ?? "unknown";
+                var citationStart = hasOffsets ? a.StartIndex : (a.Index ?? 0);
+                var citationEnd = hasOffsets ? a.EndIndex : (a.Index ?? 0);
+
+                string sourceId;
+                if (a.Filename is not null && filenameToDocId.TryGetValue(a.Filename, out var docIdByName))
+                    sourceId = docIdByName;
+                else if (a.FileId is not null && filenameToDocId.TryGetValue(a.FileId, out var docIdByFileId))
+                    sourceId = docIdByFileId;
+                else
+                    sourceId = a.FileId ?? a.Filename ?? "unknown";
 
                 return new Citation(
-                    Start: a.StartIndex,
-                    End: a.EndIndex,
+                    Start: citationStart,
+                    End: citationEnd,
                     Text: citedText,
                     Sources: [new CitationSource(Id: sourceId)],
                     Type: "file_citation");

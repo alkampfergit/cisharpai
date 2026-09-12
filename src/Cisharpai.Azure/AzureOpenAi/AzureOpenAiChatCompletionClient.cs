@@ -269,6 +269,12 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
                     "Grounded chat requires the Responses API (GPT-5 models). The current deployment does not support native document grounding with citations. Use a GPT-5 deployment or consider the prompt-injection grounding approach.");
             }
 
+            if (_routingMode == AzureOpenAiRoutingMode.ChatCompletions)
+            {
+                return GroundedChatCompletionResponse.Error(
+                    "Grounded chat requires the Responses API but the deployment uses Chat Completions which does not support native document grounding with citations.");
+            }
+
             return await ExecuteGroundedWithRouteFallbackAsync(request, groundedChatOptions, cancellationToken);
         }
         catch (LlmHttpRequestException ex)
@@ -294,8 +300,10 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         }
         catch (LlmHttpRequestException ex) when (CanRetryWithAlternateRoute(ex))
         {
+            SetRoutingMode(AzureOpenAiRoutingMode.ChatCompletions, persistToSharedCache: true);
             return GroundedChatCompletionResponse.Error(
-                "Grounded chat requires the Responses API but the deployment fell back to Chat Completions which does not support native document grounding with citations.");
+                "Grounded chat requires the Responses API but the deployment fell back to Chat Completions which does not support native document grounding with citations.",
+                ex.ResponseBody);
         }
     }
 
@@ -306,13 +314,12 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
     {
         var messages = new List<object>(await MapMessagesAsync(request.Messages, cancellationToken));
         var inputFiles = MapDocumentChunksToInputFiles(groundedChatOptions.Documents);
-        var input = new List<object>(inputFiles);
-        input.AddRange(messages);
+        EmbedInputFilesInUserMessage(messages, inputFiles);
 
         var providerRequest = new AzureOpenAiResponsesApiRequest
         {
             MaxOutputTokens = request.MaxTokens,
-            Input = input,
+            Input = messages,
             Reasoning = (request.ReasoningEffort ?? _options.ReasoningEffort) is { } effort
                 ? new AzureOpenAiResponsesReasoningOption { Effort = effort }
                 : null,
@@ -1059,6 +1066,27 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         }).ToList();
     }
 
+    private static void EmbedInputFilesInUserMessage(List<object> messages, List<AzureOpenAiInputFile> inputFiles)
+    {
+        var lastUserMsg = messages.OfType<AzureOpenAiChatMessage>().LastOrDefault(m => m.Role == "user");
+        if (lastUserMsg == null) return;
+
+        var contentItems = new List<object>();
+        contentItems.AddRange(inputFiles);
+
+        switch (lastUserMsg.Content)
+        {
+            case string text:
+                contentItems.Add(new AzureOpenAiContentPart { Type = "input_text", Text = text });
+                break;
+            case IEnumerable<object> parts:
+                contentItems.AddRange(parts);
+                break;
+        }
+
+        lastUserMsg.Content = contentItems;
+    }
+
     private static GroundedChatCompletionResponse MapGroundedChatResponse(
         AzureOpenAiResponsesApiResponse raw,
         IReadOnlyList<DocumentChunk> documents,
@@ -1089,7 +1117,7 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
 
         var citations = GroundedChatHelper.MapAnnotationsToCitations(
             annotations, parsed.Content, documents,
-            a => (a.Type, a.FileId, a.Filename, a.StartIndex, a.EndIndex));
+            a => (a.Type, a.FileId, a.Filename, a.Index, a.StartIndex, a.EndIndex));
 
         return new GroundedChatCompletionResponse(chatCompletion, citations);
     }

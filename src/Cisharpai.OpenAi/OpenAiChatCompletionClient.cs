@@ -183,14 +183,13 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
 
             var messages = new List<object>(await MapMessagesAsync(request.Messages, cancellationToken));
             var inputFiles = MapDocumentChunksToInputFiles(groundedChatOptions.Documents);
-            var input = new List<object>(inputFiles);
-            input.AddRange(messages);
+            EmbedInputFilesInUserMessage(messages, inputFiles);
 
             var providerRequest = new OpenAiResponsesApiRequest
             {
                 Model = model,
                 MaxOutputTokens = request.MaxTokens,
-                Input = input,
+                Input = messages,
                 Reasoning = (request.ReasoningEffort ?? _options.ReasoningEffort) is { } effort
                     ? new OpenAiReasoningOption { Effort = effort }
                     : null,
@@ -782,6 +781,27 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         }).ToList();
     }
 
+    private static void EmbedInputFilesInUserMessage(List<object> messages, List<OpenAiInputFile> inputFiles)
+    {
+        var lastUserMsg = messages.OfType<OpenAiChatMessage>().LastOrDefault(m => m.Role == "user");
+        if (lastUserMsg == null) return;
+
+        var contentItems = new List<object>();
+        contentItems.AddRange(inputFiles);
+
+        switch (lastUserMsg.Content)
+        {
+            case string text:
+                contentItems.Add(new OpenAiContentPart { Type = "input_text", Text = text });
+                break;
+            case IEnumerable<object> parts:
+                contentItems.AddRange(parts);
+                break;
+        }
+
+        lastUserMsg.Content = contentItems;
+    }
+
     private static GroundedChatCompletionResponse MapGroundedChatResponse(
         OpenAiResponsesApiResponse raw,
         IReadOnlyList<DocumentChunk> documents,
@@ -812,7 +832,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
 
         var citations = GroundedChatHelper.MapAnnotationsToCitations(
             annotations, parsed.Content, documents,
-            a => (a.Type, a.FileId, a.Filename, a.StartIndex, a.EndIndex));
+            a => (a.Type, a.FileId, a.Filename, a.Index, a.StartIndex, a.EndIndex));
 
         return new GroundedChatCompletionResponse(chatCompletion, citations);
     }

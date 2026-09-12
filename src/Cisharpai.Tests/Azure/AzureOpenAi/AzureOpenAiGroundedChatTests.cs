@@ -26,10 +26,8 @@ public sealed class AzureOpenAiGroundedChatTests
                             "annotations": [
                                 {
                                     "type": "file_citation",
-                                    "file_id": "file-abc",
-                                    "filename": "doc-1",
-                                    "start_index": 25,
-                                    "end_index": 30
+                                    "file_id": "doc-1",
+                                    "index": 25
                                 }
                             ]
                         }
@@ -176,7 +174,7 @@ public sealed class AzureOpenAiGroundedChatTests
     }
 
     [Test]
-    public async Task GroundedChat_IncludesInputFileItems()
+    public async Task GroundedChat_InputFilesNestedInUserMessageContent()
     {
         string? capturedBody = null;
         var handler = new MockHttpMessageHandler(async (req, _) =>
@@ -197,11 +195,43 @@ public sealed class AzureOpenAiGroundedChatTests
         var doc = JsonDocument.Parse(capturedBody!);
         var input = doc.RootElement.GetProperty("input");
 
-        var inputFiles = input.EnumerateArray()
+        var userMessage = input.EnumerateArray()
+            .First(e => e.TryGetProperty("role", out var r) && r.GetString() == "user");
+        var content = userMessage.GetProperty("content");
+
+        var inputFiles = content.EnumerateArray()
             .Where(e => e.TryGetProperty("type", out var t) && t.GetString() == "input_file")
             .ToList();
 
         Assert.That(inputFiles, Has.Count.EqualTo(2));
+    }
+
+    [Test]
+    public async Task GroundedChat_NoTopLevelInputFileItems()
+    {
+        string? capturedBody = null;
+        var handler = new MockHttpMessageHandler(async (req, _) =>
+        {
+            capturedBody = await req.Content!.ReadAsStringAsync(CancellationToken.None);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(GroundedResponseWithCitations, System.Text.Encoding.UTF8, "application/json")
+            };
+        });
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://test.openai.azure.com/") };
+        var client = new AzureOpenAiChatCompletionClient(httpClient, CreateGpt5Options());
+
+        await client.GetGroundedChatCompletionAsync(CreateRequest(), CreateOptionsWithTextDocs());
+
+        var doc = JsonDocument.Parse(capturedBody!);
+        var input = doc.RootElement.GetProperty("input");
+
+        var topLevelInputFiles = input.EnumerateArray()
+            .Where(e => e.TryGetProperty("type", out var t) && t.GetString() == "input_file")
+            .ToList();
+
+        Assert.That(topLevelInputFiles, Is.Empty);
     }
 
     #endregion
@@ -252,8 +282,7 @@ public sealed class AzureOpenAiGroundedChatTests
         Assert.Multiple(() =>
         {
             Assert.That(citation.Start, Is.EqualTo(25));
-            Assert.That(citation.End, Is.EqualTo(30));
-            Assert.That(citation.Text, Is.EqualTo("Paris"));
+            Assert.That(citation.End, Is.EqualTo(25));
             Assert.That(citation.Sources[0].Id, Is.EqualTo("doc-1"));
         });
     }
@@ -314,6 +343,74 @@ public sealed class AzureOpenAiGroundedChatTests
         {
             Assert.That(response.IsSuccess, Is.False);
             Assert.That(response.ErrorMessage, Does.Contain("Responses API"));
+        });
+    }
+
+    [Test]
+    public async Task GroundedChat_FallbackPreservesRawResponseBody()
+    {
+        const string errorBody = """{"error": {"message": "Resource not found"}}""";
+        var handler = new MockHttpMessageHandler((req, _) =>
+        {
+            if (req.RequestUri?.PathAndQuery.Contains("responses") == true)
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)
+                {
+                    Content = new StringContent(errorBody)
+                });
+            }
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(GroundedResponseNoCitations, System.Text.Encoding.UTF8, "application/json")
+            });
+        });
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://test.openai.azure.com/") };
+        var client = new AzureOpenAiChatCompletionClient(httpClient, CreateGpt5Options());
+
+        var response = await client.GetGroundedChatCompletionAsync(
+            CreateRequest(),
+            CreateOptionsWithTextDocs());
+
+        Assert.That(response.ChatCompletion.RawResponseJson, Is.Not.Null);
+    }
+
+    [Test]
+    public async Task GroundedChat_FallbackPersistsRoutingMode_SubsequentCallsReturnError()
+    {
+        var callCount = 0;
+        var handler = new MockHttpMessageHandler((req, _) =>
+        {
+            callCount++;
+            if (req.RequestUri?.PathAndQuery.Contains("responses") == true)
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.NotFound)
+                {
+                    Content = new StringContent("""{"error": {"message": "Resource not found"}}""")
+                });
+            }
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(GroundedResponseNoCitations, System.Text.Encoding.UTF8, "application/json")
+            });
+        });
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://test.openai.azure.com/") };
+        var client = new AzureOpenAiChatCompletionClient(httpClient, CreateGpt5Options());
+
+        var firstResponse = await client.GetGroundedChatCompletionAsync(
+            CreateRequest(), CreateOptionsWithTextDocs());
+        Assert.That(firstResponse.IsSuccess, Is.False);
+
+        var secondResponse = await client.GetGroundedChatCompletionAsync(
+            CreateRequest(), CreateOptionsWithTextDocs());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(secondResponse.IsSuccess, Is.False);
+            Assert.That(secondResponse.ErrorMessage, Does.Contain("Responses API"));
+            Assert.That(callCount, Is.EqualTo(1),
+                "Second call should not re-probe the Responses API endpoint");
         });
     }
 

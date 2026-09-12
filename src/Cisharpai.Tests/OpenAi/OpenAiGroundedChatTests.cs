@@ -26,6 +26,37 @@ public sealed class OpenAiGroundedChatTests
                             "annotations": [
                                 {
                                     "type": "file_citation",
+                                    "file_id": "doc-1",
+                                    "index": 25
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "usage": {
+                "input_tokens": 100,
+                "output_tokens": 20
+            }
+        }
+        """;
+
+    private const string GroundedResponseWithLegacyAnnotations = """
+        {
+            "id": "resp-abc123-legacy",
+            "model": "gpt-5-0513",
+            "status": "completed",
+            "output": [
+                {
+                    "type": "message",
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "type": "output_text",
+                            "text": "The capital of France is Paris.",
+                            "annotations": [
+                                {
+                                    "type": "file_citation",
                                     "file_id": "file-abc",
                                     "filename": "doc-1",
                                     "start_index": 25,
@@ -83,17 +114,13 @@ public sealed class OpenAiGroundedChatTests
                             "annotations": [
                                 {
                                     "type": "file_citation",
-                                    "file_id": "file-1",
-                                    "filename": "doc-1",
-                                    "start_index": 0,
-                                    "end_index": 5
+                                    "file_id": "doc-1",
+                                    "index": 0
                                 },
                                 {
                                     "type": "file_citation",
-                                    "file_id": "file-2",
-                                    "filename": "doc-2",
-                                    "start_index": 40,
-                                    "end_index": 46
+                                    "file_id": "doc-2",
+                                    "index": 40
                                 }
                             ]
                         }
@@ -261,7 +288,7 @@ public sealed class OpenAiGroundedChatTests
     }
 
     [Test]
-    public async Task GroundedChat_IncludesInputFileItems()
+    public async Task GroundedChat_InputFilesNestedInUserMessageContent()
     {
         var (_, capturedBody) = await ExecuteGroundedChat(GroundedResponseWithCitations);
 
@@ -269,11 +296,30 @@ public sealed class OpenAiGroundedChatTests
         var doc = JsonDocument.Parse(capturedBody!);
         var input = doc.RootElement.GetProperty("input");
 
-        var inputFiles = input.EnumerateArray()
+        var userMessage = input.EnumerateArray()
+            .First(e => e.TryGetProperty("role", out var r) && r.GetString() == "user");
+        var content = userMessage.GetProperty("content");
+
+        var inputFiles = content.EnumerateArray()
             .Where(e => e.TryGetProperty("type", out var t) && t.GetString() == "input_file")
             .ToList();
 
         Assert.That(inputFiles, Has.Count.EqualTo(2));
+    }
+
+    [Test]
+    public async Task GroundedChat_NoTopLevelInputFileItems()
+    {
+        var (_, capturedBody) = await ExecuteGroundedChat(GroundedResponseWithCitations);
+
+        var doc = JsonDocument.Parse(capturedBody!);
+        var input = doc.RootElement.GetProperty("input");
+
+        var topLevelInputFiles = input.EnumerateArray()
+            .Where(e => e.TryGetProperty("type", out var t) && t.GetString() == "input_file")
+            .ToList();
+
+        Assert.That(topLevelInputFiles, Is.Empty);
     }
 
     [Test]
@@ -283,7 +329,9 @@ public sealed class OpenAiGroundedChatTests
 
         var doc = JsonDocument.Parse(capturedBody!);
         var input = doc.RootElement.GetProperty("input");
-        var firstFile = input.EnumerateArray()
+        var userMessage = input.EnumerateArray()
+            .First(e => e.TryGetProperty("role", out var r) && r.GetString() == "user");
+        var firstFile = userMessage.GetProperty("content").EnumerateArray()
             .First(e => e.TryGetProperty("type", out var t) && t.GetString() == "input_file");
 
         Assert.That(firstFile.GetProperty("filename").GetString(), Is.EqualTo("doc-1"));
@@ -298,7 +346,9 @@ public sealed class OpenAiGroundedChatTests
 
         var doc = JsonDocument.Parse(capturedBody!);
         var input = doc.RootElement.GetProperty("input");
-        var firstFile = input.EnumerateArray()
+        var userMessage = input.EnumerateArray()
+            .First(e => e.TryGetProperty("role", out var r) && r.GetString() == "user");
+        var firstFile = userMessage.GetProperty("content").EnumerateArray()
             .First(e => e.TryGetProperty("type", out var t) && t.GetString() == "input_file");
 
         var fileData = firstFile.GetProperty("file_data").GetString();
@@ -316,7 +366,9 @@ public sealed class OpenAiGroundedChatTests
 
         var doc = JsonDocument.Parse(capturedBody!);
         var input = doc.RootElement.GetProperty("input");
-        var firstFile = input.EnumerateArray()
+        var userMessage = input.EnumerateArray()
+            .First(e => e.TryGetProperty("role", out var r) && r.GetString() == "user");
+        var firstFile = userMessage.GetProperty("content").EnumerateArray()
             .First(e => e.TryGetProperty("type", out var t) && t.GetString() == "input_file");
 
         var fileData = firstFile.GetProperty("file_data").GetString()!;
@@ -332,18 +384,35 @@ public sealed class OpenAiGroundedChatTests
     }
 
     [Test]
-    public async Task GroundedChat_InputFilesAppearBeforeMessages()
+    public async Task GroundedChat_InputFilesAppearBeforeTextInContent()
     {
         var (_, capturedBody) = await ExecuteGroundedChat(GroundedResponseWithCitations);
 
         var doc = JsonDocument.Parse(capturedBody!);
         var input = doc.RootElement.GetProperty("input");
-        var items = input.EnumerateArray().ToList();
+        var userMessage = input.EnumerateArray()
+            .First(e => e.TryGetProperty("role", out var r) && r.GetString() == "user");
+        var contentItems = userMessage.GetProperty("content").EnumerateArray().ToList();
 
-        var firstFileIndex = items.FindIndex(e => e.TryGetProperty("type", out var t) && t.GetString() == "input_file");
-        var firstMessageIndex = items.FindIndex(e => e.TryGetProperty("role", out _));
+        var firstFileIndex = contentItems.FindIndex(e => e.TryGetProperty("type", out var t) && t.GetString() == "input_file");
+        var textIndex = contentItems.FindIndex(e => e.TryGetProperty("type", out var t) && t.GetString() == "input_text");
 
-        Assert.That(firstFileIndex, Is.LessThan(firstMessageIndex));
+        Assert.That(firstFileIndex, Is.LessThan(textIndex));
+    }
+
+    [Test]
+    public async Task GroundedChat_UserMessageTextConvertedToInputText()
+    {
+        var (_, capturedBody) = await ExecuteGroundedChat(GroundedResponseWithCitations);
+
+        var doc = JsonDocument.Parse(capturedBody!);
+        var input = doc.RootElement.GetProperty("input");
+        var userMessage = input.EnumerateArray()
+            .First(e => e.TryGetProperty("role", out var r) && r.GetString() == "user");
+        var textPart = userMessage.GetProperty("content").EnumerateArray()
+            .First(e => e.TryGetProperty("type", out var t) && t.GetString() == "input_text");
+
+        Assert.That(textPart.GetProperty("text").GetString(), Is.EqualTo("What is the capital of France?"));
     }
 
     [Test]
@@ -358,7 +427,9 @@ public sealed class OpenAiGroundedChatTests
 
         var doc = JsonDocument.Parse(capturedBody!);
         var input = doc.RootElement.GetProperty("input");
-        var file = input.EnumerateArray()
+        var userMessage = input.EnumerateArray()
+            .First(e => e.TryGetProperty("role", out var r) && r.GetString() == "user");
+        var file = userMessage.GetProperty("content").EnumerateArray()
             .First(e => e.TryGetProperty("type", out var t) && t.GetString() == "input_file");
 
         Assert.That(file.GetProperty("filename").GetString(), Is.EqualTo("document_0.txt"));
@@ -381,7 +452,7 @@ public sealed class OpenAiGroundedChatTests
     }
 
     [Test]
-    public async Task GroundedChat_MapsCitationsFromAnnotations()
+    public async Task GroundedChat_MapsCitationsFromAnnotations_FileIdMatchesDocId()
     {
         var (response, _) = await ExecuteGroundedChat(GroundedResponseWithCitations);
 
@@ -391,10 +462,26 @@ public sealed class OpenAiGroundedChatTests
         Assert.Multiple(() =>
         {
             Assert.That(citation.Start, Is.EqualTo(25));
-            Assert.That(citation.End, Is.EqualTo(30));
-            Assert.That(citation.Text, Is.EqualTo("Paris"));
+            Assert.That(citation.End, Is.EqualTo(25));
             Assert.That(citation.Type, Is.EqualTo("file_citation"));
             Assert.That(citation.Sources, Has.Count.EqualTo(1));
+            Assert.That(citation.Sources[0].Id, Is.EqualTo("doc-1"));
+        });
+    }
+
+    [Test]
+    public async Task GroundedChat_MapsCitations_WithLegacyOffsets()
+    {
+        var (response, _) = await ExecuteGroundedChat(GroundedResponseWithLegacyAnnotations);
+
+        Assert.That(response.Citations, Has.Count.EqualTo(1));
+
+        var citation = response.Citations[0];
+        Assert.Multiple(() =>
+        {
+            Assert.That(citation.Start, Is.EqualTo(25));
+            Assert.That(citation.End, Is.EqualTo(30));
+            Assert.That(citation.Text, Is.EqualTo("Paris"));
             Assert.That(citation.Sources[0].Id, Is.EqualTo("doc-1"));
         });
     }

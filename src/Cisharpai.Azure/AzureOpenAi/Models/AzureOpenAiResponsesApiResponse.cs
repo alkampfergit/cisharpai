@@ -70,6 +70,10 @@ public sealed class AzureOpenAiAnnotation
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? Filename { get; set; }
 
+    [JsonPropertyName("index")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? Index { get; set; }
+
     [JsonPropertyName("start_index")]
     public int StartIndex { get; set; }
 
