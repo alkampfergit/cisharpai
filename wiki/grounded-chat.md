@@ -63,8 +63,8 @@ var response = await groundedFeature.GetGroundedChatCompletionAsync(request, opt
 
 | Provider | Grounded Chat | Notes |
 |----------|--------------|-------|
-| OpenAI | -- | Not supported |
-| Azure OpenAI | -- | Not supported |
+| OpenAI | Yes (GPT-5) | Via Responses API `input_file` items; returns `IsSuccess=false` for non-GPT-5 models |
+| Azure OpenAI | Yes (GPT-5) | Via Responses API `input_file` items; uses route fallback; returns `IsSuccess=false` if deployment falls back to Chat Completions |
 | Azure AI Inference | -- | Not supported |
 | Anthropic | Yes | Via `document` content blocks with `citations: {enabled: true}` in the Messages API |
 | Cohere | Yes | Via `documents` array and `citation_options` in Chat v2 API |
@@ -183,14 +183,67 @@ else
 ```
 
 Currently, `IGroundedChatFeature` is registered on:
-- `AnthropicChatCompletionClient`
-- `CohereChatCompletionClient`
+- `OpenAiChatCompletionClient` — GPT-5 models only (uses Responses API)
+- `AzureOpenAiChatCompletionClient` — GPT-5 deployments only (uses Responses API with route fallback)
+- `AnthropicChatCompletionClient` — all Claude models
+- `CohereChatCompletionClient` — all Command models
+
+## OpenAI / Azure OpenAI Grounded Chat
+
+OpenAI and Azure OpenAI grounded chat uses the Responses API's `input_file` transport. Documents are base64-encoded and sent as `input_file` items in the `input` array. The model's response includes `file_citation` annotations that are mapped to `Citation`/`CitationSource` records.
+
+### Key differences from Cohere
+
+- **GPT-5 only**: Returns `IsSuccess=false` with a descriptive error for non-GPT-5 models (Legacy, Reasoning). No silent fallback to prompt injection.
+- **`CitationMode` ignored**: OpenAI always returns annotations when sources are provided — the `CitationMode` setting has no effect (any value is accepted silently).
+- **Citation type**: OpenAI citations have `Type="file_citation"` (vs. Cohere's `"TEXT_CONTENT"`).
+- **Citation text**: Extracted from the response content using the annotation's `start_index`/`end_index` (Cohere provides the text directly in the citation object).
+
+### Example (OpenAI)
+
+```csharp
+var client = new OpenAiChatCompletionClient(httpClient, new OpenAiClientOptions
+{
+    ApiKey = "sk-...",
+    DefaultModel = "gpt-5-0513"
+});
+
+var groundedFeature = client.Features.Get<IGroundedChatFeature>()!;
+
+var documents = new List<DocumentChunk>
+{
+    new(Id: "doc-1", Text: "Paris is the capital of France."),
+    new(Id: "doc-2", Text: "Berlin is the capital of Germany.")
+};
+
+var response = await groundedFeature.GetGroundedChatCompletionAsync(
+    new ChatCompletionRequest(
+        Messages: [new LlmMessage(LlmRole.User, "What is the capital of France?")]),
+    new GroundedChatOptions(Documents: documents));
+
+// response.Citations[0].Sources[0].Id == "doc-1"
+```
+
+### Example (Azure OpenAI)
+
+```csharp
+var client = new AzureOpenAiChatCompletionClient(httpClient, new AzureOpenAiClientOptions
+{
+    DeploymentName = "my-gpt5-deployment",
+    ModelName = "gpt-5",
+    ApiKey = "..."
+});
+
+var groundedFeature = client.Features.Get<IGroundedChatFeature>()!;
+
+var response = await groundedFeature.GetGroundedChatCompletionAsync(request, options);
+```
 
 ## Limitations
 
-### Cohere
-- **Mutually exclusive with JSON Mode**: The Cohere API does not support `documents` and `response_format` in the same request. Use either grounded chat or JSON output, not both.
-- **Model support**: Not all Cohere models support grounded chat. Use Command-R, Command-R+, or Command-A models.
+- **Mutually exclusive with JSON Mode (Cohere)**: The Cohere API does not support `documents` and `response_format` in the same request. Use either grounded chat or JSON output, not both.
+- **Model support (Cohere)**: Use Command-R, Command-R+, or Command-A models.
+- **GPT-5 only (OpenAI/Azure)**: Non-GPT-5 models return `IsSuccess=false`. This is by design — prompt-injection grounding is a separate feature (#40).
 
 ### Anthropic
 - **Citation modes are binary**: Anthropic citations are enabled or disabled — there is no accuracy/speed tradeoff. `CitationMode.Fast` and `CitationMode.Accurate` are treated as `Enabled` with a logged warning.

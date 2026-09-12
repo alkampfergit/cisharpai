@@ -6,7 +6,7 @@ public sealed class OpenAiResponsesApiRequest
 {
     public string Model { get; set; } = string.Empty;
 
-    public List<OpenAiChatMessage> Input { get; set; } = [];
+    public List<object> Input { get; set; } = [];
 
     [JsonPropertyName("max_output_tokens")]
     public int? MaxOutputTokens { get; set; }

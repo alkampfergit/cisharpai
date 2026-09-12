@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.OpenAi;
 
-public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature, IStreamingChatFeature
+public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature, IStreamingChatFeature, IGroundedChatFeature
 {
     private const string ChatCompletionsEndpoint = "chat/completions";
     private const string ResponsesEndpoint = "responses";
@@ -34,6 +34,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         features.Set<IJsonOutputFeature>(this);
         features.Set<IToolCallingFeature>(this);
         features.Set<IStreamingChatFeature>(this);
+        features.Set<IGroundedChatFeature>(this);
         Features = features;
     }
 
@@ -161,6 +162,70 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         }
     }
 
+    public async Task<GroundedChatCompletionResponse> GetGroundedChatCompletionAsync(
+        ChatCompletionRequest request,
+        GroundedChatOptions groundedChatOptions,
+        CancellationToken cancellationToken = default)
+    {
+        var model = ResolveModel(request.Model);
+        request = request with { Model = model };
+
+        try
+        {
+            groundedChatOptions.Validate();
+
+            var modelType = DetectModelType(model);
+            if (modelType != OpenAiModelType.Gpt5)
+            {
+                return GroundedChatCompletionResponse.Error(
+                    $"Grounded chat requires the Responses API (GPT-5 models). Model '{model}' uses the Chat Completions API which does not support native document grounding with citations. Use a GPT-5 model or consider the prompt-injection grounding approach.");
+            }
+
+            var messages = new List<object>(await MapMessagesAsync(request.Messages, cancellationToken));
+            var inputFiles = MapDocumentChunksToInputFiles(groundedChatOptions.Documents);
+            var input = new List<object>(inputFiles);
+            input.AddRange(messages);
+
+            var providerRequest = new OpenAiResponsesApiRequest
+            {
+                Model = model,
+                MaxOutputTokens = request.MaxTokens,
+                Input = input,
+                Reasoning = (request.ReasoningEffort ?? _options.ReasoningEffort) is { } effort
+                    ? new OpenAiReasoningOption { Effort = effort }
+                    : null,
+                Text = _options.TextVerbosity is not null
+                    ? new OpenAiTextOption { Verbosity = _options.TextVerbosity }
+                    : null
+            };
+
+            string? rawResponseJson = null;
+            string? rawRequestJson = null;
+            OpenAiResponsesApiResponse raw;
+
+            if (request.IncludeRawResponse)
+            {
+                (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<OpenAiResponsesApiRequest, OpenAiResponsesApiResponse>(
+                    ResponsesEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
+            }
+            else
+            {
+                raw = await _client.PostAsync<OpenAiResponsesApiRequest, OpenAiResponsesApiResponse>(
+                    ResponsesEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
+            }
+
+            return MapGroundedChatResponse(raw, groundedChatOptions.Documents, rawResponseJson, rawRequestJson);
+        }
+        catch (LlmHttpRequestException ex)
+        {
+            return GroundedChatCompletionResponse.Error(ex.Message, ex.ResponseBody);
+        }
+        catch (Exception ex)
+        {
+            return GroundedChatCompletionResponse.Error(ex.Message);
+        }
+    }
+
     private async IAsyncEnumerable<ChatCompletionChunk> StreamLegacyChatAsync(
         ChatCompletionRequest request,
         [EnumeratorCancellation] CancellationToken cancellationToken)
@@ -222,7 +287,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         {
             Model = request.Model!,
             MaxOutputTokens = request.MaxTokens,
-            Input = await MapMessagesAsync(request.Messages, cancellationToken),
+            Input = new List<object>(await MapMessagesAsync(request.Messages, cancellationToken)),
             Stream = true,
             Reasoning = (request.ReasoningEffort ?? _options.ReasoningEffort) is { } effort
                 ? new OpenAiReasoningOption { Effort = effort }
@@ -460,7 +525,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         {
             Model = request.Model!,
             MaxOutputTokens = request.MaxTokens,
-            Input = await MapMessagesAsync(request.Messages, cancellationToken),
+            Input = new List<object>(await MapMessagesAsync(request.Messages, cancellationToken)),
             Reasoning = (request.ReasoningEffort ?? _options.ReasoningEffort) is { } effort
                 ? new OpenAiReasoningOption { Effort = effort }
                 : null,
@@ -489,7 +554,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         {
             Model = request.Model!,
             MaxOutputTokens = request.MaxTokens,
-            Input = await MapMessagesAsync(messages, cancellationToken),
+            Input = new List<object>(await MapMessagesAsync(messages, cancellationToken)),
             Reasoning = (request.ReasoningEffort ?? _options.ReasoningEffort) is { } effort
                 ? new OpenAiReasoningOption { Effort = effort }
                 : null,
@@ -723,6 +788,115 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
             return OpenAiModelType.Gpt5;
 
         return OpenAiModelType.Legacy;
+    }
+
+    private static List<OpenAiInputFile> MapDocumentChunksToInputFiles(IReadOnlyList<DocumentChunk> documents)
+    {
+        return documents.Select((doc, index) =>
+        {
+            var content = doc.Text ?? SerializeDocumentData(doc.Data!);
+            var base64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(content));
+
+            return new OpenAiInputFile
+            {
+                Filename = doc.Id ?? $"document_{index}.txt",
+                FileData = $"data:text/plain;base64,{base64}"
+            };
+        }).ToList();
+    }
+
+    private static string SerializeDocumentData(IReadOnlyDictionary<string, string> data)
+    {
+        return JsonSerializer.Serialize(data);
+    }
+
+    private static GroundedChatCompletionResponse MapGroundedChatResponse(
+        OpenAiResponsesApiResponse raw,
+        IReadOnlyList<DocumentChunk> documents,
+        string? rawResponseJson,
+        string? rawRequestJson)
+    {
+        var outputMessages = raw.Output.Where(o => o.Type == "message").ToList();
+
+        var content = outputMessages
+            .SelectMany(o => o.Content)
+            .Where(c => c.Type == "output_text")
+            .Select(c => c.Text)
+            .FirstOrDefault() ?? string.Empty;
+
+        var refusal = outputMessages
+            .SelectMany(o => o.Content)
+            .Where(c => c.Type == "refusal")
+            .Select(c => c.Refusal)
+            .FirstOrDefault();
+
+        var isError = raw.Status is "incomplete" or "failed";
+        var errorMessage = isError
+            ? (raw.IncompleteDetails?.Reason ?? $"Response status: {raw.Status}")
+            : null;
+
+        var chatCompletion = new ChatCompletionResponse(
+            Content: content,
+            Model: raw.Model,
+            PromptTokens: raw.Usage.InputTokens,
+            CompletionTokens: raw.Usage.OutputTokens,
+            RawResponseJson: rawResponseJson,
+            RawRequestJson: rawRequestJson,
+            Status: raw.Status,
+            IncompleteReason: raw.IncompleteDetails?.Reason,
+            IsSuccess: !isError,
+            ErrorMessage: errorMessage,
+            Refusal: refusal);
+
+        var annotations = outputMessages
+            .SelectMany(o => o.Content)
+            .Where(c => c.Type == "output_text" && c.Annotations is not null)
+            .SelectMany(c => c.Annotations!)
+            .ToList();
+
+        var citations = MapAnnotationsToCitations(annotations, content, documents);
+
+        return new GroundedChatCompletionResponse(chatCompletion, citations);
+    }
+
+    private static List<Citation> MapAnnotationsToCitations(
+        List<OpenAiAnnotation> annotations,
+        string content,
+        IReadOnlyList<DocumentChunk> documents)
+    {
+        if (annotations.Count == 0)
+            return [];
+
+        var filenameToDocId = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        for (var i = 0; i < documents.Count; i++)
+        {
+            var filename = documents[i].Id ?? $"document_{i}.txt";
+            var docId = documents[i].Id ?? $"document_{i}";
+            filenameToDocId[filename] = docId;
+        }
+
+        return annotations
+            .Where(a => a.Type == "file_citation")
+            .Select(a =>
+            {
+                var start = a.StartIndex;
+                var end = a.EndIndex;
+                var citedText = start >= 0 && end <= content.Length && start < end
+                    ? content[start..end]
+                    : string.Empty;
+
+                var sourceId = a.Filename is not null && filenameToDocId.TryGetValue(a.Filename, out var docId)
+                    ? docId
+                    : a.FileId ?? a.Filename ?? "unknown";
+
+                return new Citation(
+                    Start: start,
+                    End: end,
+                    Text: citedText,
+                    Sources: [new CitationSource(Id: sourceId)],
+                    Type: "file_citation");
+            })
+            .ToList();
     }
 
     internal enum OpenAiModelType

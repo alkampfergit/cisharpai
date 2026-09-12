@@ -18,7 +18,7 @@ namespace Cisharpai.Azure.AzureOpenAi;
 /// Azure OpenAI chat completion client using HttpClient.
 /// Supports legacy models (GPT-4), reasoning models (o1/o3/o4), and GPT-5 via the Responses API.
 /// </summary>
-public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature, IStreamingChatFeature
+public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature, IStreamingChatFeature, IGroundedChatFeature
 {
     private static readonly JsonSerializerOptions StreamJsonOptions = new()
     {
@@ -61,6 +61,7 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         features.Set<IJsonOutputFeature>(this);
         features.Set<IToolCallingFeature>(this);
         features.Set<IStreamingChatFeature>(this);
+        features.Set<IGroundedChatFeature>(this);
         Features = features;
     }
 
@@ -249,6 +250,80 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         }
     }
 
+    public async Task<GroundedChatCompletionResponse> GetGroundedChatCompletionAsync(
+        ChatCompletionRequest request,
+        GroundedChatOptions groundedChatOptions,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            groundedChatOptions.Validate();
+
+            var modelType = DetectModelTypeForRequest(request);
+            if (modelType != AzureOpenAiModelType.Gpt5 && _routingMode != AzureOpenAiRoutingMode.ResponsesApi)
+            {
+                return GroundedChatCompletionResponse.Error(
+                    "Grounded chat requires the Responses API (GPT-5 models). The current deployment does not support native document grounding with citations. Use a GPT-5 deployment or consider the prompt-injection grounding approach.");
+            }
+
+            return await ExecuteGroundedWithRouteFallbackAsync(request, groundedChatOptions, cancellationToken);
+        }
+        catch (LlmHttpRequestException ex)
+        {
+            return GroundedChatCompletionResponse.Error(ex.Message, ex.ResponseBody);
+        }
+        catch (Exception ex)
+        {
+            return GroundedChatCompletionResponse.Error(ex.Message);
+        }
+    }
+
+    private async Task<GroundedChatCompletionResponse> ExecuteGroundedWithRouteFallbackAsync(
+        ChatCompletionRequest request,
+        GroundedChatOptions groundedChatOptions,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var response = await SendGroundedResponsesApiAsync(request, groundedChatOptions, cancellationToken);
+            SetRoutingMode(AzureOpenAiRoutingMode.ResponsesApi);
+            return response;
+        }
+        catch (LlmHttpRequestException ex) when (CanRetryWithAlternateRoute(ex))
+        {
+            return GroundedChatCompletionResponse.Error(
+                "Grounded chat requires the Responses API but the deployment fell back to Chat Completions which does not support native document grounding with citations.");
+        }
+    }
+
+    private async Task<GroundedChatCompletionResponse> SendGroundedResponsesApiAsync(
+        ChatCompletionRequest request,
+        GroundedChatOptions groundedChatOptions,
+        CancellationToken cancellationToken)
+    {
+        var messages = new List<object>(await MapMessagesAsync(request.Messages, cancellationToken));
+        var inputFiles = MapDocumentChunksToInputFiles(groundedChatOptions.Documents);
+        var input = new List<object>(inputFiles);
+        input.AddRange(messages);
+
+        var providerRequest = new AzureOpenAiResponsesApiRequest
+        {
+            MaxOutputTokens = request.MaxTokens,
+            Input = input,
+            Reasoning = (request.ReasoningEffort ?? _options.ReasoningEffort) is { } effort
+                ? new AzureOpenAiResponsesReasoningOption { Effort = effort }
+                : null,
+            Text = _options.TextVerbosity is not null
+                ? new AzureOpenAiTextOption { Verbosity = _options.TextVerbosity }
+                : null
+        };
+
+        var (raw, rawResponseJson, rawRequestJson) = await PostWithOptionalRawAsync<AzureOpenAiResponsesApiRequest, AzureOpenAiResponsesApiResponse>(
+            ResponsesApiUri, providerRequest, request, cancellationToken);
+
+        return MapGroundedChatResponse(raw, groundedChatOptions.Documents, rawResponseJson, rawRequestJson);
+    }
+
     private async Task<ChatCompletionResponse> SendChatCompletionsAsync(
         ChatCompletionRequest request,
         AzureOpenAiModelType modelType,
@@ -422,7 +497,7 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         var providerRequest = new AzureOpenAiResponsesApiRequest
         {
             MaxOutputTokens = request.MaxTokens,
-            Input = await MapMessagesAsync(request.Messages, cancellationToken),
+            Input = new List<object>(await MapMessagesAsync(request.Messages, cancellationToken)),
             Reasoning = (request.ReasoningEffort ?? _options.ReasoningEffort) is { } effort
                 ? new AzureOpenAiResponsesReasoningOption { Effort = effort }
                 : null,
@@ -449,7 +524,7 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         var providerRequest = new AzureOpenAiResponsesApiRequest
         {
             MaxOutputTokens = request.MaxTokens,
-            Input = await MapMessagesAsync(messages, cancellationToken),
+            Input = new List<object>(await MapMessagesAsync(messages, cancellationToken)),
             Reasoning = (request.ReasoningEffort ?? _options.ReasoningEffort) is { } effort
                 ? new AzureOpenAiResponsesReasoningOption { Effort = effort }
                 : null,
@@ -507,7 +582,7 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         var providerRequest = new AzureOpenAiResponsesApiRequest
         {
             MaxOutputTokens = request.MaxTokens,
-            Input = await MapMessagesAsync(request.Messages, cancellationToken),
+            Input = new List<object>(await MapMessagesAsync(request.Messages, cancellationToken)),
             Stream = true,
             Reasoning = (request.ReasoningEffort ?? _options.ReasoningEffort) is { } effort
                 ? new AzureOpenAiResponsesReasoningOption { Effort = effort }
@@ -955,5 +1030,109 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
     internal static AzureOpenAiModelType DetectModelType(string? model)
     {
         return TryDetectModelType(model) ?? AzureOpenAiModelType.Legacy;
+    }
+
+    private static List<AzureOpenAiInputFile> MapDocumentChunksToInputFiles(IReadOnlyList<DocumentChunk> documents)
+    {
+        return documents.Select((doc, index) =>
+        {
+            var content = doc.Text ?? JsonSerializer.Serialize(doc.Data!);
+            var base64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(content));
+
+            return new AzureOpenAiInputFile
+            {
+                Filename = doc.Id ?? $"document_{index}.txt",
+                FileData = $"data:text/plain;base64,{base64}"
+            };
+        }).ToList();
+    }
+
+    private static GroundedChatCompletionResponse MapGroundedChatResponse(
+        AzureOpenAiResponsesApiResponse raw,
+        IReadOnlyList<DocumentChunk> documents,
+        string? rawResponseJson,
+        string? rawRequestJson)
+    {
+        var outputMessages = raw.Output.Where(o => o.Type == "message").ToList();
+
+        var content = outputMessages
+            .SelectMany(o => o.Content)
+            .Where(c => c.Type == "output_text")
+            .Select(c => c.Text)
+            .FirstOrDefault() ?? string.Empty;
+
+        var refusal = outputMessages
+            .SelectMany(o => o.Content)
+            .Where(c => c.Type == "refusal")
+            .Select(c => c.Refusal)
+            .FirstOrDefault();
+
+        var isIncomplete = raw.Status == "incomplete";
+        var incompleteReason = raw.IncompleteDetails?.Reason;
+        var isError = raw.Status is "incomplete" or "failed";
+        var errorMessage = BuildResponsesErrorMessage(isError, raw.Status, incompleteReason);
+
+        var chatCompletion = new ChatCompletionResponse(
+            Content: content,
+            Model: raw.Model,
+            PromptTokens: raw.Usage.InputTokens,
+            CompletionTokens: raw.Usage.OutputTokens,
+            RawResponseJson: rawResponseJson,
+            RawRequestJson: rawRequestJson,
+            Status: raw.Status,
+            IncompleteReason: isIncomplete ? incompleteReason : null,
+            IsSuccess: !isError,
+            ErrorMessage: errorMessage,
+            Refusal: refusal);
+
+        var annotations = outputMessages
+            .SelectMany(o => o.Content)
+            .Where(c => c.Type == "output_text" && c.Annotations is not null)
+            .SelectMany(c => c.Annotations!)
+            .ToList();
+
+        var citations = MapAnnotationsToCitations(annotations, content, documents);
+
+        return new GroundedChatCompletionResponse(chatCompletion, citations);
+    }
+
+    private static List<Citation> MapAnnotationsToCitations(
+        List<AzureOpenAiAnnotation> annotations,
+        string content,
+        IReadOnlyList<DocumentChunk> documents)
+    {
+        if (annotations.Count == 0)
+            return [];
+
+        var filenameToDocId = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        for (var i = 0; i < documents.Count; i++)
+        {
+            var filename = documents[i].Id ?? $"document_{i}.txt";
+            var docId = documents[i].Id ?? $"document_{i}";
+            filenameToDocId[filename] = docId;
+        }
+
+        return annotations
+            .Where(a => a.Type == "file_citation")
+            .Select(a =>
+            {
+                var start = a.StartIndex;
+                var end = a.EndIndex;
+                var citedText = start >= 0 && end <= content.Length && start < end
+                    ? content[start..end]
+                    : string.Empty;
+
+                var sourceId = a.Filename is not null && filenameToDocId.TryGetValue(a.Filename, out var docId)
+                    ? docId
+                    : a.FileId ?? a.Filename ?? "unknown";
+
+                return new Citation(
+                    Start: start,
+                    End: end,
+                    Text: citedText,
+                    Sources: [new CitationSource(Id: sourceId)],
+                    Type: "file_citation");
+            })
+            .ToList();
     }
 }
