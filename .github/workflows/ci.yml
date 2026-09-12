@@ -2,10 +2,14 @@ name: Cisharpai CI
 
 on:
   push:
-    branches: [main, master, develop, 'feature/**', 'hotfix/**', 'release/**']
+    # 'feature/**' deliberately omitted: those branches are already covered by
+    # the pull_request trigger, and listing both ran every commit twice.
+    # 'hotfix/**' and 'release/**' stay because the publish job keys off push
+    # events from them.
+    branches: [main, master, develop, 'hotfix/**', 'release/**']
     tags: ['v*']
   pull_request:
-    branches: [main, master, develop, rag101]
+    branches: [main, master, develop]
   workflow_dispatch:
     inputs:
       publish_nuget:
@@ -13,6 +17,12 @@ on:
         required: false
         type: boolean
         default: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref || github.ref }}
+  # Only PR runs are cancellable. A develop/master/tag run may be mid-publish,
+  # so it must never be interrupted by a subsequent push.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -49,7 +59,18 @@ jobs:
 
       - name: Run integration tests
         continue-on-error: true
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        # Integration tests call real LLM provider APIs and cost money. Run them
+        # on trunk pushes and tags, on manual dispatch, or on a PR explicitly
+        # labelled 'run-integration'.
+        if: >-
+          github.event_name == 'workflow_dispatch' ||
+          (github.event_name == 'push' &&
+            (github.ref == 'refs/heads/develop' ||
+             github.ref == 'refs/heads/main' ||
+             github.ref == 'refs/heads/master' ||
+             startsWith(github.ref, 'refs/tags/v'))) ||
+          (github.event_name == 'pull_request' &&
+            contains(github.event.pull_request.labels.*.name, 'run-integration'))
         shell: pwsh
         env:
           OPENAI_TEST_API_KEY: ${{ secrets.OPENAI_TEST_API_KEY }}
@@ -187,7 +208,7 @@ jobs:
             /d:sonar.host.url="https://sonarcloud.io" `
             /d:sonar.cs.vstest.reportsPaths="artifacts/TestResults/**/*.trx" `
             /d:sonar.cs.opencover.reportsPaths="artifacts/TestResults/**/coverage.opencover.xml" `
-            /d:sonar.coverage.exclusions="**/*Tests*/**,**/Cisharp.Console/**" `
+            /d:sonar.coverage.exclusions="**/*Tests*/**,**/Cisharp.Console/**,.agents/**" `
             /d:sonar.cpd.exclusions="**/*Tests*/**,**/Cisharp.Console/**,**/Models/**"
           if ($LASTEXITCODE -ne 0) { throw "SonarScanner begin failed" }
 
