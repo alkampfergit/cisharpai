@@ -81,8 +81,9 @@ public sealed class BulkEmbeddingProcessor : IBulkEmbeddingProcessor
         while (batch.Count < batchSize)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!await enumerator.MoveNextAsync().ConfigureAwait(false)) break;
+            var hasMore = await enumerator.MoveNextAsync().ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
+            if (!hasMore) break;
             ValidateChunk(enumerator.Current);
             batch.Add(enumerator.Current);
         }
