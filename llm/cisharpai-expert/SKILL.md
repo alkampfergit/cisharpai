@@ -6,8 +6,9 @@ description: >
   LLM providers. Use when writing, debugging, or architecting code that uses
   Cisharpai clients, features, DTOs, DI registration, or provider-specific
   integrations. Activates on mentions of "Cisharpai", "IChatCompletionClient",
-  "IEmbeddingClient", provider setup, tool calling, streaming, JSON output,
-  grounded chat, vision, embeddings, or fake clients for testing.
+  "IEmbeddingClient", "IRerankerClient", provider setup, tool calling, streaming,
+  JSON output, grounded chat, vision, embeddings, reranking, or fake clients for
+  testing.
 ---
 
 # Cisharpai Expert
@@ -22,7 +23,7 @@ change — application code stays the same.
 
 **Key Design Principles:**
 
-- **Unified Abstraction** — Same `IChatCompletionClient` / `IEmbeddingClient` for all providers
+- **Unified Abstraction** — Same `IChatCompletionClient` / `IEmbeddingClient` / `IRerankerClient` for all providers that offer the capability
 - **No Exceptions for API Errors** — `IsSuccess` + `ErrorMessage` on responses; exceptions only for network/config
 - **Debuggability** — `RawResponseJson` / `RawRequestJson` on every response
 - **Immutable DTOs** — Request/Response types are immutable records
@@ -62,6 +63,12 @@ services.AddAnthropicClient(o => { o.ApiKey = "sk-ant-..."; });
 
 // Cohere
 services.AddCohereChatClient(o => { o.ApiKey = "..."; });
+
+// Cohere reranking
+services.AddCohereRerankerClient(o => {
+    o.ApiKey = "...";
+    o.DefaultModel = CohereModels.Rerank.RerankV3_5;
+});
 ```
 
 ### 3. Send a Request
@@ -145,6 +152,13 @@ var config = new OpenAiClientConfiguration { ApiKey = "sk-...", DefaultModel = "
 var result = factory.CreateChatCompletionClient(config);
 if (result.IsSuccess) { /* use result.Client */ }
 else { /* result.ErrorMessage explains why */ }
+
+// Reranking (Cohere only — other providers return IsSuccess=false)
+var rerankResult = factory.CreateRerankerClient(new CohereClientConfiguration
+{
+    ApiKey = "...",
+    DefaultModel = CohereModels.Rerank.RerankV3_5
+});
 ```
 
 **Configuration classes:** `OpenAiClientConfiguration`, `AnthropicClientConfiguration`, `AzureOpenAiClientConfiguration` (requires Endpoint + DeploymentName), `AzureAiInferenceClientConfiguration` (requires Endpoint + ModelId), `CohereClientConfiguration`.
@@ -174,6 +188,45 @@ public interface IEmbeddingClient : IHasFeatures
         EmbeddingRequest request, CancellationToken ct = default);
 }
 ```
+
+### IRerankerClient
+
+Reranking reorders candidate documents by relevance to a query — the second stage of a RAG
+pipeline. **Cohere only**; other providers have no rerank API.
+
+```csharp
+public interface IRerankerClient : IHasFeatures
+{
+    Task<RerankResponse> RerankAsync(
+        RerankRequest request, CancellationToken ct = default);
+}
+```
+
+```csharp
+string[] documents = [ /* candidates from your vector search */ ];
+
+var response = await rerankClient.RerankAsync(new RerankRequest(
+    Query: "What is the capital of France?",
+    Documents: documents,
+    TopN: 3));
+
+if (!response.IsSuccess) { /* response.ErrorMessage */ }
+
+foreach (var result in response.Results)
+{
+    // Index points back into YOUR documents array; Results are most-relevant-first
+    Console.WriteLine($"{result.RelevanceScore:F4}  {documents[result.Index]}");
+}
+```
+
+**Alternative hosting:** set `CohereClientOptions.BaseUrl` (e.g. an Azure AI Foundry deployment)
+— the `rerank` path is appended relatively and nothing else changes.
+
+**Cohere `priority`:** deliberately not on `RerankRequest` (no analogue at other providers). Use
+`ExtraParameters: JsonSerializer.SerializeToElement(new { priority = 500 })` (integer 0–999, lower = higher priority).
+
+**Gotcha:** if neither `RerankRequest.Model` nor `CohereClientOptions.DefaultModel` is set,
+`RerankAsync` throws `InvalidOperationException` — that is a config error, not an API error.
 
 ### Feature Discovery
 
@@ -209,6 +262,15 @@ if (streaming is not null)
 **EmbeddingResponse:**
 - `Embeddings` (float[][]), `Dimensions`, `Model`, `TotalTokens`, `IsSuccess`, `ErrorMessage`
 
+**RerankRequest:**
+- `Query`, `Documents` (string[]), `Model?`, `TopN?`, `MaxTokensPerDocument?`, `IncludeRawResponse`, `ExtraParameters?`
+
+**RerankResponse:**
+- `Results` (`RerankResult[]`, most relevant first), `Model`, `SearchUnits?`, `InputTokens?`, `IsSuccess`, `ErrorMessage`, raw payloads
+
+**RerankResult:**
+- `Index` (position in the request's `Documents`), `RelevanceScore` (provider-defined scale — compare within one response only)
+
 ## Feature Interfaces
 
 All feature interfaces live in the `Cisharpai.Features.Chat` namespace (not `Cisharpai.Features`).
@@ -221,6 +283,9 @@ All feature interfaces live in the `Cisharpai.Features.Chat` namespace (not `Cis
 | Grounded Chat | `IGroundedChatFeature` | Cohere only |
 | Image Embedding | `IImageEmbeddingFeature` | Azure AI Inference, Cohere |
 | Multimodal Embedding | `IMultimodalEmbeddingFeature` | Cohere only |
+
+Reranking is not a feature interface — it is its own top-level client (`IRerankerClient`),
+implemented by Cohere only.
 
 ## Provider-Specific Guides
 
@@ -239,6 +304,7 @@ See the reference files for detailed information:
 - [references/streaming.md](references/streaming.md) — Token-by-token streaming
 - [references/vision.md](references/vision.md) — Image input across providers
 - [references/embeddings.md](references/embeddings.md) — Text, image, and multimodal embeddings
+- [references/reranking.md](references/reranking.md) — Relevance reranking with `IRerankerClient` (Cohere)
 - [references/grounded-chat.md](references/grounded-chat.md) — RAG with citations (Cohere)
 - [references/testing.md](references/testing.md) — Fake clients, response queues, DI
 - [references/provider-features.md](references/provider-features.md) — Complete feature support matrix

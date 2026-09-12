@@ -125,4 +125,34 @@ public static class FakeResponses
     /// </summary>
     public static EmbeddingResponse EmbeddingError(string errorMessage) =>
         EmbeddingResponse.Error(errorMessage);
+
+    /// <summary>
+    /// Creates a successful rerank response from (index, score) pairs, in the order given.
+    /// </summary>
+    public static RerankResponse Rerank(
+        params (int Index, double RelevanceScore)[] results) =>
+        new(
+            Results: results.Select(r => new RerankResult(r.Index, r.RelevanceScore)).ToList(),
+            Model: DefaultModel,
+            SearchUnits: 1);
+
+    /// <summary>
+    /// Creates a successful rerank response that ranks the given number of documents in
+    /// their original order with descending scores.
+    /// </summary>
+    public static RerankResponse Rerank(
+        int documentCount,
+        string model = DefaultModel) =>
+        new(
+            Results: Enumerable.Range(0, documentCount)
+                .Select(i => new RerankResult(i, 1.0 - (i * 0.1)))
+                .ToList(),
+            Model: model,
+            SearchUnits: 1);
+
+    /// <summary>
+    /// Creates a rerank error response.
+    /// </summary>
+    public static RerankResponse RerankError(string errorMessage) =>
+        RerankResponse.Error(errorMessage);
 }

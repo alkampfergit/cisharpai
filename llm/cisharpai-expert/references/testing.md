@@ -43,6 +43,11 @@ FakeResponses.Embedding()
 FakeResponses.Embedding(new float[] { 0.1f, 0.2f, 0.3f })
 FakeResponses.Embeddings(vector1, vector2)
 FakeResponses.EmbeddingError("Invalid input")
+
+// Reranking
+FakeResponses.Rerank((1, 0.99), (0, 0.42))   // explicit (index, score) pairs, ranked order
+FakeResponses.Rerank(documentCount: 3)        // N docs in original order, descending scores
+FakeResponses.RerankError("Invalid input")
 ```
 
 ## FakeChatCompletionClient
@@ -184,6 +189,31 @@ fake.EnqueueResponse(FakeResponses.Chat("First call"));
 fake.EnqueueResponse(FakeResponses.Chat("Second call"));
 fake.DefaultResponse = FakeResponses.Chat("All subsequent calls");
 ```
+
+## FakeRerankerClient
+
+Same queue/default/capture shape as the other fakes. `IRerankerClient` has no optional feature
+interfaces, so there are no feature flags.
+
+```csharp
+var fake = new FakeRerankerClient
+{
+    DefaultResponse = FakeResponses.Rerank((1, 0.99), (0, 0.42))
+};
+
+string[] documents = ["Nevada's capital is Carson City.", "Paris is the capital of France."];
+var response = await fake.RerankAsync(new RerankRequest("What is the capital of France?", documents));
+
+Assert.Equal(documents[1], documents[response.Results[0].Index]);
+Assert.Single(fake.ReceivedRequests);
+Assert.Equal("What is the capital of France?", fake.ReceivedRequests[0].Query);
+```
+
+Members: `DefaultResponse`, `EnqueueResponse(response)`, `ReceivedRequests`, `CallCount`,
+`Reset()`. DI helper: `services.AddFakeRerankerClient()`.
+
+Calling `RerankAsync` with neither a queued response nor a default throws
+`InvalidOperationException`.
 
 ## Request DTO Syntax
 

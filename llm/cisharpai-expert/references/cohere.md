@@ -28,6 +28,11 @@ services.AddCohereChatClient(options =>
 - `CohereModels.Embedding.EmbedEnglishV3` — `embed-english-v3.0`
 - `CohereModels.Embedding.EmbedMultilingualV3` — `embed-multilingual-v3.0`
 
+**Rerank:**
+- `CohereModels.Rerank.RerankV3_5` — `rerank-v3.5`
+- `CohereModels.Rerank.RerankEnglishV3` — `rerank-english-v3.0`
+- `CohereModels.Rerank.RerankMultilingualV3` — `rerank-multilingual-v3.0`
+
 ## Supported Features
 
 - `IJsonOutputFeature` — JSON Mode + Structured Outputs
@@ -37,6 +42,30 @@ services.AddCohereChatClient(options =>
 - `IImageEmbeddingFeature` — Single image embedding
 - `IMultimodalEmbeddingFeature` — Mixed text + image (Embed v4)
 - Vision — Partial (image parts silently skipped, only text extracted)
+- `IRerankerClient` — Relevance reranking (Cohere only); separate client, not a feature interface
+
+## Reranking
+
+See [reranking.md](reranking.md) for full details.
+
+```csharp
+services.AddCohereRerankerClient(o => {
+    o.ApiKey = "...";
+    o.DefaultModel = CohereModels.Rerank.RerankV3_5;
+});
+
+var response = await rerankClient.RerankAsync(new RerankRequest(
+    Query: "What is the capital of France?",
+    Documents: documents,
+    TopN: 3));
+
+// Results are most-relevant-first; Index points back into your documents array
+foreach (var r in response.Results)
+    Console.WriteLine($"{r.RelevanceScore:F4}  {documents[r.Index]}");
+```
+
+Set `BaseUrl` to target an Azure AI Foundry deployment. Cohere's `priority` hint goes through
+`ExtraParameters`.
 
 ## Grounded Chat (RAG)
 

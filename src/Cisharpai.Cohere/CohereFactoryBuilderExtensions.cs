@@ -18,6 +18,9 @@ public static class CohereFactoryBuilderExtensions
         builder.Services.AddHttpClient(CohereClientFactoryProvider.EmbeddingHttpClientName)
             .AddCisharpaiResilienceHandler();
 
+        builder.Services.AddHttpClient(CohereClientFactoryProvider.RerankHttpClientName)
+            .AddCisharpaiResilienceHandler();
+
         return builder.AddProvider(new CohereClientFactoryProvider());
     }
 }

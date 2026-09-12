@@ -32,4 +32,16 @@ public static class FakeServiceCollectionExtensions
         services.AddSingleton<IEmbeddingClient>(fake);
         return fake;
     }
+
+    /// <summary>
+    /// Registers a <see cref="FakeRerankerClient"/> as <see cref="IRerankerClient"/>.
+    /// Returns the fake instance for setup and assertions.
+    /// </summary>
+    public static FakeRerankerClient AddFakeRerankerClient(
+        this IServiceCollection services)
+    {
+        var fake = new FakeRerankerClient();
+        services.AddSingleton<IRerankerClient>(fake);
+        return fake;
+    }
 }

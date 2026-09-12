@@ -1,6 +1,6 @@
 # Client Factory
 
-The **DI Client Factory** creates `IChatCompletionClient` and `IEmbeddingClient` instances at runtime from a provider-agnostic configuration object. Factory-created clients use the same DI-managed `HttpClient` with resilience handlers (retry, circuit breaker, timeout) as clients registered via the existing `Add*Client()` helpers.
+The **DI Client Factory** creates `IChatCompletionClient`, `IEmbeddingClient`, and `IRerankerClient` instances at runtime from a provider-agnostic configuration object. Factory-created clients use the same DI-managed `HttpClient` with resilience handlers (retry, circuit breaker, timeout) as clients registered via the existing `Add*Client()` helpers.
 
 ## When to Use
 
@@ -75,6 +75,21 @@ var result = factory.CreateEmbeddingClient(embeddingConfig);
 
 Not all providers support embeddings. Anthropic returns `IsSuccess=false` with a descriptive error.
 
+## Reranker Clients
+
+```csharp
+var rerankConfig = new CohereClientConfiguration
+{
+    ApiKey = "...",
+    DefaultModel = CohereModels.Rerank.RerankV3_5
+};
+
+var result = factory.CreateRerankerClient(rerankConfig);
+```
+
+Only Cohere supports reranking today. Every other provider returns `IsSuccess=false` with a
+descriptive error. See [Reranking](reranking.md).
+
 ## Error Handling
 
 The factory follows the library's **no-exceptions-for-API-errors** pattern:
@@ -83,6 +98,7 @@ The factory follows the library's **no-exceptions-for-API-errors** pattern:
 |----------|-----------|-------------|
 | Provider not registered | `false` | `"Provider 'Cohere' is not registered..."` |
 | Provider doesn't support embedding | `false` | `"Provider 'Anthropic' does not support embedding clients."` |
+| Provider doesn't support reranking | `false` | `"Provider 'OpenAi' does not support reranker clients."` |
 | Wrong config type for provider | `false` | `"Expected AzureOpenAiClientConfiguration for provider AzureOpenAi, got OpenAiClientConfiguration."` |
 | Success | `true` | `null` |
 

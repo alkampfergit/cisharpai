@@ -8,6 +8,7 @@ The only dependency needed by consuming applications.
 
 - **`IChatCompletionClient.cs`** — Primary chat interface. Inherits `IHasFeatures`.
 - **`IEmbeddingClient.cs`** — Primary embedding interface. Inherits `IHasFeatures`.
+- **`IRerankerClient.cs`** — Primary reranking interface (`RerankAsync`). Inherits `IHasFeatures`. Cohere only.
 - **`Features/`** — Feature Collection Pattern for optional capabilities:
   - `IFeatureCollection.cs` / `FeatureCollection.cs` — Thread-safe `Get<T>()`/`Set<T>()` backed by `ConcurrentDictionary`.
   - `Chat/IJsonOutputFeature.cs` — JSON Mode + Structured Outputs.
@@ -20,6 +21,7 @@ The only dependency needed by consuming applications.
   - `ChatCompletionRequest` (Messages, Model?, Temperature, MaxTokens, ExtraParameters)
   - `ChatCompletionResponse` (Content, Usage, Status/IncompleteReason, IsSuccess/ErrorMessage, RawResponseJson/RawRequestJson, Refusal)
   - `EmbeddingRequest` / `EmbeddingResponse`
+  - Reranking: `RerankRequest` (Query, Documents, Model?, TopN, MaxTokensPerDocument, ExtraParameters), `RerankResponse` (Results, Model, SearchUnits/InputTokens, IsSuccess/ErrorMessage, raw payloads), `RerankResult` (Index into the request documents, RelevanceScore)
   - `LlmMessage` (Role, Content, ContentParts, ToolCallId, ToolCalls) + factory methods `WithImage()`, `WithBase64Image()`
   - `MessageContentPart` hierarchy: `TextContentPart`, `ImageFileContentPart`, `ImageBase64ContentPart`
   - `ChatCompletionChunk` (streaming) with `ToolCallDelta`
@@ -35,8 +37,8 @@ The only dependency needed by consuming applications.
   - `CisharpaiProvider.cs` — Enum identifying supported providers (OpenAi, AzureOpenAi, AzureAiInference, Anthropic, Cohere).
   - `CisharpaiClientConfiguration.cs` — Abstract base record (Provider + ApiKey); each provider defines a concrete subclass.
   - `CisharpaiClientFactoryResult<T>.cs` — Result wrapper (IsSuccess, Client, ErrorMessage) with static Success/Failure factories.
-  - `IClientFactoryProvider.cs` — Provider descriptor interface; implemented per provider.
-  - `ICisharpaiClientFactory.cs` — Consumer-facing factory interface (CreateChatCompletionClient, CreateEmbeddingClient, GetRegisteredProviders).
+  - `IClientFactoryProvider.cs` — Provider descriptor interface; implemented per provider. `SupportsReranking` / `CreateRerankerClient` are **default interface members** (false / failure result) so existing implementations stay source-compatible.
+  - `ICisharpaiClientFactory.cs` — Consumer-facing factory interface (CreateChatCompletionClient, CreateEmbeddingClient, CreateRerankerClient, GetRegisteredProviders).
   - `ICisharpaiClientFactoryBuilder.cs` — Fluent builder for registering providers.
   - `CisharpaiClientFactory.cs` — Default implementation; routes on Provider enum.
   - `CisharpaiClientFactoryExtensions.cs` — `services.AddCisharpaiClientFactory()` extension method.
@@ -70,7 +72,8 @@ Consolidated package for all Azure AI services. Uses HttpClient directly (no SDK
 ### `src/Cisharpai.Cohere/`
 - `CohereChatCompletionClient` — Chat + JSON + grounded chat (RAG) + tool calling + streaming. Vision: image parts silently skipped. Static `Create(IHttpMessageHandlerFactory, options, ...)` for runtime construction.
 - `CohereEmbeddingClient` — Text + image + multimodal (Embed v4) embeddings. Images sent as data URIs. Static `Create(IHttpMessageHandlerFactory, options, ...)` for runtime construction.
-- `CohereModels` — Constants: `Chat.CommandA`, `Embedding.EmbedV4`, etc.
+- `CohereRerankerClient` — Reranking via `POST {BaseUrl}rerank`. Model from request or `DefaultModel` (throws if neither). `priority` reachable through `ExtraParameters`. Static `Create(IHttpMessageHandlerFactory, options, ...)` for runtime construction.
+- `CohereModels` — Constants: `Chat.CommandA`, `Embedding.EmbedV4`, `Rerank.RerankV3_5`, etc.
 - `CohereClientOptions` — BaseUrl, ApiKey, DefaultModel.
 - `CohereClientConfiguration` — Factory config record.
 - `CohereClientFactoryProvider` / `CohereFactoryBuilderExtensions` — Factory support.
@@ -80,7 +83,8 @@ Consolidated package for all Azure AI services. Uses HttpClient directly (no SDK
 
 - `FakeChatCompletionClient` — Fake for `IChatCompletionClient` + all chat features. Response queues, defaults, request capture.
 - `FakeEmbeddingClient` — Fake for `IEmbeddingClient` + embedding features.
-- `FakeResponses` — Static factories: `Chat`, `ChatError`, `ToolCall`, `ToolCalls`, `GroundedChat`, `StreamingChunks`, `Embedding`, etc.
+- `FakeRerankerClient` — Fake for `IRerankerClient`. Response queue, default, request capture, `Reset()`. No feature flags (no optional rerank features exist).
+- `FakeResponses` — Static factories: `Chat`, `ChatError`, `ToolCall`, `ToolCalls`, `GroundedChat`, `StreamingChunks`, `Embedding`, `Rerank`, `RerankError`, etc.
 - `FakeChatFeatures` / `FakeEmbeddingFeatures` — `[Flags]` enums for selective feature registration.
 - `FakeServiceCollectionExtensions` — DI helpers.
 
