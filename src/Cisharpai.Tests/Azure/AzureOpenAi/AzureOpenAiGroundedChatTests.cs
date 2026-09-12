@@ -582,6 +582,35 @@ public sealed class AzureOpenAiGroundedChatTests
         });
     }
 
+    [Test]
+    public async Task GroundedChat_NoUserMessage_DoesNotMakeHttpRequest()
+    {
+        var httpCallCount = 0;
+        var handler = new MockHttpMessageHandler((_, _) =>
+        {
+            httpCallCount++;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(GroundedResponseNoCitations, System.Text.Encoding.UTF8, "application/json")
+            });
+        });
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://test.openai.azure.com/") };
+        var client = new AzureOpenAiChatCompletionClient(httpClient, CreateGpt5Options());
+
+        var groundedResponse = await client.GetGroundedChatCompletionAsync(
+            CreateSystemOnlyRequest(),
+            CreateOptionsWithTextDocs());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(groundedResponse.IsSuccess, Is.False);
+            Assert.That(groundedResponse.ErrorMessage, Does.Contain("user message"));
+            Assert.That(httpCallCount, Is.EqualTo(0),
+                "No HTTP request should be made when the request is rejected before sending");
+        });
+    }
+
     #endregion
 
     #region Multi-block response (Issue 2)

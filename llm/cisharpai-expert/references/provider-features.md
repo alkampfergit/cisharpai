@@ -11,7 +11,7 @@
 | Structured Outputs | Yes | Yes | Varies | Yes | Yes |
 | Image Embeddings | -- | -- | Yes | -- | Yes |
 | Multimodal Embeddings | -- | -- | -- | -- | Yes |
-| Grounded Chat (RAG) | -- | -- | -- | Yes | Yes |
+| Grounded Chat (RAG) | Yes (GPT-5) | Yes (GPT-5) | -- | Yes | Yes |
 | Tool Calling | Yes | Yes | Yes | Yes | Yes |
 | Vision | Yes | Yes | Varies | Yes | Partial |
 | Streaming | Yes | Yes | Yes | Yes | Yes |

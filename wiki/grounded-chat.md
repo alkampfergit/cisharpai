@@ -190,7 +190,7 @@ Currently, `IGroundedChatFeature` is registered on:
 
 ## OpenAI / Azure OpenAI Grounded Chat
 
-OpenAI and Azure OpenAI grounded chat uses the Responses API's `input_file` transport. Documents are base64-encoded and sent as `input_file` items in the `input` array. The model's response includes `file_citation` annotations that are mapped to `Citation`/`CitationSource` records.
+OpenAI and Azure OpenAI grounded chat uses the Responses API's `input_file` transport. Documents are base64-encoded and nested as `input_file` items inside the last user message's `content` array (via `EmbedInputFilesInUserMessage`). The model's response includes `file_citation` annotations that are mapped to `Citation`/`CitationSource` records.
 
 ### Key differences from Cohere
 

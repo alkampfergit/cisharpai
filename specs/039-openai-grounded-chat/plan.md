@@ -2,7 +2,7 @@
 
 ## Architecture
 
-Documents are base64-encoded as `input_file` items in the Responses API `input` array (alongside chat messages). The model processes these files and returns `file_citation` annotations on `output_text` content blocks. Annotations are mapped to the existing `Citation`/`CitationSource` model using filename-to-DocumentChunk.Id mapping.
+Documents are base64-encoded as `input_file` items nested inside the last user message's `content` array (via `EmbedInputFilesInUserMessage`). The model processes these files and returns `file_citation` annotations on `output_text` content blocks. Annotations are mapped to the existing `Citation`/`CitationSource` model using the `file_citation.index` ordinal to look up the source `DocumentChunk.Id`.
 
 ## Changes
 
@@ -12,7 +12,7 @@ Documents are base64-encoded as `input_file` items in the Responses API `input` 
 
 ### Response Models (Modified)
 - `OpenAiResponseContent` — Added `Annotations` list
-- `OpenAiAnnotation` — `type`, `file_id`, `filename`, `start_index`, `end_index`
+- `OpenAiAnnotation` — `type`, `file_id`, `filename`, `start_index?`, `end_index?`, `index` (file ordinal)
 - `AzureOpenAiResponseContent` / `AzureOpenAiAnnotation` — Same
 
 ### Request Models (Modified)

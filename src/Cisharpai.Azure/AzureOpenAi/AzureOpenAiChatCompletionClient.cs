@@ -295,7 +295,10 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         try
         {
             var response = await SendGroundedResponsesApiAsync(request, groundedChatOptions, cancellationToken);
-            SetRoutingMode(AzureOpenAiRoutingMode.ResponsesApi);
+            if (response.IsSuccess)
+            {
+                SetRoutingMode(AzureOpenAiRoutingMode.ResponsesApi);
+            }
             return response;
         }
         catch (LlmHttpRequestException ex) when (CanRetryWithAlternateRoute(ex))
