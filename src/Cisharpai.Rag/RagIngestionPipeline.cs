@@ -19,17 +19,27 @@ public sealed class RagIngestionPipeline : IRagIngestionPipeline
     }
 
     public IAsyncEnumerable<EmbeddingBatchResult> IngestAsync(
-        IEnumerable<RagDocument> documents, CancellationToken cancellationToken = default)
+        IEnumerable<RagDocument> documents,
+        IProgress<BulkEmbeddingProgress>? progress = null,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(documents);
-        return _processor.EmbedAsync(ChunkDocumentsAsync(AsAsync(documents, cancellationToken), cancellationToken), cancellationToken);
+        return _processor.EmbedAsync(
+            ChunkDocumentsAsync(AsAsync(documents, cancellationToken), cancellationToken),
+            progress,
+            cancellationToken);
     }
 
     public IAsyncEnumerable<EmbeddingBatchResult> IngestAsync(
-        IAsyncEnumerable<RagDocument> documents, CancellationToken cancellationToken = default)
+        IAsyncEnumerable<RagDocument> documents,
+        IProgress<BulkEmbeddingProgress>? progress = null,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(documents);
-        return _processor.EmbedAsync(ChunkDocumentsAsync(documents, cancellationToken), cancellationToken);
+        return _processor.EmbedAsync(
+            ChunkDocumentsAsync(documents, cancellationToken),
+            progress,
+            cancellationToken);
     }
 
     private static async IAsyncEnumerable<RagDocument> AsAsync(

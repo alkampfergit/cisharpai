@@ -27,7 +27,7 @@ public class RagIngestionPipelineTests
         fake.EnqueueResponse(Response(1));
         var pipeline = new RagIngestionPipeline(
             new FixedSizeChunker(new() { ChunkSize = 2, Overlap = 0 }),
-            new BulkEmbeddingProcessor(fake, new() { BatchSize = 3 }));
+            new BulkEmbeddingProcessor(fake, new() { MaxBatchItems = 3 }));
 
         var batches = await Collect(pipeline.IngestAsync(new[]
         {
@@ -52,7 +52,7 @@ public class RagIngestionPipelineTests
         {
             options.Chunking.ChunkSize = 2;
             options.Chunking.Overlap = 0;
-            options.Embedding.BatchSize = 2;
+            options.Embedding.MaxBatchItems = 2;
             options.Embedding.Model = "configured-model";
         });
         using var provider = services.BuildServiceProvider(new ServiceProviderOptions { ValidateScopes = true, ValidateOnBuild = true });
@@ -93,7 +93,7 @@ public class RagIngestionPipelineTests
         {
             ["Rag:Chunking:ChunkSize"] = "2",
             ["Rag:Chunking:Overlap"] = "0",
-            ["Rag:Embedding:BatchSize"] = "2",
+            ["Rag:Embedding:MaxBatchItems"] = "2",
             ["Rag:Embedding:Model"] = "bound-model",
             ["Rag:Embedding:Dimensions"] = "2",
             ["Rag:Embedding:InputType"] = "Document",
@@ -151,7 +151,7 @@ public class RagIngestionPipelineTests
         }
 
         var fake = new FakeEmbeddingClient { DefaultResponse = Response(2) };
-        var pipeline = new RagIngestionPipeline(new FixedSizeChunker(), new BulkEmbeddingProcessor(fake, new() { BatchSize = 2 }));
+        var pipeline = new RagIngestionPipeline(new FixedSizeChunker(), new BulkEmbeddingProcessor(fake, new() { MaxBatchItems = 2 }));
         await foreach (var batch in pipeline.IngestAsync(Source()))
         {
             Assert.That(batch.Items, Has.Count.EqualTo(2));
@@ -182,8 +182,8 @@ public class RagIngestionPipelineTests
         }
 
         var fake = new FakeEmbeddingClient { DefaultResponse = Response(1) };
-        var pipeline = new RagIngestionPipeline(new FixedSizeChunker(), new BulkEmbeddingProcessor(fake, new() { BatchSize = 1 }));
-        await using var enumerator = pipeline.IngestAsync(Source(), cancellation.Token).GetAsyncEnumerator();
+        var pipeline = new RagIngestionPipeline(new FixedSizeChunker(), new BulkEmbeddingProcessor(fake, new() { MaxBatchItems = 1 }));
+        await using var enumerator = pipeline.IngestAsync(Source(), null, cancellation.Token).GetAsyncEnumerator();
         Assert.That(await enumerator.MoveNextAsync(), Is.True);
         cancellation.Cancel();
         Assert.ThrowsAsync<OperationCanceledException>(async () => await enumerator.MoveNextAsync());
@@ -216,16 +216,16 @@ public class RagIngestionPipelineTests
     }
 
     [Test]
-    public async Task Ingest_ProviderFailureStopsAndDisposesDocuments()
+    public async Task Ingest_ProviderFailureSurfacedAndDisposesDocuments()
     {
         var disposed = false;
         IEnumerable<RagDocument> Source()
         {
-            try { yield return new("a", "text"); throw new InvalidOperationException("Must not read ahead"); }
+            try { yield return new("a", "text"); }
             finally { disposed = true; }
         }
         var fake = new FakeEmbeddingClient { DefaultResponse = EmbeddingResponse.Error("quota") };
-        var pipeline = new RagIngestionPipeline(new FixedSizeChunker(), new BulkEmbeddingProcessor(fake, new() { BatchSize = 1 }));
+        var pipeline = new RagIngestionPipeline(new FixedSizeChunker(), new BulkEmbeddingProcessor(fake, new() { MaxBatchItems = 1 }));
         var batches = await Collect(pipeline.IngestAsync(Source()));
         Assert.That(batches.Single().ErrorMessage, Is.EqualTo("quota"));
         Assert.That(disposed, Is.True);
@@ -250,7 +250,7 @@ public class RagIngestionPipelineTests
         services.AddCisharpaiRag();
         Assert.Throws<InvalidOperationException>(() => services.AddCisharpaiRag(
             sp => sp.GetRequiredService<IEmbeddingClient>(),
-            options => options.Embedding.BatchSize = 1));
+            options => options.Embedding.MaxBatchItems = 1));
     }
 
     [Test]

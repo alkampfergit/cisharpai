@@ -6,8 +6,12 @@ namespace Cisharpai.Rag;
 public interface IRagIngestionPipeline
 {
     IAsyncEnumerable<EmbeddingBatchResult> IngestAsync(
-        IAsyncEnumerable<RagDocument> documents, CancellationToken cancellationToken = default);
+        IAsyncEnumerable<RagDocument> documents,
+        IProgress<BulkEmbeddingProgress>? progress = null,
+        CancellationToken cancellationToken = default);
 
     IAsyncEnumerable<EmbeddingBatchResult> IngestAsync(
-        IEnumerable<RagDocument> documents, CancellationToken cancellationToken = default);
+        IEnumerable<RagDocument> documents,
+        IProgress<BulkEmbeddingProgress>? progress = null,
+        CancellationToken cancellationToken = default);
 }
