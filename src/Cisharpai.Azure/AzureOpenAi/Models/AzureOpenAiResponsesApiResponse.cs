@@ -75,10 +75,12 @@ public sealed class AzureOpenAiAnnotation
     public int? Index { get; set; }
 
     [JsonPropertyName("start_index")]
-    public int StartIndex { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? StartIndex { get; set; }
 
     [JsonPropertyName("end_index")]
-    public int EndIndex { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? EndIndex { get; set; }
 }
 
 public sealed class AzureOpenAiResponsesUsage

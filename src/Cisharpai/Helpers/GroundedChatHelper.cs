@@ -19,7 +19,7 @@ public static class GroundedChatHelper
         List<TAnnotation> annotations,
         string content,
         IReadOnlyList<DocumentChunk> documents,
-        Func<TAnnotation, (string Type, string? FileId, string? Filename, int? Index, int StartIndex, int EndIndex)> extractor)
+        Func<TAnnotation, (string Type, string? FileId, string? Filename, int? Index, int? StartIndex, int? EndIndex)> extractor)
     {
         if (annotations.Count == 0)
             return [];
@@ -37,13 +37,35 @@ public static class GroundedChatHelper
             .Where(a => a.Type == "file_citation")
             .Select(a =>
             {
-                var hasOffsets = a.StartIndex >= 0 && a.EndIndex > a.StartIndex && a.EndIndex <= content.Length;
-                var citedText = hasOffsets
-                    ? content[a.StartIndex..a.EndIndex]
-                    : string.Empty;
+                var hasOffsets = a.StartIndex.HasValue && a.EndIndex.HasValue
+                    && a.EndIndex.Value > a.StartIndex.Value
+                    && a.EndIndex.Value <= content.Length;
 
-                var citationStart = hasOffsets ? a.StartIndex : (a.Index ?? 0);
-                var citationEnd = hasOffsets ? a.EndIndex : (a.Index ?? 0);
+                string citedText;
+                int citationStart;
+                int citationEnd;
+
+                if (hasOffsets)
+                {
+                    citationStart = a.StartIndex!.Value;
+                    citationEnd = a.EndIndex!.Value;
+                    citedText = content[citationStart..citationEnd];
+                }
+                else if (a.Index is { } idx && idx >= 0 && idx < content.Length)
+                {
+                    citationStart = idx;
+                    var wordEnd = idx;
+                    while (wordEnd < content.Length && !char.IsWhiteSpace(content[wordEnd]) && content[wordEnd] != '.')
+                        wordEnd++;
+                    citationEnd = wordEnd;
+                    citedText = content[citationStart..citationEnd];
+                }
+                else
+                {
+                    citationStart = 0;
+                    citationEnd = 0;
+                    citedText = string.Empty;
+                }
 
                 string sourceId;
                 if (a.Filename is not null && filenameToDocId.TryGetValue(a.Filename, out var docIdByName))

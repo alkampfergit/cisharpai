@@ -282,7 +282,8 @@ public sealed class AzureOpenAiGroundedChatTests
         Assert.Multiple(() =>
         {
             Assert.That(citation.Start, Is.EqualTo(25));
-            Assert.That(citation.End, Is.EqualTo(25));
+            Assert.That(citation.End, Is.EqualTo(30));
+            Assert.That(citation.Text, Is.EqualTo("Paris"));
             Assert.That(citation.Sources[0].Id, Is.EqualTo("doc-1"));
         });
     }

@@ -134,6 +134,37 @@ public sealed class OpenAiGroundedChatTests
         }
         """;
 
+    private const string GroundedResponseWithOpaqueFileId = """
+        {
+            "id": "resp-opaque",
+            "model": "gpt-5-0513",
+            "status": "completed",
+            "output": [
+                {
+                    "type": "message",
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "type": "output_text",
+                            "text": "The capital of France is Paris.",
+                            "annotations": [
+                                {
+                                    "type": "file_citation",
+                                    "file_id": "file-opaque-abc123",
+                                    "index": 25
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "usage": {
+                "input_tokens": 100,
+                "output_tokens": 20
+            }
+        }
+        """;
+
     private const string GroundedResponseFailed = """
         {
             "id": "resp-fail",
@@ -462,7 +493,8 @@ public sealed class OpenAiGroundedChatTests
         Assert.Multiple(() =>
         {
             Assert.That(citation.Start, Is.EqualTo(25));
-            Assert.That(citation.End, Is.EqualTo(25));
+            Assert.That(citation.End, Is.EqualTo(30));
+            Assert.That(citation.Text, Is.EqualTo("Paris"));
             Assert.That(citation.Type, Is.EqualTo("file_citation"));
             Assert.That(citation.Sources, Has.Count.EqualTo(1));
             Assert.That(citation.Sources[0].Id, Is.EqualTo("doc-1"));
@@ -483,6 +515,21 @@ public sealed class OpenAiGroundedChatTests
             Assert.That(citation.End, Is.EqualTo(30));
             Assert.That(citation.Text, Is.EqualTo("Paris"));
             Assert.That(citation.Sources[0].Id, Is.EqualTo("doc-1"));
+        });
+    }
+
+    [Test]
+    public async Task GroundedChat_MapsCitations_OpaqueFileIdFallsBackToRawId()
+    {
+        var (response, _) = await ExecuteGroundedChat(GroundedResponseWithOpaqueFileId);
+
+        Assert.That(response.Citations, Has.Count.EqualTo(1));
+
+        var citation = response.Citations[0];
+        Assert.Multiple(() =>
+        {
+            Assert.That(citation.Text, Is.EqualTo("Paris"));
+            Assert.That(citation.Sources[0].Id, Is.EqualTo("file-opaque-abc123"));
         });
     }
 
