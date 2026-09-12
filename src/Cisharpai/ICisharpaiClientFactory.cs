@@ -9,7 +9,9 @@ public interface ICisharpaiClientFactory
         CisharpaiClientConfiguration configuration);
 
     CisharpaiClientFactoryResult<IRerankerClient> CreateRerankerClient(
-        CisharpaiClientConfiguration configuration);
+        CisharpaiClientConfiguration configuration) =>
+        CisharpaiClientFactoryResult<IRerankerClient>.Failure(
+            "Reranker client creation is not supported by this factory implementation.");
 
     IReadOnlyCollection<CisharpaiProvider> GetRegisteredProviders();
 }

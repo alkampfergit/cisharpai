@@ -59,7 +59,7 @@ services.AddCohereRerankerClient(options =>
 var response = await client.RerankAsync(new RerankRequest(
     Query: query,
     Documents: documents,
-    ExtraParameters: JsonSerializer.SerializeToElement(new { priority = "high" })));
+    ExtraParameters: JsonSerializer.SerializeToElement(new { priority = 500 })));
 ```
 
 ## Keyed registration

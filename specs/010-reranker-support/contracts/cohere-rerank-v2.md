@@ -30,7 +30,7 @@
 `ExtraParameters` is deep-merged over this body — for example:
 
 ```json
-{ "priority": "high" }
+{ "priority": 500 }
 ```
 
 ## Success response (200)

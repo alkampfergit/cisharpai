@@ -76,9 +76,17 @@ public sealed class CohereRerankerClient : IRerankerClient
                     RerankEndpoint, providerRequest, request.ExtraParameters, cancellationToken),
                 model);
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (LlmHttpRequestException ex)
         {
             return RerankResponse.Error(ex.Message, ex.ResponseBody);
+        }
+        catch (HttpRequestException)
+        {
+            throw;
         }
         catch (Exception ex)
         {

@@ -17,11 +17,12 @@ public sealed record RerankResponse(
     bool IsSuccess = true,
     string? ErrorMessage = null)
 {
-    public static RerankResponse Error(string errorMessage, string? rawResponseJson = null) =>
+    public static RerankResponse Error(string errorMessage, string? rawResponseJson = null, string? rawRequestJson = null) =>
         new(
             Results: [],
             Model: string.Empty,
             RawResponseJson: rawResponseJson,
+            RawRequestJson: rawRequestJson,
             IsSuccess: false,
             ErrorMessage: errorMessage);
 }

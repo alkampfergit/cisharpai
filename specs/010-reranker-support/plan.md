@@ -56,7 +56,7 @@ downstream code. Adding two abstract members would be a breaking change. Instead
 Per the issue discussion. Cohere's `priority` is a scheduling hint with no analogue at other
 providers; putting it in `RerankRequest` would leak a provider concept into the abstraction.
 `ExtraParameters` already deep-merges arbitrary JSON, so
-`JsonSerializer.SerializeToElement(new { priority = "high" })` covers it.
+`JsonSerializer.SerializeToElement(new { priority = 500 })` covers it (integer 0–999, lower = higher priority).
 
 ### D3 — Index semantics
 

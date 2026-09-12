@@ -114,7 +114,7 @@ analogue at other providers and would leak a provider concept into the unified a
 the escape hatch:
 
 ```csharp
-ExtraParameters: JsonSerializer.SerializeToElement(new { priority = "high" })
+ExtraParameters: JsonSerializer.SerializeToElement(new { priority = 500 })
 ```
 
 The same mechanism reaches any future Cohere rerank parameter without a library update.

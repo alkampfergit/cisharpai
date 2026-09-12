@@ -104,7 +104,7 @@ public sealed class CohereRerankIntegrationTests
             Query: Query,
             Documents: Documents,
             Model: CohereModels.Rerank.RerankV3_5,
-            ExtraParameters: JsonSerializer.SerializeToElement(new { priority = "high" })));
+            ExtraParameters: JsonSerializer.SerializeToElement(new { priority = 500 })));
 
         Assert.That(response.IsSuccess, Is.True, $"Request failed: {response.ErrorMessage}");
         Assert.That(response.Results[0].Index, Is.EqualTo(ParisIndex));

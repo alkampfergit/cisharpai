@@ -200,12 +200,12 @@ public sealed class CohereRerankerClientTests
             Query: "q",
             Documents: Documents,
             Model: "rerank-v3.5",
-            ExtraParameters: JsonSerializer.SerializeToElement(new { priority = "high" })));
+            ExtraParameters: JsonSerializer.SerializeToElement(new { priority = 500 })));
 
         var root = JsonDocument.Parse(capturedBody!).RootElement;
         Assert.Multiple(() =>
         {
-            Assert.That(root.GetProperty("priority").GetString(), Is.EqualTo("high"));
+            Assert.That(root.GetProperty("priority").GetInt32(), Is.EqualTo(500));
             Assert.That(root.GetProperty("model").GetString(), Is.EqualTo("rerank-v3.5"));
         });
     }

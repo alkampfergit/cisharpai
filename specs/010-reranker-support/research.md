@@ -13,7 +13,7 @@
 | `documents` | string[] | required — plain strings (object form also accepted) |
 | `top_n` | int | optional — how many results to return; defaults to all |
 | `max_tokens_per_doc` | int | optional — long documents are truncated to this budget |
-| `priority` | string | optional scheduling hint — **not** mapped to the unified request (see plan D2) |
+| `priority` | int (0–999) | optional scheduling hint — lower = higher priority. **Not** mapped to the unified request (see plan D2) |
 
 **Response**:
 

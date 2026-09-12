@@ -223,7 +223,7 @@ foreach (var result in response.Results)
 — the `rerank` path is appended relatively and nothing else changes.
 
 **Cohere `priority`:** deliberately not on `RerankRequest` (no analogue at other providers). Use
-`ExtraParameters: JsonSerializer.SerializeToElement(new { priority = "high" })`.
+`ExtraParameters: JsonSerializer.SerializeToElement(new { priority = 500 })` (integer 0–999, lower = higher priority).
 
 **Gotcha:** if neither `RerankRequest.Model` nor `CohereClientOptions.DefaultModel` is set,
 `RerankAsync` throws `InvalidOperationException` — that is a config error, not an API error.
