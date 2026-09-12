@@ -84,10 +84,11 @@ Consolidated package for all Azure AI services. Uses HttpClient directly (no SDK
 - Independently consumable library targeting .NET 8 and .NET 10; depends on core abstractions, not a specific provider.
 - `Models/` — `RagDocument`, `TextChunk`, `ChunkEmbedding`, `EmbeddingBatchResult`; chunk identities and UTF-16 source offsets survive embedding.
 - `Chunking/` — `ITextChunker`, `FixedSizeChunker`, `FixedSizeChunkerOptions`; lazy scalar-aware chunks (size 1024, overlap 128).
-- `Embeddings/` — `IBulkEmbeddingProcessor`, `BulkEmbeddingProcessor`, `BulkEmbeddingOptions`; sequential float requests (batch size 32), bounded buffering and validation of provider vectors.
-- `IRagIngestionPipeline` / `RagIngestionPipeline` — compose document chunking with bulk embedding; collection and async-stream overloads, cancellation and fail-fast batch results.
+- `Embeddings/` — `IBulkEmbeddingProcessor`, `BulkEmbeddingProcessor`, `BulkEmbeddingOptions`; dual-constraint batching (item count + token budget), bounded concurrency (1–32 parallel requests with ordered output), transient failure retry with exponential backoff, `IProgress<BulkEmbeddingProgress>` observability, and continue-on-failure semantics.
+- `Models/BulkEmbeddingProgress` — progress record: `CompletedBatches`, `TotalChunksProcessed`, `FailedBatches`.
+- `IRagIngestionPipeline` / `RagIngestionPipeline` — compose document chunking with bulk embedding; collection and async-stream overloads, cancellation, progress pass-through, and partial batch results.
 - `RagOptions` and `AddCisharpaiRag` — validated option snapshots, callback configuration and embedding-client factory for keyed DI; scoped processors/pipelines.
-- No storage, retrieval, tokenization or ingestion-level retries. Existing embedding fakes support offline tests without core interface changes.
+- No storage, retrieval or tokenization. Token estimation uses a pluggable `Func<string, int>` seam (default: `s.Length / 4`). Existing embedding fakes support offline tests without core interface changes.
 - Consumer guide: `wiki/rag.md`; unit tests: `src/Cisharpai.Tests/Rag/`.
 
 ## Testing Package — `src/Cisharpai.Testing/`
