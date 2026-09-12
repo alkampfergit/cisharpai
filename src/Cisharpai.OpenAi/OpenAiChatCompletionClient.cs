@@ -584,37 +584,20 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
                 ResponsesEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
         }
 
-        var content = raw.Output
-            .Where(o => o.Type == "message")
-            .SelectMany(o => o.Content)
-            .Where(c => c.Type == "output_text")
-            .Select(c => c.Text)
-            .FirstOrDefault() ?? string.Empty;
-
-        var refusal = raw.Output
-            .Where(o => o.Type == "message")
-            .SelectMany(o => o.Content)
-            .Where(c => c.Type == "refusal")
-            .Select(c => c.Refusal)
-            .FirstOrDefault();
-
-        var isError = raw.Status is "incomplete" or "failed";
-        var errorMessage = isError
-            ? (raw.IncompleteDetails?.Reason ?? $"Response status: {raw.Status}")
-            : null;
+        var parsed = ParseResponsesApiOutput(raw);
 
         return new ChatCompletionResponse(
-            Content: content,
+            Content: parsed.Content,
             Model: raw.Model,
             PromptTokens: raw.Usage.InputTokens,
             CompletionTokens: raw.Usage.OutputTokens,
             RawResponseJson: rawResponseJson,
             RawRequestJson: rawRequestJson,
             Status: raw.Status,
-            IncompleteReason: raw.IncompleteDetails?.Reason,
-            IsSuccess: !isError,
-            ErrorMessage: errorMessage,
-            Refusal: refusal);
+            IncompleteReason: parsed.IncompleteReason,
+            IsSuccess: !parsed.IsError,
+            ErrorMessage: parsed.ErrorMessage,
+            Refusal: parsed.Refusal);
     }
 
     private static ChatCompletionResponse MapChatResponse(
@@ -794,20 +777,9 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
     {
         return documents.Select((doc, index) =>
         {
-            var content = doc.Text ?? SerializeDocumentData(doc.Data!);
-            var base64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(content));
-
-            return new OpenAiInputFile
-            {
-                Filename = doc.Id ?? $"document_{index}.txt",
-                FileData = $"data:text/plain;base64,{base64}"
-            };
+            var (filename, fileData) = GroundedChatHelper.EncodeDocumentChunk(doc, index);
+            return new OpenAiInputFile { Filename = filename, FileData = fileData };
         }).ToList();
-    }
-
-    private static string SerializeDocumentData(IReadOnlyDictionary<string, string> data)
-    {
-        return JsonSerializer.Serialize(data);
     }
 
     private static GroundedChatCompletionResponse MapGroundedChatResponse(
@@ -816,15 +788,53 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         string? rawResponseJson,
         string? rawRequestJson)
     {
-        var outputMessages = raw.Output.Where(o => o.Type == "message").ToList();
+        var parsed = ParseResponsesApiOutput(raw);
 
-        var content = outputMessages
+        var chatCompletion = new ChatCompletionResponse(
+            Content: parsed.Content,
+            Model: raw.Model,
+            PromptTokens: raw.Usage.InputTokens,
+            CompletionTokens: raw.Usage.OutputTokens,
+            RawResponseJson: rawResponseJson,
+            RawRequestJson: rawRequestJson,
+            Status: raw.Status,
+            IncompleteReason: parsed.IncompleteReason,
+            IsSuccess: !parsed.IsError,
+            ErrorMessage: parsed.ErrorMessage,
+            Refusal: parsed.Refusal);
+
+        var annotations = raw.Output
+            .Where(o => o.Type == "message")
+            .SelectMany(o => o.Content)
+            .Where(c => c.Type == "output_text" && c.Annotations is not null)
+            .SelectMany(c => c.Annotations!)
+            .ToList();
+
+        var citations = GroundedChatHelper.MapAnnotationsToCitations(
+            annotations, parsed.Content, documents,
+            a => (a.Type, a.FileId, a.Filename, a.StartIndex, a.EndIndex));
+
+        return new GroundedChatCompletionResponse(chatCompletion, citations);
+    }
+
+    private readonly record struct ParsedResponsesApiOutput(
+        string Content,
+        string? Refusal,
+        bool IsError,
+        string? IncompleteReason,
+        string? ErrorMessage);
+
+    private static ParsedResponsesApiOutput ParseResponsesApiOutput(OpenAiResponsesApiResponse raw)
+    {
+        var messages = raw.Output.Where(o => o.Type == "message");
+
+        var content = messages
             .SelectMany(o => o.Content)
             .Where(c => c.Type == "output_text")
             .Select(c => c.Text)
             .FirstOrDefault() ?? string.Empty;
 
-        var refusal = outputMessages
+        var refusal = messages
             .SelectMany(o => o.Content)
             .Where(c => c.Type == "refusal")
             .Select(c => c.Refusal)
@@ -835,68 +845,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
             ? (raw.IncompleteDetails?.Reason ?? $"Response status: {raw.Status}")
             : null;
 
-        var chatCompletion = new ChatCompletionResponse(
-            Content: content,
-            Model: raw.Model,
-            PromptTokens: raw.Usage.InputTokens,
-            CompletionTokens: raw.Usage.OutputTokens,
-            RawResponseJson: rawResponseJson,
-            RawRequestJson: rawRequestJson,
-            Status: raw.Status,
-            IncompleteReason: raw.IncompleteDetails?.Reason,
-            IsSuccess: !isError,
-            ErrorMessage: errorMessage,
-            Refusal: refusal);
-
-        var annotations = outputMessages
-            .SelectMany(o => o.Content)
-            .Where(c => c.Type == "output_text" && c.Annotations is not null)
-            .SelectMany(c => c.Annotations!)
-            .ToList();
-
-        var citations = MapAnnotationsToCitations(annotations, content, documents);
-
-        return new GroundedChatCompletionResponse(chatCompletion, citations);
-    }
-
-    private static List<Citation> MapAnnotationsToCitations(
-        List<OpenAiAnnotation> annotations,
-        string content,
-        IReadOnlyList<DocumentChunk> documents)
-    {
-        if (annotations.Count == 0)
-            return [];
-
-        var filenameToDocId = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        for (var i = 0; i < documents.Count; i++)
-        {
-            var filename = documents[i].Id ?? $"document_{i}.txt";
-            var docId = documents[i].Id ?? $"document_{i}";
-            filenameToDocId[filename] = docId;
-        }
-
-        return annotations
-            .Where(a => a.Type == "file_citation")
-            .Select(a =>
-            {
-                var start = a.StartIndex;
-                var end = a.EndIndex;
-                var citedText = start >= 0 && end <= content.Length && start < end
-                    ? content[start..end]
-                    : string.Empty;
-
-                var sourceId = a.Filename is not null && filenameToDocId.TryGetValue(a.Filename, out var docId)
-                    ? docId
-                    : a.FileId ?? a.Filename ?? "unknown";
-
-                return new Citation(
-                    Start: start,
-                    End: end,
-                    Text: citedText,
-                    Sources: [new CitationSource(Id: sourceId)],
-                    Type: "file_citation");
-            })
-            .ToList();
+        return new ParsedResponsesApiOutput(content, refusal, isError, raw.IncompleteDetails?.Reason, errorMessage);
     }
 
     internal enum OpenAiModelType
