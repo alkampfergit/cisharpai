@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Text;
 using System.Text.Json;
 using Cisharpai.Models;
@@ -25,11 +26,13 @@ public static class GroundedChatHelper
             return [];
 
         var filenameToDocId = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var docIdToData = new Dictionary<string, IReadOnlyDictionary<string, string>?>(StringComparer.OrdinalIgnoreCase);
         for (var i = 0; i < documents.Count; i++)
         {
             var filename = documents[i].Id ?? $"document_{i}.txt";
             var docId = documents[i].Id ?? $"document_{i}";
             filenameToDocId[filename] = docId;
+            docIdToData[docId] = CloneData(documents[i].Data);
         }
 
         return annotations
@@ -40,7 +43,7 @@ public static class GroundedChatHelper
                 var (citedText, citationStart, citationEnd) =
                     ResolveCitedText(content, a.StartIndex, a.EndIndex);
                 var (sourceId, sourceData) =
-                    ResolveSourceId(a.Filename, a.FileId, a.Index, documents, filenameToDocId);
+                    ResolveSourceId(a.Filename, a.FileId, a.Index, documents, filenameToDocId, docIdToData);
 
                 return new Citation(
                     Start: citationStart,
@@ -56,6 +59,7 @@ public static class GroundedChatHelper
         string content, int? startIndex, int? endIndex)
     {
         if (startIndex.HasValue && endIndex.HasValue
+            && startIndex.Value >= 0
             && endIndex.Value > startIndex.Value
             && endIndex.Value <= content.Length)
         {
@@ -67,30 +71,26 @@ public static class GroundedChatHelper
 
     private static (string Id, IReadOnlyDictionary<string, string>? Data) ResolveSourceId(
         string? filename, string? fileId, int? index,
-        IReadOnlyList<DocumentChunk> documents, Dictionary<string, string> filenameToDocId)
+        IReadOnlyList<DocumentChunk> documents,
+        Dictionary<string, string> filenameToDocId,
+        Dictionary<string, IReadOnlyDictionary<string, string>?> docIdToData)
     {
-        // Primary: use index (file ordinal) to look up the document directly
         if (index.HasValue && index.Value >= 0 && index.Value < documents.Count)
         {
-            var doc = documents[index.Value];
-            return (doc.Id ?? $"document_{index.Value}", doc.Data);
+            var docId = documents[index.Value].Id ?? $"document_{index.Value}";
+            return (docId, docIdToData.GetValueOrDefault(docId));
         }
 
         if (filename is not null && filenameToDocId.TryGetValue(filename, out var docIdByName))
-            return (docIdByName, FindDocData(docIdByName, documents));
+            return (docIdByName, docIdToData.GetValueOrDefault(docIdByName));
         if (fileId is not null && filenameToDocId.TryGetValue(fileId, out var docIdByFileId))
-            return (docIdByFileId, FindDocData(docIdByFileId, documents));
+            return (docIdByFileId, docIdToData.GetValueOrDefault(docIdByFileId));
         return (fileId ?? filename ?? "unknown", null);
     }
 
-    private static IReadOnlyDictionary<string, string>? FindDocData(
-        string docId, IReadOnlyList<DocumentChunk> documents)
+    private static IReadOnlyDictionary<string, string>? CloneData(IReadOnlyDictionary<string, string>? data)
     {
-        for (var i = 0; i < documents.Count; i++)
-        {
-            if (string.Equals(documents[i].Id, docId, StringComparison.OrdinalIgnoreCase))
-                return documents[i].Data;
-        }
-        return null;
+        if (data is null) return null;
+        return new ReadOnlyDictionary<string, string>(new Dictionary<string, string>(data));
     }
 }

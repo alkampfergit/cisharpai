@@ -262,8 +262,8 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         {
             groundedChatOptions.Validate();
 
-            var modelType = DetectModelTypeForRequest(request);
-            if (modelType != AzureOpenAiModelType.Gpt5 && _routingMode != AzureOpenAiRoutingMode.ResponsesApi)
+            var modelType = DetectModelTypeFromHints(request);
+            if (modelType != AzureOpenAiModelType.Gpt5)
             {
                 return GroundedChatCompletionResponse.Error(
                     "Grounded chat requires the Responses API (GPT-5 models). The current deployment does not support native document grounding with citations. Use a GPT-5 deployment or consider the prompt-injection grounding approach.");
@@ -868,11 +868,10 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
     {
         var messages = raw.Output.Where(o => o.Type == "message");
 
-        var content = messages
+        var content = string.Join("", messages
             .SelectMany(o => o.Content)
             .Where(c => c.Type == "output_text")
-            .Select(c => c.Text)
-            .FirstOrDefault() ?? string.Empty;
+            .Select(c => c.Text));
 
         var refusal = messages
             .SelectMany(o => o.Content)
@@ -1019,6 +1018,14 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         };
     }
 
+    private AzureOpenAiModelType DetectModelTypeFromHints(ChatCompletionRequest request)
+    {
+        return GetRoutingHints(request)
+            .Select(TryDetectModelType)
+            .FirstOrDefault(modelType => modelType.HasValue)
+            ?? AzureOpenAiModelType.Legacy;
+    }
+
     private AzureOpenAiModelType DetectChatCompletionsModelTypeForRequest(ChatCompletionRequest request)
     {
         if (_chatCompletionsModelOverride is { } overrideModel)
@@ -1084,7 +1091,17 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
                 contentItems.Add(new AzureOpenAiContentPart { Type = "input_text", Text = text });
                 break;
             case IEnumerable<object> parts:
-                contentItems.AddRange(parts);
+                foreach (var part in parts)
+                {
+                    contentItems.Add(part switch
+                    {
+                        AzureOpenAiContentPart { Type: "text" } textPart =>
+                            new AzureOpenAiContentPart { Type = "input_text", Text = textPart.Text },
+                        AzureOpenAiContentPart { Type: "image_url", ImageUrl: { } img } =>
+                            (object)new Dictionary<string, string> { ["type"] = "input_image", ["image_url"] = img.Url },
+                        _ => part
+                    });
+                }
                 break;
         }
 

@@ -65,6 +65,48 @@ public sealed class AzureOpenAiGroundedChatTests
         }
         """;
 
+    private const string GroundedResponseMultiBlock = """
+        {
+            "id": "resp-azure-multi",
+            "model": "gpt-5-0513",
+            "status": "completed",
+            "output": [
+                {
+                    "type": "message",
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "type": "output_text",
+                            "text": "First block. ",
+                            "annotations": [
+                                {
+                                    "type": "file_citation",
+                                    "file_id": "file-abc",
+                                    "index": 0
+                                }
+                            ]
+                        },
+                        {
+                            "type": "output_text",
+                            "text": "Second block.",
+                            "annotations": [
+                                {
+                                    "type": "file_citation",
+                                    "file_id": "file-def",
+                                    "index": 1
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "usage": {
+                "input_tokens": 100,
+                "output_tokens": 30
+            }
+        }
+        """;
+
     #endregion
 
     private static AzureOpenAiClientOptions CreateGpt5Options() => new()
@@ -491,6 +533,170 @@ public sealed class AzureOpenAiGroundedChatTests
             Assert.That(response.IsSuccess, Is.False);
             Assert.That(response.ErrorMessage, Does.Contain("user message"));
         });
+    }
+
+    #endregion
+
+    #region GPT-5 gate bypass (Issue 1)
+
+    [Test]
+    public async Task GroundedChat_ReturnsError_WhenRoutingCachedAsResponsesApi_ButModelIsNotGpt5()
+    {
+        var callCount = 0;
+        var handler = new MockHttpMessageHandler((req, _) =>
+        {
+            callCount++;
+            if (req.RequestUri?.PathAndQuery.Contains("responses") == true)
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(GroundedResponseWithCitations, System.Text.Encoding.UTF8, "application/json")
+                });
+            }
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("""{"id":"chatcmpl-1","model":"gpt-4o","choices":[{"index":0,"message":{"role":"assistant","content":"Hello"},"finish_reason":"stop"}],"usage":{"prompt_tokens":10,"completion_tokens":5}}""", System.Text.Encoding.UTF8, "application/json")
+            });
+        });
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://test.openai.azure.com/") };
+        var legacyOptions = new AzureOpenAiClientOptions
+        {
+            DeploymentName = "gpt-4o-deployment",
+            ApiKey = "test-key",
+            ModelName = "gpt-4o"
+        };
+        var client = new AzureOpenAiChatCompletionClient(httpClient, legacyOptions);
+
+        await client.GetChatCompletionAsync(
+            new ChatCompletionRequest(Messages: [new LlmMessage(LlmRole.User, "Hi")]));
+
+        var groundedResponse = await client.GetGroundedChatCompletionAsync(
+            CreateRequest(),
+            CreateOptionsWithTextDocs());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(groundedResponse.IsSuccess, Is.False);
+            Assert.That(groundedResponse.ErrorMessage, Does.Contain("GPT-5"));
+        });
+    }
+
+    #endregion
+
+    #region Multi-block response (Issue 2)
+
+    [Test]
+    public async Task GroundedChat_MultiBlock_ConcatenatesAllOutputTextBlocks()
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(GroundedResponseMultiBlock, System.Text.Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://test.openai.azure.com/") };
+        var client = new AzureOpenAiChatCompletionClient(httpClient, CreateGpt5Options());
+
+        var response = await client.GetGroundedChatCompletionAsync(
+            CreateRequest(),
+            CreateOptionsWithTextDocs());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.True);
+            Assert.That(response.Content, Is.EqualTo("First block. Second block."));
+        });
+    }
+
+    [Test]
+    public async Task GroundedChat_MultiBlock_CollectsCitationsFromAllBlocks()
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(GroundedResponseMultiBlock, System.Text.Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://test.openai.azure.com/") };
+        var client = new AzureOpenAiChatCompletionClient(httpClient, CreateGpt5Options());
+
+        var response = await client.GetGroundedChatCompletionAsync(
+            CreateRequest(),
+            CreateOptionsWithTextDocs());
+
+        Assert.That(response.Citations, Has.Count.EqualTo(2));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Citations[0].Sources[0].Id, Is.EqualTo("doc-1"));
+            Assert.That(response.Citations[1].Sources[0].Id, Is.EqualTo("doc-2"));
+        });
+    }
+
+    #endregion
+
+    #region Data cloning and id-less document lookup (Issues 5-6)
+
+    [Test]
+    public async Task GroundedChat_IdLessDocument_PopulatesSourceData()
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(GroundedResponseWithCitations, System.Text.Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://test.openai.azure.com/") };
+        var client = new AzureOpenAiChatCompletionClient(httpClient, CreateGpt5Options());
+
+        var options = new GroundedChatOptions(
+            Documents:
+            [
+                new DocumentChunk(
+                    Data: new Dictionary<string, string>
+                    {
+                        ["title"] = "France",
+                        ["snippet"] = "Paris is the capital."
+                    })
+            ]);
+
+        var response = await client.GetGroundedChatCompletionAsync(CreateRequest(), options);
+
+        var source = response.Citations[0].Sources[0];
+        Assert.Multiple(() =>
+        {
+            Assert.That(source.Data, Is.Not.Null);
+            Assert.That(source.Data!["title"], Is.EqualTo("France"));
+        });
+    }
+
+    [Test]
+    public async Task GroundedChat_SourceData_IsImmutableCopy()
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(GroundedResponseWithCitations, System.Text.Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://test.openai.azure.com/") };
+        var client = new AzureOpenAiChatCompletionClient(httpClient, CreateGpt5Options());
+
+        var mutableData = new Dictionary<string, string>
+        {
+            ["title"] = "France",
+            ["snippet"] = "Paris is the capital."
+        };
+        var options = new GroundedChatOptions(
+            Documents: [new DocumentChunk(Id: "doc-1", Data: mutableData)]);
+
+        var response = await client.GetGroundedChatCompletionAsync(CreateRequest(), options);
+
+        mutableData["title"] = "MUTATED";
+
+        var source = response.Citations[0].Sources[0];
+        Assert.That(source.Data!["title"], Is.EqualTo("France"),
+            "CitationSource.Data should be a defensive copy, not alias the caller's dictionary");
     }
 
     #endregion

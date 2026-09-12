@@ -202,6 +202,8 @@ OpenAI and Azure OpenAI grounded chat uses the Responses API's `input_file` tran
 ### Example (OpenAI)
 
 ```csharp
+// Use OpenAiChatCompletionClient.Create(...) to get an authenticated HttpClient,
+// or configure httpClient with OpenAiAuthenticationHandler (see wiki/openai.md).
 var client = new OpenAiChatCompletionClient(httpClient, new OpenAiClientOptions
 {
     ApiKey = "sk-...",
@@ -227,6 +229,8 @@ var response = await groundedFeature.GetGroundedChatCompletionAsync(
 ### Example (Azure OpenAI)
 
 ```csharp
+// Use AzureOpenAiChatCompletionClient.Create(...) to get an authenticated HttpClient,
+// or configure httpClient with AzureAuthenticationHandler (see wiki/azure.md).
 var client = new AzureOpenAiChatCompletionClient(httpClient, new AzureOpenAiClientOptions
 {
     DeploymentName = "my-gpt5-deployment",

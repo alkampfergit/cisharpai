@@ -178,6 +178,80 @@ public sealed class OpenAiGroundedChatTests
         }
         """;
 
+    private const string GroundedResponseMultiBlock = """
+        {
+            "id": "resp-multi",
+            "model": "gpt-5-0513",
+            "status": "completed",
+            "output": [
+                {
+                    "type": "message",
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "type": "output_text",
+                            "text": "First block. ",
+                            "annotations": [
+                                {
+                                    "type": "file_citation",
+                                    "file_id": "file-abc",
+                                    "index": 0
+                                }
+                            ]
+                        },
+                        {
+                            "type": "output_text",
+                            "text": "Second block.",
+                            "annotations": [
+                                {
+                                    "type": "file_citation",
+                                    "file_id": "file-def",
+                                    "index": 1
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "usage": {
+                "input_tokens": 100,
+                "output_tokens": 30
+            }
+        }
+        """;
+
+    private const string GroundedResponseNegativeIndex = """
+        {
+            "id": "resp-neg",
+            "model": "gpt-5-0513",
+            "status": "completed",
+            "output": [
+                {
+                    "type": "message",
+                    "role": "assistant",
+                    "content": [
+                        {
+                            "type": "output_text",
+                            "text": "The capital of France is Paris.",
+                            "annotations": [
+                                {
+                                    "type": "file_citation",
+                                    "file_id": "file-abc",
+                                    "start_index": -1,
+                                    "end_index": 5
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ],
+            "usage": {
+                "input_tokens": 100,
+                "output_tokens": 20
+            }
+        }
+        """;
+
     #endregion
 
     private static ChatCompletionRequest CreateGpt5Request() =>
@@ -677,6 +751,136 @@ public sealed class OpenAiGroundedChatTests
             CreateOptionsWithKeyValueDocs());
 
         Assert.That(response.IsSuccess, Is.False);
+    }
+
+    #endregion
+
+    #region Multi-block response (Issue 2)
+
+    [Test]
+    public async Task GroundedChat_MultiBlock_ConcatenatesAllOutputTextBlocks()
+    {
+        var (response, _) = await ExecuteGroundedChat(GroundedResponseMultiBlock);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.True);
+            Assert.That(response.Content, Is.EqualTo("First block. Second block."));
+        });
+    }
+
+    [Test]
+    public async Task GroundedChat_MultiBlock_CollectsCitationsFromAllBlocks()
+    {
+        var (response, _) = await ExecuteGroundedChat(GroundedResponseMultiBlock);
+
+        Assert.That(response.Citations, Has.Count.EqualTo(2));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Citations[0].Sources[0].Id, Is.EqualTo("doc-1"));
+            Assert.That(response.Citations[1].Sources[0].Id, Is.EqualTo("doc-2"));
+        });
+    }
+
+    #endregion
+
+    #region Content parts conversion (Issue 3)
+
+    [Test]
+    public async Task GroundedChat_ContentParts_ConvertedToResponsesApiFormat()
+    {
+        var request = new ChatCompletionRequest(
+            Messages: [LlmMessage.WithBase64Image("What is this?", "dGVzdA==", "image/png")],
+            Model: "gpt-5-0513");
+
+        var (_, capturedBody) = await ExecuteGroundedChat(
+            GroundedResponseNoCitations,
+            request: request);
+
+        var doc = JsonDocument.Parse(capturedBody!);
+        var input = doc.RootElement.GetProperty("input");
+        var userMessage = input.EnumerateArray()
+            .First(e => e.TryGetProperty("role", out var r) && r.GetString() == "user");
+        var content = userMessage.GetProperty("content");
+
+        var types = content.EnumerateArray()
+            .Select(e => e.GetProperty("type").GetString())
+            .ToList();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(types, Does.Not.Contain("text"), "Chat Completions 'text' type should be converted");
+            Assert.That(types, Does.Not.Contain("image_url"), "Chat Completions 'image_url' type should be converted");
+            Assert.That(types, Does.Contain("input_text"));
+            Assert.That(types, Does.Contain("input_image"));
+        });
+    }
+
+    #endregion
+
+    #region Negative index guard (Issue 4)
+
+    [Test]
+    public async Task GroundedChat_NegativeStartIndex_DoesNotThrow()
+    {
+        var (response, _) = await ExecuteGroundedChat(GroundedResponseNegativeIndex);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.True);
+            Assert.That(response.Citations, Has.Count.EqualTo(1));
+            Assert.That(response.Citations[0].Text, Is.Empty);
+            Assert.That(response.Citations[0].Start, Is.EqualTo(0));
+            Assert.That(response.Citations[0].End, Is.EqualTo(0));
+        });
+    }
+
+    #endregion
+
+    #region Data cloning and id-less document lookup (Issues 5-6)
+
+    [Test]
+    public async Task GroundedChat_IdLessDocument_PopulatesSourceData()
+    {
+        var options = new GroundedChatOptions(
+            Documents:
+            [
+                new DocumentChunk(
+                    Data: new Dictionary<string, string>
+                    {
+                        ["title"] = "France",
+                        ["snippet"] = "Paris is the capital."
+                    })
+            ]);
+
+        var (response, _) = await ExecuteGroundedChat(GroundedResponseWithCitations, options: options);
+
+        var source = response.Citations[0].Sources[0];
+        Assert.Multiple(() =>
+        {
+            Assert.That(source.Data, Is.Not.Null);
+            Assert.That(source.Data!["title"], Is.EqualTo("France"));
+        });
+    }
+
+    [Test]
+    public async Task GroundedChat_SourceData_IsImmutableCopy()
+    {
+        var mutableData = new Dictionary<string, string>
+        {
+            ["title"] = "France",
+            ["snippet"] = "Paris is the capital."
+        };
+        var options = new GroundedChatOptions(
+            Documents: [new DocumentChunk(Id: "doc-1", Data: mutableData)]);
+
+        var (response, _) = await ExecuteGroundedChat(GroundedResponseWithCitations, options: options);
+
+        mutableData["title"] = "MUTATED";
+
+        var source = response.Citations[0].Sources[0];
+        Assert.That(source.Data!["title"], Is.EqualTo("France"),
+            "CitationSource.Data should be a defensive copy, not alias the caller's dictionary");
     }
 
     #endregion

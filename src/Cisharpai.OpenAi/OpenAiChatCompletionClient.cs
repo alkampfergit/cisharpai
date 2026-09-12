@@ -799,7 +799,17 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
                 contentItems.Add(new OpenAiContentPart { Type = "input_text", Text = text });
                 break;
             case IEnumerable<object> parts:
-                contentItems.AddRange(parts);
+                foreach (var part in parts)
+                {
+                    contentItems.Add(part switch
+                    {
+                        OpenAiContentPart { Type: "text" } textPart =>
+                            new OpenAiContentPart { Type = "input_text", Text = textPart.Text },
+                        OpenAiContentPart { Type: "image_url", ImageUrl: { } img } =>
+                            (object)new Dictionary<string, string> { ["type"] = "input_image", ["image_url"] = img.Url },
+                        _ => part
+                    });
+                }
                 break;
         }
 
@@ -853,11 +863,10 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
     {
         var messages = raw.Output.Where(o => o.Type == "message");
 
-        var content = messages
+        var content = string.Join("", messages
             .SelectMany(o => o.Content)
             .Where(c => c.Type == "output_text")
-            .Select(c => c.Text)
-            .FirstOrDefault() ?? string.Empty;
+            .Select(c => c.Text));
 
         var refusal = messages
             .SelectMany(o => o.Content)
