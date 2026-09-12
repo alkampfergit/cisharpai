@@ -88,7 +88,7 @@ public static class GroundedChatHelper
         return (fileId ?? filename ?? "unknown", null);
     }
 
-    private static IReadOnlyDictionary<string, string>? CloneData(IReadOnlyDictionary<string, string>? data)
+    private static ReadOnlyDictionary<string, string>? CloneData(IReadOnlyDictionary<string, string>? data)
     {
         if (data is null) return null;
         return new ReadOnlyDictionary<string, string>(new Dictionary<string, string>(data));
