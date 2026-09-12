@@ -37,43 +37,9 @@ public static class GroundedChatHelper
             .Where(a => a.Type == "file_citation")
             .Select(a =>
             {
-                var hasOffsets = a.StartIndex.HasValue && a.EndIndex.HasValue
-                    && a.EndIndex.Value > a.StartIndex.Value
-                    && a.EndIndex.Value <= content.Length;
-
-                string citedText;
-                int citationStart;
-                int citationEnd;
-
-                if (hasOffsets)
-                {
-                    citationStart = a.StartIndex!.Value;
-                    citationEnd = a.EndIndex!.Value;
-                    citedText = content[citationStart..citationEnd];
-                }
-                else if (a.Index is { } idx && idx >= 0 && idx < content.Length)
-                {
-                    citationStart = idx;
-                    var wordEnd = idx;
-                    while (wordEnd < content.Length && !char.IsWhiteSpace(content[wordEnd]) && content[wordEnd] != '.')
-                        wordEnd++;
-                    citationEnd = wordEnd;
-                    citedText = content[citationStart..citationEnd];
-                }
-                else
-                {
-                    citationStart = 0;
-                    citationEnd = 0;
-                    citedText = string.Empty;
-                }
-
-                string sourceId;
-                if (a.Filename is not null && filenameToDocId.TryGetValue(a.Filename, out var docIdByName))
-                    sourceId = docIdByName;
-                else if (a.FileId is not null && filenameToDocId.TryGetValue(a.FileId, out var docIdByFileId))
-                    sourceId = docIdByFileId;
-                else
-                    sourceId = a.FileId ?? a.Filename ?? "unknown";
+                var (citedText, citationStart, citationEnd) =
+                    ResolveCitedText(content, a.StartIndex, a.EndIndex, a.Index);
+                var sourceId = ResolveSourceId(a.Filename, a.FileId, filenameToDocId);
 
                 return new Citation(
                     Start: citationStart,
@@ -83,5 +49,36 @@ public static class GroundedChatHelper
                     Type: "file_citation");
             })
             .ToList();
+    }
+
+    private static (string Text, int Start, int End) ResolveCitedText(
+        string content, int? startIndex, int? endIndex, int? index)
+    {
+        if (startIndex.HasValue && endIndex.HasValue
+            && endIndex.Value > startIndex.Value
+            && endIndex.Value <= content.Length)
+        {
+            return (content[startIndex.Value..endIndex.Value], startIndex.Value, endIndex.Value);
+        }
+
+        if (index is { } idx && idx >= 0 && idx < content.Length)
+        {
+            var wordEnd = idx;
+            while (wordEnd < content.Length && !char.IsWhiteSpace(content[wordEnd]) && content[wordEnd] != '.')
+                wordEnd++;
+            return (content[idx..wordEnd], idx, wordEnd);
+        }
+
+        return (string.Empty, 0, 0);
+    }
+
+    private static string ResolveSourceId(
+        string? filename, string? fileId, Dictionary<string, string> filenameToDocId)
+    {
+        if (filename is not null && filenameToDocId.TryGetValue(filename, out var docIdByName))
+            return docIdByName;
+        if (fileId is not null && filenameToDocId.TryGetValue(fileId, out var docIdByFileId))
+            return docIdByFileId;
+        return fileId ?? filename ?? "unknown";
     }
 }
