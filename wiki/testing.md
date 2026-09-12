@@ -588,3 +588,47 @@ services.AddCisharpaiClientFactory()
 | `WithDefaultEmbeddingClient(client)` | `FakeClientFactoryProvider` | Set default embedding client (used when queue empty) |
 | `EnqueueRerankerClient(client)` | `FakeClientFactoryProvider` | Queue a reranker client (FIFO) |
 | `WithDefaultRerankerClient(client)` | `FakeClientFactoryProvider` | Set default reranker client (used when queue empty) |
+
+## RAG ingestion tests
+
+Reference `Cisharpai.Rag` and `Cisharpai.Testing` in your application test project. The existing `FakeEmbeddingClient` works with the chunker, processor, pipeline and DI; no new optional core feature needs faking. Queue one vector per expected chunk in each batch, because malformed successful output is rejected.
+
+```csharp
+using Cisharpai.Rag;
+using Cisharpai.Rag.Chunking;
+using Cisharpai.Rag.Embeddings;
+using Cisharpai.Rag.Models;
+using Cisharpai.Testing;
+using NUnit.Framework;
+
+var fake = new FakeEmbeddingClient();
+fake.EnqueueResponse(FakeResponses.Embeddings(new float[][]
+{
+    new float[] { 1, 0 },
+    new float[] { 0, 1 }
+}));
+var pipeline = new RagIngestionPipeline(
+    new FixedSizeChunker(new FixedSizeChunkerOptions { ChunkSize = 4, Overlap = 0 }),
+    new BulkEmbeddingProcessor(fake, new BulkEmbeddingOptions { BatchSize = 2 }));
+
+var batches = new List<EmbeddingBatchResult>();
+await foreach (var batch in pipeline.IngestAsync(new[] { new RagDocument("doc", "abcdefgh") }))
+    batches.Add(batch);
+
+Assert.That(batches, Has.Count.EqualTo(1));
+Assert.That(batches[0].IsSuccess, Is.True);
+Assert.That(batches[0].Items[1].Chunk.StartOffset, Is.EqualTo(4));
+Assert.That(batches[0].Items[1].Vector, Is.EqualTo(new float[] { 0, 1 }));
+Assert.That(fake.ReceivedRequests[0].Input, Is.EqualTo(new[] { "abcd", "efgh" }));
+```
+
+For a failed provider batch, enqueue `FakeResponses.EmbeddingError("rate limit exceeded")`; assert `IsSuccess == false`, empty `Items`, retained `Chunks`, and no later provider requests. The fake's default response contains only one vector, so explicitly queue matching responses for multi-chunk batches. Cancellation is an exception, not an ordinary failed batch.
+
+Repository tests are in the existing `src/Cisharpai.Tests/Rag/` folder. They cover Unicode and overlap boundaries, option snapshots, lazy bulk processing, malformed vectors, partial failures, cancellation/disposal, pipeline composition and DI/keyed providers. Run them offline on both targets:
+
+```sh
+dotnet test src/Cisharpai.Tests/Cisharpai.Tests.csproj --framework net8.0 --filter FullyQualifiedName~Rag
+dotnet test src/Cisharpai.Tests/Cisharpai.Tests.csproj --framework net10.0 --filter FullyQualifiedName~Rag
+```
+
+See [RAG Ingestion](rag.md) for complete consumer configuration and streaming examples.

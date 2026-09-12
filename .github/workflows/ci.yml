@@ -5,7 +5,7 @@ on:
     branches: [main, master, develop, 'feature/**', 'hotfix/**', 'release/**']
     tags: ['v*']
   pull_request:
-    branches: [main, master, develop]
+    branches: [main, master, develop, rag101]
   workflow_dispatch:
     inputs:
       publish_nuget:

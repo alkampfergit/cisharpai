@@ -6,6 +6,7 @@ This file is included in the NuGet packages. Keep a single line for each user-fa
 
 - Reranking: new `IRerankerClient` abstraction (`RerankRequest` / `RerankResponse` / `RerankResult`) with a Cohere implementation over `POST {BaseUrl}rerank` — register via `services.AddCohereRerankerClient(...)` (keyed overload available) or create at runtime through `ICisharpaiClientFactory.CreateRerankerClient`; set `CohereClientOptions.BaseUrl` to target Azure-hosted or self-hosted Cohere deployments, and reach Cohere's `priority` hint through `ExtraParameters`.
 - `Cisharpai.Testing` gains `FakeRerankerClient`, `FakeResponses.Rerank`/`RerankError`, and `services.AddFakeRerankerClient()` for testing rerank-dependent code without HTTP calls.
+- New `Cisharpai.Rag` package: Unicode-aware fixed-size chunking, bounded sequential bulk float embeddings and document ingestion, with validated options, direct/DI/keyed-provider configuration, cancellation and explicit partial batch results.
 
 ## 0.3.0
 
