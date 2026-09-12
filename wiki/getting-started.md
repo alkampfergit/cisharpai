@@ -147,7 +147,7 @@ If API keys or endpoints are not known at startup (e.g. multi-tenant systems), u
 - [JSON Output](json-output.md) — JSON Mode and Structured Outputs
 - [Vision](vision.md) — sending images in chat messages
 - [Embeddings](embeddings.md) — text, image, and multimodal embeddings
-- [Grounded Chat (RAG)](grounded-chat.md) — document grounding with citations (Cohere)
+- [Grounded Chat (RAG)](grounded-chat.md) — document grounding with citations (Anthropic, Cohere)
 - [Logging](logging.md) — structured logs and distributed tracing
 - [Testing with Cisharpai](testing.md) — fake clients for unit tests
 - [Runtime Configuration](runtime-configuration.md) — dynamic client creation

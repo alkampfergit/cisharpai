@@ -66,16 +66,16 @@ var response = await groundedFeature.GetGroundedChatCompletionAsync(request, opt
 | OpenAI | -- | Not supported |
 | Azure OpenAI | -- | Not supported |
 | Azure AI Inference | -- | Not supported |
-| Anthropic | -- | Not supported |
+| Anthropic | Yes | Via `document` content blocks with `citations: {enabled: true}` in the Messages API |
 | Cohere | Yes | Via `documents` array and `citation_options` in Chat v2 API |
 
 ## Citation Modes
 
 | Mode | Description |
 |------|-------------|
-| `CitationMode.Accurate` | Model generates the full response first, then produces fine-grained citations. Higher latency, more precise. **Only supported by Cohere's `command-r` family** — `command-a` models reject this value. When the requested model is `command-a*`, the provider logs a warning and silently downgrades to `Fast`. |
-| `CitationMode.Fast` (default) | Citations generated inline as the response is produced. Lower latency, slightly less precise. Supported by both `command-r` and `command-a` families, which is why it is the cross-model default. |
-| `CitationMode.Enabled` | Provider-default citation behavior. |
+| `CitationMode.Accurate` | Model generates the full response first, then produces fine-grained citations. Higher latency, more precise. **Cohere**: only supported by the `command-r` family — `command-a` models reject this value (the provider logs a warning and downgrades to `Fast`). **Anthropic**: treated as `Enabled` (warning logged; citations are binary on/off). |
+| `CitationMode.Fast` (default) | Citations generated inline as the response is produced. Lower latency, slightly less precise. **Cohere**: supported by both `command-r` and `command-a` families. **Anthropic**: treated as `Enabled` (warning logged). |
+| `CitationMode.Enabled` | Provider-default citation behavior. Both Cohere and Anthropic honour this directly. |
 
 ```csharp
 var options = new GroundedChatOptions(
@@ -117,7 +117,18 @@ new DocumentChunk(Id: "doc-1", Text: "The actual content of the document.")
 Each `Citation` in the response has:
 - `Start` / `End`: Character offsets (inclusive/exclusive) in the response content
 - `Text`: The cited text span
-- `Sources`: List of `CitationSource` objects, each with an `Id` and optional `Data` dictionary
+- `Sources`: List of `CitationSource` objects, each with an `Id`, optional `Data` dictionary, and optional `CitedText`
+
+### `Start`/`End` Semantics Per Provider
+
+| Provider | `Start`/`End` Meaning |
+|----------|----------------------|
+| Cohere | Character offsets within the concatenated response content, pointing to the response text span that is backed by the citation. One citation per inline span. |
+| Anthropic | Character offsets within the concatenated response content, corresponding to the text block that carries the citation. Multiple citations may share the same `Start`/`End` range when a text block references several sources. |
+
+### `CitedText` on `CitationSource`
+
+Anthropic returns the exact text from the *source document* that was cited (`cited_text`). This is available via `CitationSource.CitedText`. Cohere does not provide this — `CitedText` will be `null` for Cohere citations.
 
 ```csharp
 var response = await groundedFeature.GetGroundedChatCompletionAsync(request, options);
@@ -172,12 +183,19 @@ else
 ```
 
 Currently, `IGroundedChatFeature` is registered on:
+- `AnthropicChatCompletionClient`
 - `CohereChatCompletionClient`
 
 ## Limitations
 
+### Cohere
 - **Mutually exclusive with JSON Mode**: The Cohere API does not support `documents` and `response_format` in the same request. Use either grounded chat or JSON output, not both.
 - **Model support**: Not all Cohere models support grounded chat. Use Command-R, Command-R+, or Command-A models.
+
+### Anthropic
+- **Citation modes are binary**: Anthropic citations are enabled or disabled — there is no accuracy/speed tradeoff. `CitationMode.Fast` and `CitationMode.Accurate` are treated as `Enabled` with a logged warning.
+- **PDF / base64 sources**: Only `text` and `custom_content` source types are mapped. Anthropic's richer source types (PDF base64 etc.) are reachable via `ExtraParameters` and may get first-class mapping in a future release.
+- **Offset granularity**: Each text block maps to one citation span. If a text block carries multiple citations from different documents, they share the same `Start`/`End` range; use `CitationSource.CitedText` to distinguish.
 
 ## Troubleshooting
 
@@ -185,5 +203,6 @@ Currently, `IGroundedChatFeature` is registered on:
 |---------|----------|
 | No citations returned | The model may not find relevant information in the provided documents. Ensure documents contain relevant content. |
 | Empty response | Check `response.IsSuccess` and `response.ErrorMessage` for API errors. |
-| Citation offsets incorrect | For the most precise offsets request `CitationMode.Accurate` against a `command-r` model. `command-a` models do not support `Accurate`; the provider downgrades to `Fast` and logs a warning. |
-| "documents not supported" error | Check that you're using a supported model (Command-R, Command-R+, Command-A). |
+| Citation offsets incorrect (Cohere) | For the most precise offsets request `CitationMode.Accurate` against a `command-r` model. `command-a` models do not support `Accurate`; the provider downgrades to `Fast` and logs a warning. |
+| "documents not supported" error (Cohere) | Check that you're using a supported model (Command-R, Command-R+, Command-A). |
+| `CitedText` is null (Cohere) | This field is only populated by Anthropic. Cohere does not return source-level cited text. |

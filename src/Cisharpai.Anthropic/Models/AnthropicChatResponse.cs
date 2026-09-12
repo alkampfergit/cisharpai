@@ -39,6 +39,10 @@ public sealed class AnthropicContentBlock
     /// <summary>For image content blocks: the image source (base64 data and media type).</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public AnthropicImageSource? Source { get; set; }
+
+    /// <summary>For response text blocks: citation results from grounded chat.</summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<AnthropicCitationResult>? Citations { get; set; }
 }
 
 public sealed class AnthropicUsage

@@ -54,7 +54,7 @@ Detailed structure: [project_overview.md](memories/project_overview.md)
 | `IJsonOutputFeature` | All 5 chat clients |
 | `IToolCallingFeature` | All 5 chat clients |
 | `IStreamingChatFeature` | All 5 chat clients |
-| `IGroundedChatFeature` | Cohere only |
+| `IGroundedChatFeature` | Anthropic, Cohere |
 | `IImageEmbeddingFeature` | Azure AI Inference, Cohere |
 | `IMultimodalEmbeddingFeature` | Cohere only |
 

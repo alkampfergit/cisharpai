@@ -346,12 +346,17 @@ public sealed class FeatureDiscoveryTests
     }
 
     [Test]
-    public void AnthropicChatCompletionClient_DoesNotExposeGroundedChatFeature()
+    public void AnthropicChatCompletionClient_ExposesGroundedChatFeature()
     {
         using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
         var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
 
-        Assert.That(client.Features.Get<IGroundedChatFeature>(), Is.Null);
+        var feature = client.Features.Get<IGroundedChatFeature>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
     }
 
     [Test]

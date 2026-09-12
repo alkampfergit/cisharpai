@@ -11,7 +11,7 @@
 | Structured Outputs | Yes | Yes | Varies | Yes | Yes |
 | Image Embeddings | -- | -- | Yes | -- | Yes |
 | Multimodal Embeddings | -- | -- | -- | -- | Yes |
-| Grounded Chat (RAG) | -- | -- | -- | -- | Yes |
+| Grounded Chat (RAG) | -- | -- | -- | Yes | Yes |
 | Tool Calling | Yes | Yes | Yes | Yes | Yes |
 | Vision | Yes | Yes | Varies | Yes | Partial |
 | Streaming | Yes | Yes | Yes | Yes | Yes |
@@ -57,6 +57,7 @@ interface, implemented by Cohere only.
 - Only provider with image embeddings (besides Cohere)
 
 ### Anthropic
+- Grounded chat via `document` content blocks with native citations; `CitedText` on `CitationSource`
 - Event-based SSE streaming (not `[DONE]` based)
 - Raw base64 images (not data URIs)
 - Claude model family only

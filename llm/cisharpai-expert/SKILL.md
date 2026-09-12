@@ -280,7 +280,7 @@ All feature interfaces live in the `Cisharpai.Features.Chat` namespace (not `Cis
 | JSON Output | `IJsonOutputFeature` | All 5 |
 | Tool Calling | `IToolCallingFeature` | All 5 |
 | Streaming | `IStreamingChatFeature` | All 5 |
-| Grounded Chat | `IGroundedChatFeature` | Cohere only |
+| Grounded Chat | `IGroundedChatFeature` | Anthropic, Cohere |
 | Image Embedding | `IImageEmbeddingFeature` | Azure AI Inference, Cohere |
 | Multimodal Embedding | `IMultimodalEmbeddingFeature` | Cohere only |
 
@@ -288,7 +288,7 @@ Reranking is not a feature interface — it is its own top-level client (`IReran
 implemented by Cohere only.
 ## RAG Ingestion (`Cisharpai.Rag`)
 
-Use the separate `Cisharpai.Rag` package for ingestion with any `IEmbeddingClient`. This is independent of Cohere's `IGroundedChatFeature`; it does not provide storage, retrieval or generation.
+Use the separate `Cisharpai.Rag` package for ingestion with any `IEmbeddingClient`. This is independent of `IGroundedChatFeature` (Anthropic/Cohere); it does not provide storage, retrieval or generation.
 
 - Root namespace `Cisharpai.Rag`: `IRagIngestionPipeline`, `RagIngestionPipeline`, `RagOptions`, `AddCisharpaiRag`.
 - `.Chunking`: `ITextChunker.Chunk(RagDocument)`, `FixedSizeChunker`, `FixedSizeChunkerOptions`.

@@ -63,7 +63,7 @@ Consolidated package for all Azure AI services. Uses HttpClient directly (no SDK
 - **Factory configs**: `AzureOpenAiClientConfiguration`, `AzureAiInferenceClientConfiguration` + corresponding factory providers.
 
 ### `src/Cisharpai.Anthropic/`
-- `AnthropicChatCompletionClient` — Chat + JSON output (via `output_config.format`) + tool calling (`tool_use`/`tool_result` blocks) + streaming (event-based SSE). Vision uses raw base64 (NOT data URIs). Static `Create(IHttpMessageHandlerFactory, options, ...)` for runtime construction.
+- `AnthropicChatCompletionClient` — Chat + JSON output (via `output_config.format`) + tool calling (`tool_use`/`tool_result` blocks) + streaming (event-based SSE) + grounded chat (RAG via `document` content blocks with native citations). Vision uses raw base64 (NOT data URIs). Static `Create(IHttpMessageHandlerFactory, options, ...)` for runtime construction.
 - `AnthropicModels` — Constants: `Chat.ClaudeOpus4_5`, `Chat.ClaudeSonnet4_5`, `Chat.ClaudeHaiku4_5`, etc.
 - `AnthropicClientOptions` — BaseUrl, ApiKey, ApiVersion, DefaultModel.
 - `AnthropicClientConfiguration` — Factory config record (chat only, no embedding).

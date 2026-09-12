@@ -4,6 +4,7 @@ This file is included in the NuGet packages. Keep a single line for each user-fa
 
 ## Unreleased
 
+- Anthropic grounded chat (RAG): `AnthropicChatCompletionClient` now implements `IGroundedChatFeature` — documents are sent as Anthropic `document` content blocks with native citations enabled, and responses map to the existing unified `Citation`/`CitationSource` model. Text documents use `text` source type; key-value `DocumentChunk.Data` uses `custom_content` source type. New optional `CitationSource.CitedText` field carries the source-document text span returned by Anthropic.
 - Reranking: new `IRerankerClient` abstraction (`RerankRequest` / `RerankResponse` / `RerankResult`) with a Cohere implementation over `POST {BaseUrl}rerank` — register via `services.AddCohereRerankerClient(...)` (keyed overload available) or create at runtime through `ICisharpaiClientFactory.CreateRerankerClient`; set `CohereClientOptions.BaseUrl` to target Azure-hosted or self-hosted Cohere deployments, and reach Cohere's `priority` hint through `ExtraParameters`.
 - `Cisharpai.Testing` gains `FakeRerankerClient`, `FakeResponses.Rerank`/`RerankError`, and `services.AddFakeRerankerClient()` for testing rerank-dependent code without HTTP calls.
 - New `Cisharpai.Rag` package: Unicode-aware fixed-size chunking, bounded bulk float embeddings and document ingestion, with validated options, direct/DI/keyed-provider configuration, cancellation and explicit partial batch results.

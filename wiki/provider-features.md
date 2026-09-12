@@ -33,7 +33,7 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Multimodal Embeddings | -- | -- | -- | -- | Yes |
 | Reasoning Models | Yes | Yes | Yes | -- | -- |
 | Responses API (GPT-5) | Yes | Yes | -- | -- | -- |
-| Grounded Chat (RAG) | -- | -- | -- | -- | Yes |
+| Grounded Chat (RAG) | -- | -- | -- | Yes | Yes |
 | Tool Calling | Yes | Yes | Yes | Yes | Yes |
 | Vision (Image Input) | Yes | Yes | Yes | Yes | Partial* |
 | Streaming | Yes | Yes | Yes | Yes | Yes |
@@ -112,6 +112,7 @@ Azure OpenAI truncation is surfaced as a failed unified response when the provid
 | Chat Completions | Claude model family (claude-opus-4-5, claude-sonnet-4-5, claude-haiku-4-5) |
 | JSON Mode | Implemented via system-message injection; auto-strips markdown fences |
 | Structured Outputs | Via native `output_config.format` parameter; refusal via `stop_reason: "refusal"` |
+| Grounded Chat (RAG) | Document grounding via `document` content blocks with `citations: {enabled: true}`; text documents use `text` source type, key-value documents use `custom_content` source type; `CitationMode.Fast`/`Accurate` treated as `Enabled` (Anthropic citations are binary: on/off) with a logged warning |
 | Tool Calling | All Claude models; `ToolChoice` maps Auto->auto, Required->any, Specific->{type:tool,name}, None is omitted |
 | Vision | Images sent as raw base64 (NOT data URIs) via `source.type: "base64"` in content blocks |
 | Streaming | `IStreamingChatFeature`; event-based SSE (no `[DONE]` sentinel); `message_start`/`content_block_delta`/`message_delta` events |
