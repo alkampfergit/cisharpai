@@ -168,4 +168,95 @@ public sealed class CohereDiRegistrationTests
             Assert.That(defaultClient, Is.Not.SameAs(specialClient));
         });
     }
+
+    [Test]
+    public void SingleRerankerClient_ResolvesCorrectly()
+    {
+        var services = new ServiceCollection();
+
+        services.AddCohereRerankerClient(opt =>
+        {
+            opt.ApiKey = "test-key";
+            opt.DefaultModel = CohereModels.Rerank.RerankV3_5;
+        });
+
+        using var provider = services.BuildServiceProvider();
+
+        var client = provider.GetRequiredService<IRerankerClient>();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(client, Is.Not.Null);
+            Assert.That(client, Is.InstanceOf<CohereRerankerClient>());
+        });
+    }
+
+    [Test]
+    public void RerankerClient_CoexistsWithChatAndEmbeddingClients()
+    {
+        var services = new ServiceCollection();
+
+        services.AddCohereEmbeddingClient(opt => opt.ApiKey = "embed-key");
+        services.AddCohereChatClient(opt => opt.ApiKey = "chat-key");
+        services.AddCohereRerankerClient(opt => opt.ApiKey = "rerank-key");
+
+        using var provider = services.BuildServiceProvider();
+
+        var embeddingClient = provider.GetRequiredService<IEmbeddingClient>();
+        var chatClient = provider.GetRequiredService<IChatCompletionClient>();
+        var rerankerClient = provider.GetRequiredService<IRerankerClient>();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(rerankerClient, Is.InstanceOf<CohereRerankerClient>());
+            Assert.That(rerankerClient, Is.Not.SameAs(embeddingClient));
+            Assert.That(rerankerClient, Is.Not.SameAs(chatClient));
+        });
+    }
+
+    [Test]
+    public void KeyedRerankerClients_ResolveIndependentlyByKey()
+    {
+        var services = new ServiceCollection();
+
+        services.AddCohereRerankerClient("tenant-a", opt =>
+        {
+            opt.ApiKey = "key-a";
+            opt.DefaultModel = CohereModels.Rerank.RerankV3_5;
+        });
+
+        services.AddCohereRerankerClient("tenant-b", opt =>
+        {
+            opt.ApiKey = "key-b";
+            opt.DefaultModel = CohereModels.Rerank.RerankEnglishV3;
+        });
+
+        using var provider = services.BuildServiceProvider();
+
+        var tenantA = provider.GetRequiredKeyedService<IRerankerClient>("tenant-a");
+        var tenantB = provider.GetRequiredKeyedService<IRerankerClient>("tenant-b");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(tenantA, Is.InstanceOf<CohereRerankerClient>());
+            Assert.That(tenantB, Is.InstanceOf<CohereRerankerClient>());
+            Assert.That(tenantA, Is.Not.SameAs(tenantB));
+        });
+    }
+
+    [Test]
+    public void KeyedAndNonKeyedRerankerClients_CoexistIndependently()
+    {
+        var services = new ServiceCollection();
+
+        services.AddCohereRerankerClient(opt => opt.ApiKey = "default-key");
+        services.AddCohereRerankerClient("special", opt => opt.ApiKey = "special-key");
+
+        using var provider = services.BuildServiceProvider();
+
+        var defaultClient = provider.GetRequiredService<IRerankerClient>();
+        var specialClient = provider.GetRequiredKeyedService<IRerankerClient>("special");
+
+        Assert.That(defaultClient, Is.Not.SameAs(specialClient));
+    }
 }

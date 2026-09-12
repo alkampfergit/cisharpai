@@ -8,5 +8,8 @@ public interface ICisharpaiClientFactory
     CisharpaiClientFactoryResult<IEmbeddingClient> CreateEmbeddingClient(
         CisharpaiClientConfiguration configuration);
 
+    CisharpaiClientFactoryResult<IRerankerClient> CreateRerankerClient(
+        CisharpaiClientConfiguration configuration);
+
     IReadOnlyCollection<CisharpaiProvider> GetRegisteredProviders();
 }

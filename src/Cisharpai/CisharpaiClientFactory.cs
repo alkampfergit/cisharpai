@@ -55,6 +55,25 @@ internal sealed class CisharpaiClientFactory : ICisharpaiClientFactory
         return provider.CreateEmbeddingClient(_serviceProvider, configuration);
     }
 
+    public CisharpaiClientFactoryResult<IRerankerClient> CreateRerankerClient(
+        CisharpaiClientConfiguration configuration)
+    {
+        if (!_providers.TryGetValue(configuration.Provider, out var provider))
+        {
+            var registered = string.Join(", ", _providers.Keys);
+            return CisharpaiClientFactoryResult<IRerankerClient>.Failure(
+                $"Provider '{configuration.Provider}' is not registered. Registered providers: {registered}.");
+        }
+
+        if (!provider.SupportsReranking)
+        {
+            return CisharpaiClientFactoryResult<IRerankerClient>.Failure(
+                $"Provider '{configuration.Provider}' does not support reranker clients.");
+        }
+
+        return provider.CreateRerankerClient(_serviceProvider, configuration);
+    }
+
     public IReadOnlyCollection<CisharpaiProvider> GetRegisteredProviders() =>
         _providers.Keys.ToArray();
 }

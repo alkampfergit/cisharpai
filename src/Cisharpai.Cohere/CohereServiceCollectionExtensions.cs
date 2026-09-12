@@ -93,6 +93,65 @@ public static class CohereServiceCollectionExtensions
         return builder;
     }
 
+    public static IHttpClientBuilder AddCohereRerankerClient(
+        this IServiceCollection services,
+        Action<CohereClientOptions> configure)
+    {
+        var options = new CohereClientOptions();
+        configure(options);
+
+        var builder = services.AddHttpClient<CohereRerankerClient>(client =>
+            {
+                client.BaseAddress = new Uri(options.BaseUrl);
+                client.Timeout = TimeSpan.FromMinutes(2);
+            })
+            .AddHttpMessageHandler(() => new CohereAuthenticationHandler(options));
+
+        builder.AddCisharpaiResilienceHandler();
+
+        services.AddTransient(sp =>
+            new CohereRerankerClient(
+                sp.GetRequiredService<IHttpClientFactory>().CreateClient(typeof(CohereRerankerClient).Name),
+                options,
+                sp.GetService<ILoggerFactory>()));
+
+        services.AddSingleton<IRerankerClient>(sp =>
+            sp.GetRequiredService<CohereRerankerClient>());
+
+        return builder;
+    }
+
+    public static IHttpClientBuilder AddCohereRerankerClient(
+        this IServiceCollection services,
+        string key,
+        Action<CohereClientOptions> configure)
+    {
+        var options = new CohereClientOptions();
+        configure(options);
+
+        var clientName = $"{nameof(CohereRerankerClient)}_{key}";
+
+        var builder = services.AddHttpClient(clientName, client =>
+            {
+                client.BaseAddress = new Uri(options.BaseUrl);
+                client.Timeout = TimeSpan.FromMinutes(2);
+            })
+            .AddHttpMessageHandler(() => new CohereAuthenticationHandler(options));
+
+        builder.AddCisharpaiResilienceHandler();
+
+        services.AddKeyedTransient<CohereRerankerClient>(key, (sp, _) =>
+            new CohereRerankerClient(
+                sp.GetRequiredService<IHttpClientFactory>().CreateClient(clientName),
+                options,
+                sp.GetService<ILoggerFactory>()));
+
+        services.AddKeyedSingleton<IRerankerClient>(key, (sp, k) =>
+            sp.GetRequiredKeyedService<CohereRerankerClient>(k));
+
+        return builder;
+    }
+
     public static IHttpClientBuilder AddCohereChatClient(
         this IServiceCollection services,
         string key,

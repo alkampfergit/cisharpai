@@ -112,6 +112,19 @@ FakeResponses.Embeddings(new float[][] { [0.1f], [0.2f], [0.3f] });
 FakeResponses.EmbeddingError("model not found");
 ```
 
+### Rerank Responses
+
+```csharp
+// Explicit (index, score) pairs, in ranked order
+FakeResponses.Rerank((1, 0.99), (0, 0.42));
+
+// N documents ranked in their original order with descending scores
+FakeResponses.Rerank(documentCount: 3);
+
+// Error
+FakeResponses.RerankError("model not found");
+```
+
 ## FakeChatCompletionClient
 
 ### Response Configuration
@@ -220,9 +233,38 @@ var mmResult = await fake.GetMultimodalEmbeddingsAsync(inputs, "model-v1");
 Assert.That(fake.ReceivedMultimodalRequests, Has.Count.EqualTo(1));
 ```
 
+## FakeRerankerClient
+
+Same queue/default/capture shape as the other fakes.
+
+```csharp
+var fake = new FakeRerankerClient
+{
+    DefaultResponse = FakeResponses.Rerank((1, 0.99), (0, 0.42))
+};
+
+string[] documents = ["Nevada's capital is Carson City.", "Paris is the capital of France."];
+var result = await fake.RerankAsync(new RerankRequest("What is the capital of France?", documents));
+
+// Index points back into the documents you passed in
+Assert.That(documents[result.Results[0].Index], Is.EqualTo(documents[1]));
+Assert.That(fake.ReceivedRequests[0].Query, Is.EqualTo("What is the capital of France?"));
+```
+
+Queue responses to drive a sequence of calls:
+
+```csharp
+var fake = new FakeRerankerClient();
+fake.EnqueueResponse(FakeResponses.Rerank((0, 0.9)));
+fake.EnqueueResponse(FakeResponses.RerankError("rate limited"));
+```
+
+`IRerankerClient` has no optional feature interfaces today, so `FakeRerankerClient` takes no
+feature flags -- its `Features` collection is empty.
+
 ## Feature Opt-Out
 
-Both fake clients register all feature interfaces by default. Use the flags enums to control which features are available -- useful for testing feature-detection code paths.
+Both fake chat and embedding clients register all feature interfaces by default. Use the flags enums to control which features are available -- useful for testing feature-detection code paths.
 
 ### FakeChatFeatures
 
@@ -270,6 +312,10 @@ fakeChatClient.DefaultResponse = FakeResponses.Chat("mocked answer");
 // Register fake embedding client
 var fakeEmbeddingClient = services.AddFakeEmbeddingClient();
 fakeEmbeddingClient.DefaultResponse = FakeResponses.Embedding();
+
+// Register fake reranker client
+var fakeRerankerClient = services.AddFakeRerankerClient();
+fakeRerankerClient.DefaultResponse = FakeResponses.Rerank(3);
 
 var provider = services.BuildServiceProvider();
 
@@ -492,6 +538,16 @@ public async Task ConversationAgent_HandlesMultipleTurns()
 | `ReceivedMultimodalRequests` | `IReadOnlyList<IReadOnlyList<MultimodalEmbeddingInput>>` | Captured multimodal requests |
 | `Reset()` | `void` | Clears all queues and captured requests |
 
+### FakeRerankerClient
+
+| Member | Type | Description |
+|--------|------|-------------|
+| `DefaultResponse` | `RerankResponse?` | Fallback used when the queue is empty |
+| `EnqueueResponse(response)` | `void` | Queue a response (FIFO) |
+| `CallCount` | `int` | Number of `RerankAsync` calls |
+| `ReceivedRequests` | `IReadOnlyList<RerankRequest>` | Captured rerank requests |
+| `Reset()` | `void` | Clears the queue and captured requests |
+
 ### FakeClientFactoryProvider
 
 A fake `IClientFactoryProvider` for testing code that depends on `ICisharpaiClientFactory`. By default it registers as the OpenAI provider; pass a different `CisharpaiProvider` to the constructor to fake any provider.
@@ -530,3 +586,5 @@ services.AddCisharpaiClientFactory()
 | `EnqueueEmbeddingClient(client)` | `FakeClientFactoryProvider` | Queue an embedding client (FIFO) |
 | `WithDefaultChatClient(client)` | `FakeClientFactoryProvider` | Set default chat client (used when queue empty) |
 | `WithDefaultEmbeddingClient(client)` | `FakeClientFactoryProvider` | Set default embedding client (used when queue empty) |
+| `EnqueueRerankerClient(client)` | `FakeClientFactoryProvider` | Queue a reranker client (FIFO) |
+| `WithDefaultRerankerClient(client)` | `FakeClientFactoryProvider` | Set default reranker client (used when queue empty) |

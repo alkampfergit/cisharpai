@@ -6,6 +6,7 @@ Lightweight fake clients for unit testing application code that depends on [Cish
 
 - **`FakeChatCompletionClient`** — fake `IChatCompletionClient` with support for `IStreamingChatFeature`, `IToolCallingFeature`, `IJsonOutputFeature`, `IGroundedChatFeature`
 - **`FakeEmbeddingClient`** — fake `IEmbeddingClient` with support for `IImageEmbeddingFeature`, `IMultimodalEmbeddingFeature`
+- **`FakeRerankerClient`** — fake `IRerankerClient` for reranking
 - **`FakeResponses`** — static factory methods for common response objects
 - **Response queues** — enqueue specific responses for sequential calls
 - **Default responses** — fallback when the queue is empty

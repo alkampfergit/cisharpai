@@ -8,12 +8,15 @@ public sealed class CohereClientFactoryProvider : IClientFactoryProvider
 {
     internal const string ChatHttpClientName = "CisharpaiFactory_Cohere_Chat";
     internal const string EmbeddingHttpClientName = "CisharpaiFactory_Cohere_Embedding";
+    internal const string RerankHttpClientName = "CisharpaiFactory_Cohere_Rerank";
 
     public CisharpaiProvider Provider => CisharpaiProvider.Cohere;
 
     public bool SupportsChatCompletion => true;
 
     public bool SupportsEmbedding => true;
+
+    public bool SupportsReranking => true;
 
     public CisharpaiClientFactoryResult<IChatCompletionClient> CreateChatCompletionClient(
         IServiceProvider serviceProvider,
@@ -49,6 +52,24 @@ public sealed class CohereClientFactoryProvider : IClientFactoryProvider
 
         var client = new CohereEmbeddingClient(httpClient, options, loggerFactory);
         return CisharpaiClientFactoryResult<IEmbeddingClient>.Success(client);
+    }
+
+    public CisharpaiClientFactoryResult<IRerankerClient> CreateRerankerClient(
+        IServiceProvider serviceProvider,
+        CisharpaiClientConfiguration configuration)
+    {
+        if (configuration is not CohereClientConfiguration config)
+        {
+            return CisharpaiClientFactoryResult<IRerankerClient>.Failure(
+                $"Expected CohereClientConfiguration for provider Cohere, got {configuration.GetType().Name}.");
+        }
+
+        var options = MapToOptions(config);
+        var httpClient = CreateHttpClient(serviceProvider, RerankHttpClientName, config);
+        var loggerFactory = serviceProvider.GetService<ILoggerFactory>();
+
+        var client = new CohereRerankerClient(httpClient, options, loggerFactory);
+        return CisharpaiClientFactoryResult<IRerankerClient>.Success(client);
     }
 
     private static HttpClient CreateHttpClient(

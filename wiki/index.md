@@ -4,13 +4,13 @@ Cisharpai is a unified .NET client library providing a single `IChatCompletionCl
 
 ## Supported Providers
 
-| Provider | Package | Chat | Embeddings | Notes |
-|----------|---------|------|------------|-------|
-| OpenAI | `Cisharpai.OpenAi` | Yes | Yes | Chat Completions, Responses API (GPT-5), reasoning models |
-| Azure OpenAI | `Cisharpai.Azure` | Yes | Yes | Deployment-based routing, Azure AD auth, Responses API (GPT-5) |
-| Azure AI Inference | `Cisharpai.Azure` | Yes | Yes | Model catalog: Phi, Llama, Mistral; image embeddings |
-| Anthropic | `Cisharpai.Anthropic` | Yes | -- | Claude model family |
-| Cohere | `Cisharpai.Cohere` | Yes | Yes | Grounded chat (RAG), multimodal embeddings |
+| Provider | Package | Chat | Embeddings | Reranking | Notes |
+|----------|---------|------|------------|-----------|-------|
+| OpenAI | `Cisharpai.OpenAi` | Yes | Yes | -- | Chat Completions, Responses API (GPT-5), reasoning models |
+| Azure OpenAI | `Cisharpai.Azure` | Yes | Yes | -- | Deployment-based routing, Azure AD auth, Responses API (GPT-5) |
+| Azure AI Inference | `Cisharpai.Azure` | Yes | Yes | -- | Model catalog: Phi, Llama, Mistral; image embeddings |
+| Anthropic | `Cisharpai.Anthropic` | Yes | -- | -- | Claude model family |
+| Cohere | `Cisharpai.Cohere` | Yes | Yes | Yes | Grounded chat (RAG), multimodal embeddings, reranking |
 
 ## Key Design Principles
 
@@ -38,6 +38,7 @@ Cisharpai is a unified .NET client library providing a single `IChatCompletionCl
 - [JSON Output](json-output.md) — JSON Mode and Structured Outputs via `IJsonOutputFeature`
 - [Vision](vision.md) — sending images in chat messages
 - [Embeddings](embeddings.md) — text, image, and multimodal embeddings
+- [Reranking](reranking.md) — relevance reranking via `IRerankerClient` (Cohere)
 - [Grounded Chat (RAG)](grounded-chat.md) — document grounding with citations via `IGroundedChatFeature` (Cohere)
 
 ### Operations

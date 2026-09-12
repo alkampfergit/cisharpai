@@ -6,6 +6,7 @@
 |---------|--------|--------------|-------------------|-----------|--------|
 | Chat Completions | Yes | Yes | Yes | Yes | Yes |
 | Text Embeddings | Yes | Yes | Yes | -- | Yes |
+| Reranking | -- | -- | -- | -- | Yes |
 | JSON Mode | Yes | Yes | Yes | Yes | Yes |
 | Structured Outputs | Yes | Yes | Varies | Yes | Yes |
 | Image Embeddings | -- | -- | Yes | -- | Yes |
@@ -37,6 +38,9 @@ if (feature is not null)
 | `IImageEmbeddingFeature` | Single image embedding |
 | `IMultimodalEmbeddingFeature` | Mixed text + image embedding |
 
+Reranking is not discovered through `Features` — it is the standalone `IRerankerClient`
+interface, implemented by Cohere only.
+
 ## Provider-Specific Notes
 
 ### OpenAI
@@ -58,7 +62,7 @@ if (feature is not null)
 - Claude model family only
 
 ### Cohere
-- Most feature-rich: grounded chat, image/multimodal embeddings
+- Most feature-rich: grounded chat, image/multimodal embeddings, reranking (`IRerankerClient`)
 - Vision is partial (image parts silently skipped in chat)
 - Uppercase ToolChoice values, `Specific` degrades to `REQUIRED`
 - Embedding InputType required for v3 models

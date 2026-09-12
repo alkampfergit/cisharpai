@@ -8,6 +8,7 @@ This page lists every feature supported by each provider integration in Cisharpa
 |---------|-----------|-------------|
 | Chat Completions | `IChatCompletionClient` | Send messages and receive model-generated replies |
 | Text Embeddings | `IEmbeddingClient` | Generate vector embeddings from text |
+| Reranking | `IRerankerClient` | Reorder candidate documents by relevance to a query |
 | JSON Output | `IJsonOutputFeature` | Force JSON Mode or Structured Outputs on chat responses |
 | Image Embeddings | `IImageEmbeddingFeature` | Generate vector embeddings from a single image |
 | Multimodal Embeddings | `IMultimodalEmbeddingFeature` | Embed mixed text + image inputs in a single request |
@@ -15,7 +16,7 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Tool Calling | `IToolCallingFeature` | Function calling / tool use in chat completions |
 | Vision (Image Input) | `LlmMessage.ContentParts` | Send images inline in chat messages for visual understanding |
 | Streaming | `IStreamingChatFeature` | Stream chat completions token-by-token via SSE |
-| Client Factory | `ICisharpaiClientFactory` | Create chat/embedding clients at runtime from provider-agnostic configuration |
+| Client Factory | `ICisharpaiClientFactory` | Create chat/embedding/reranker clients at runtime from provider-agnostic configuration |
 
 ## Support Matrix
 
@@ -23,6 +24,7 @@ This page lists every feature supported by each provider integration in Cisharpa
 |---------|--------|--------------|-------------------|-----------|--------|
 | Chat Completions | Yes | Yes | Yes | Yes | Yes |
 | Text Embeddings | Yes | Yes | Yes | -- | Yes |
+| Reranking | -- | -- | -- | -- | Yes |
 | JSON Mode | Yes | Yes | Yes | Yes | Yes |
 | Structured Outputs | Yes | Yes | Yes | Yes | Yes |
 | Image Embeddings | -- | -- | Yes | -- | Yes |
@@ -118,6 +120,7 @@ Azure OpenAI truncation is surfaced as a failed unified response when the provid
 |------------|---------|
 | Chat Completions | Command family models (command-a-03-2025, command-r-plus-08-2024, command-r-08-2024) |
 | Text Embeddings | Embed v3 and v4 models |
+| Reranking | `IRerankerClient` via `POST {BaseUrl}rerank`; rerank-v3.5, rerank-english-v3.0, rerank-multilingual-v3.0; `TopN` and `MaxTokensPerDocument` supported; `priority` reachable via `ExtraParameters`; `BaseUrl` retargets to Azure AI Foundry or other hosts |
 | JSON Mode | Via `response_format` type `json_object` |
 | Structured Outputs | Via `response_format` with `json_schema` parameter |
 | Image Embeddings | Single image via data URI (`data:image/{mime};base64,...`) |
