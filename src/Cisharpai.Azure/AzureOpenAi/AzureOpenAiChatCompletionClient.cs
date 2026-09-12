@@ -314,7 +314,11 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
     {
         var messages = new List<object>(await MapMessagesAsync(request.Messages, cancellationToken));
         var inputFiles = MapDocumentChunksToInputFiles(groundedChatOptions.Documents);
-        EmbedInputFilesInUserMessage(messages, inputFiles);
+        if (!EmbedInputFilesInUserMessage(messages, inputFiles))
+        {
+            return GroundedChatCompletionResponse.Error(
+                "Grounded chat requires at least one user message to attach documents to.");
+        }
 
         var providerRequest = new AzureOpenAiResponsesApiRequest
         {
@@ -1066,10 +1070,10 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         }).ToList();
     }
 
-    private static void EmbedInputFilesInUserMessage(List<object> messages, List<AzureOpenAiInputFile> inputFiles)
+    private static bool EmbedInputFilesInUserMessage(List<object> messages, List<AzureOpenAiInputFile> inputFiles)
     {
         var lastUserMsg = messages.OfType<AzureOpenAiChatMessage>().LastOrDefault(m => m.Role == "user");
-        if (lastUserMsg == null) return;
+        if (lastUserMsg == null) return false;
 
         var contentItems = new List<object>();
         contentItems.AddRange(inputFiles);
@@ -1085,6 +1089,7 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         }
 
         lastUserMsg.Content = contentItems;
+        return true;
     }
 
     private static GroundedChatCompletionResponse MapGroundedChatResponse(

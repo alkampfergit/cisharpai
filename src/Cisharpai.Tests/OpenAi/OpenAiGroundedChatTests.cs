@@ -26,8 +26,8 @@ public sealed class OpenAiGroundedChatTests
                             "annotations": [
                                 {
                                     "type": "file_citation",
-                                    "file_id": "doc-1",
-                                    "index": 25
+                                    "file_id": "file-abc",
+                                    "index": 0
                                 }
                             ]
                         }
@@ -114,13 +114,13 @@ public sealed class OpenAiGroundedChatTests
                             "annotations": [
                                 {
                                     "type": "file_citation",
-                                    "file_id": "doc-1",
+                                    "file_id": "file-abc",
                                     "index": 0
                                 },
                                 {
                                     "type": "file_citation",
-                                    "file_id": "doc-2",
-                                    "index": 40
+                                    "file_id": "file-def",
+                                    "index": 1
                                 }
                             ]
                         }
@@ -151,7 +151,7 @@ public sealed class OpenAiGroundedChatTests
                                 {
                                     "type": "file_citation",
                                     "file_id": "file-opaque-abc123",
-                                    "index": 25
+                                    "index": 99
                                 }
                             ]
                         }
@@ -191,6 +191,10 @@ public sealed class OpenAiGroundedChatTests
     private static ChatCompletionRequest CreateReasoningRequest() =>
         new(Messages: [new LlmMessage(LlmRole.User, "What is the capital of France?")],
             Model: "o4-mini");
+
+    private static ChatCompletionRequest CreateSystemOnlyRequest() =>
+        new(Messages: [new LlmMessage(LlmRole.System, "You are a helpful assistant.")],
+            Model: "gpt-5-0513");
 
     private static GroundedChatOptions CreateOptionsWithKeyValueDocs() =>
         new(Documents:
@@ -483,7 +487,7 @@ public sealed class OpenAiGroundedChatTests
     }
 
     [Test]
-    public async Task GroundedChat_MapsCitationsFromAnnotations_FileIdMatchesDocId()
+    public async Task GroundedChat_MapsCitationsFromAnnotations_IndexResolvesDocument()
     {
         var (response, _) = await ExecuteGroundedChat(GroundedResponseWithCitations);
 
@@ -492,9 +496,9 @@ public sealed class OpenAiGroundedChatTests
         var citation = response.Citations[0];
         Assert.Multiple(() =>
         {
-            Assert.That(citation.Start, Is.EqualTo(25));
-            Assert.That(citation.End, Is.EqualTo(30));
-            Assert.That(citation.Text, Is.EqualTo("Paris"));
+            Assert.That(citation.Text, Is.Empty, "file_citation has no character offsets; text should be empty");
+            Assert.That(citation.Start, Is.EqualTo(0));
+            Assert.That(citation.End, Is.EqualTo(0));
             Assert.That(citation.Type, Is.EqualTo("file_citation"));
             Assert.That(citation.Sources, Has.Count.EqualTo(1));
             Assert.That(citation.Sources[0].Id, Is.EqualTo("doc-1"));
@@ -528,7 +532,7 @@ public sealed class OpenAiGroundedChatTests
         var citation = response.Citations[0];
         Assert.Multiple(() =>
         {
-            Assert.That(citation.Text, Is.EqualTo("Paris"));
+            Assert.That(citation.Text, Is.Empty);
             Assert.That(citation.Sources[0].Id, Is.EqualTo("file-opaque-abc123"));
         });
     }
@@ -564,6 +568,31 @@ public sealed class OpenAiGroundedChatTests
         var (response, _) = await ExecuteGroundedChat(GroundedResponseWithCitations);
 
         Assert.That(response.Citations[0].Sources[0].Id, Is.EqualTo("doc-1"));
+    }
+
+    [Test]
+    public async Task GroundedChat_PopulatesSourceData_ForStructuredDocuments()
+    {
+        var (response, _) = await ExecuteGroundedChat(GroundedResponseWithCitations);
+
+        var source = response.Citations[0].Sources[0];
+        Assert.Multiple(() =>
+        {
+            Assert.That(source.Data, Is.Not.Null);
+            Assert.That(source.Data!["title"], Is.EqualTo("France"));
+            Assert.That(source.Data["snippet"], Is.EqualTo("Paris is the capital of France."));
+        });
+    }
+
+    [Test]
+    public async Task GroundedChat_SourceDataIsNull_ForTextDocuments()
+    {
+        var (response, _) = await ExecuteGroundedChat(
+            GroundedResponseWithCitations,
+            options: CreateOptionsWithTextDocs());
+
+        var source = response.Citations[0].Sources[0];
+        Assert.That(source.Data, Is.Null);
     }
 
     [Test]
@@ -614,6 +643,20 @@ public sealed class OpenAiGroundedChatTests
         {
             Assert.That(response.IsSuccess, Is.False);
             Assert.That(response.ErrorMessage, Does.Contain("document"));
+        });
+    }
+
+    [Test]
+    public async Task GroundedChat_ReturnsError_WhenNoUserMessage()
+    {
+        var (response, _) = await ExecuteGroundedChat(
+            GroundedResponseNoCitations,
+            request: CreateSystemOnlyRequest());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.False);
+            Assert.That(response.ErrorMessage, Does.Contain("user message"));
         });
     }
 

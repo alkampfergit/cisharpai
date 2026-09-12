@@ -26,8 +26,8 @@ public sealed class AzureOpenAiGroundedChatTests
                             "annotations": [
                                 {
                                     "type": "file_citation",
-                                    "file_id": "doc-1",
-                                    "index": 25
+                                    "file_id": "file-abc",
+                                    "index": 0
                                 }
                             ]
                         }
@@ -83,6 +83,9 @@ public sealed class AzureOpenAiGroundedChatTests
 
     private static ChatCompletionRequest CreateRequest() =>
         new(Messages: [new LlmMessage(LlmRole.User, "What is the capital of France?")]);
+
+    private static ChatCompletionRequest CreateSystemOnlyRequest() =>
+        new(Messages: [new LlmMessage(LlmRole.System, "You are a helpful assistant.")]);
 
     private static GroundedChatOptions CreateOptionsWithTextDocs() =>
         new(Documents:
@@ -281,10 +284,35 @@ public sealed class AzureOpenAiGroundedChatTests
         var citation = response.Citations[0];
         Assert.Multiple(() =>
         {
-            Assert.That(citation.Start, Is.EqualTo(25));
-            Assert.That(citation.End, Is.EqualTo(30));
-            Assert.That(citation.Text, Is.EqualTo("Paris"));
+            Assert.That(citation.Text, Is.Empty, "file_citation has no character offsets; text should be empty");
+            Assert.That(citation.Start, Is.EqualTo(0));
+            Assert.That(citation.End, Is.EqualTo(0));
             Assert.That(citation.Sources[0].Id, Is.EqualTo("doc-1"));
+        });
+    }
+
+    [Test]
+    public async Task GroundedChat_PopulatesSourceData_ForStructuredDocuments()
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(GroundedResponseWithCitations, System.Text.Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://test.openai.azure.com/") };
+        var client = new AzureOpenAiChatCompletionClient(httpClient, CreateGpt5Options());
+
+        var response = await client.GetGroundedChatCompletionAsync(
+            CreateRequest(),
+            CreateOptionsWithKeyValueDocs());
+
+        var source = response.Citations[0].Sources[0];
+        Assert.Multiple(() =>
+        {
+            Assert.That(source.Data, Is.Not.Null);
+            Assert.That(source.Data!["title"], Is.EqualTo("France"));
+            Assert.That(source.Data["snippet"], Is.EqualTo("Paris is the capital of France."));
         });
     }
 
@@ -439,6 +467,29 @@ public sealed class AzureOpenAiGroundedChatTests
         {
             Assert.That(response.IsSuccess, Is.False);
             Assert.That(response.ErrorMessage, Does.Contain("document"));
+        });
+    }
+
+    [Test]
+    public async Task GroundedChat_ReturnsError_WhenNoUserMessage()
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(GroundedResponseNoCitations, System.Text.Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://test.openai.azure.com/") };
+        var client = new AzureOpenAiChatCompletionClient(httpClient, CreateGpt5Options());
+
+        var response = await client.GetGroundedChatCompletionAsync(
+            CreateSystemOnlyRequest(),
+            CreateOptionsWithTextDocs());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.False);
+            Assert.That(response.ErrorMessage, Does.Contain("user message"));
         });
     }
 

@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Text;
 using System.Text.Json;
 using Cisharpai.Models;
@@ -38,21 +39,22 @@ public static class GroundedChatHelper
             .Select(a =>
             {
                 var (citedText, citationStart, citationEnd) =
-                    ResolveCitedText(content, a.StartIndex, a.EndIndex, a.Index);
-                var sourceId = ResolveSourceId(a.Filename, a.FileId, filenameToDocId);
+                    ResolveCitedText(content, a.StartIndex, a.EndIndex);
+                var (sourceId, sourceData) =
+                    ResolveSourceId(a.Filename, a.FileId, a.Index, documents, filenameToDocId);
 
                 return new Citation(
                     Start: citationStart,
                     End: citationEnd,
                     Text: citedText,
-                    Sources: [new CitationSource(Id: sourceId)],
+                    Sources: [new CitationSource(Id: sourceId, Data: sourceData)],
                     Type: "file_citation");
             })
             .ToList();
     }
 
     private static (string Text, int Start, int End) ResolveCitedText(
-        string content, int? startIndex, int? endIndex, int? index)
+        string content, int? startIndex, int? endIndex)
     {
         if (startIndex.HasValue && endIndex.HasValue
             && endIndex.Value > startIndex.Value
@@ -61,24 +63,35 @@ public static class GroundedChatHelper
             return (content[startIndex.Value..endIndex.Value], startIndex.Value, endIndex.Value);
         }
 
-        if (index is { } idx && idx >= 0 && idx < content.Length)
-        {
-            var wordEnd = idx;
-            while (wordEnd < content.Length && !char.IsWhiteSpace(content[wordEnd]) && content[wordEnd] != '.')
-                wordEnd++;
-            return (content[idx..wordEnd], idx, wordEnd);
-        }
-
         return (string.Empty, 0, 0);
     }
 
-    private static string ResolveSourceId(
-        string? filename, string? fileId, Dictionary<string, string> filenameToDocId)
+    private static (string Id, IReadOnlyDictionary<string, string>? Data) ResolveSourceId(
+        string? filename, string? fileId, int? index,
+        IReadOnlyList<DocumentChunk> documents, Dictionary<string, string> filenameToDocId)
     {
+        // Primary: use index (file ordinal) to look up the document directly
+        if (index.HasValue && index.Value >= 0 && index.Value < documents.Count)
+        {
+            var doc = documents[index.Value];
+            return (doc.Id ?? $"document_{index.Value}", doc.Data);
+        }
+
         if (filename is not null && filenameToDocId.TryGetValue(filename, out var docIdByName))
-            return docIdByName;
+            return (docIdByName, FindDocData(docIdByName, documents));
         if (fileId is not null && filenameToDocId.TryGetValue(fileId, out var docIdByFileId))
-            return docIdByFileId;
-        return fileId ?? filename ?? "unknown";
+            return (docIdByFileId, FindDocData(docIdByFileId, documents));
+        return (fileId ?? filename ?? "unknown", null);
+    }
+
+    private static IReadOnlyDictionary<string, string>? FindDocData(
+        string docId, IReadOnlyList<DocumentChunk> documents)
+    {
+        for (var i = 0; i < documents.Count; i++)
+        {
+            if (string.Equals(documents[i].Id, docId, StringComparison.OrdinalIgnoreCase))
+                return documents[i].Data;
+        }
+        return null;
     }
 }

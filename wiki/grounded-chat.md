@@ -197,7 +197,7 @@ OpenAI and Azure OpenAI grounded chat uses the Responses API's `input_file` tran
 - **GPT-5 only**: Returns `IsSuccess=false` with a descriptive error for non-GPT-5 models (Legacy, Reasoning). No silent fallback to prompt injection.
 - **`CitationMode` ignored**: OpenAI always returns annotations when sources are provided — the `CitationMode` setting has no effect (any value is accepted silently).
 - **Citation type**: OpenAI citations have `Type="file_citation"` (vs. Cohere's `"TEXT_CONTENT"`).
-- **Citation text**: Extracted from the response content using the annotation's `start_index`/`end_index` (Cohere provides the text directly in the citation object).
+- **Citation text**: OpenAI `file_citation` annotations do not include character offsets (`start_index`/`end_index` only appear on `url_citation`/`container_file_citation`). `Citation.Text` is empty and `Citation.Start`/`End` are 0 for OpenAI/Azure citations. Use `CitationSource.Id` to identify which document was cited. `CitationSource.Data` is populated when the source document used structured `Data`.
 
 ### Example (OpenAI)
 
@@ -259,3 +259,5 @@ var response = await groundedFeature.GetGroundedChatCompletionAsync(request, opt
 | Citation offsets incorrect (Cohere) | For the most precise offsets request `CitationMode.Accurate` against a `command-r` model. `command-a` models do not support `Accurate`; the provider downgrades to `Fast` and logs a warning. |
 | "documents not supported" error (Cohere) | Check that you're using a supported model (Command-R, Command-R+, Command-A). |
 | `CitedText` is null (Cohere) | This field is only populated by Anthropic. Cohere does not return source-level cited text. |
+| `Citation.Text` is empty (OpenAI/Azure) | OpenAI `file_citation` annotations do not include character offsets. Use `CitationSource.Id` to identify the cited document and `CitationSource.Data` (if structured) for content. |
+| "user message" error (OpenAI/Azure) | Grounded chat requires at least one user message to attach documents to. Ensure your request includes a user-role message. |
