@@ -9,7 +9,7 @@ public static class GroundedChatHelper
 {
     public static (string Filename, string FileData) EncodeDocumentChunk(DocumentChunk doc, int index)
     {
-        var content = doc.Text ?? JsonSerializer.Serialize(doc.Data!);
+        var content = string.IsNullOrWhiteSpace(doc.Text) ? JsonSerializer.Serialize(doc.Data!) : doc.Text;
         var base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(content));
         return (
             doc.Id ?? $"document_{index}.txt",
@@ -77,8 +77,9 @@ public static class GroundedChatHelper
     {
         if (index.HasValue && index.Value >= 0 && index.Value < documents.Count)
         {
-            var docId = documents[index.Value].Id ?? $"document_{index.Value}";
-            return (docId, docIdToData.GetValueOrDefault(docId));
+            var doc = documents[index.Value];
+            var docId = doc.Id ?? $"document_{index.Value}";
+            return (docId, CloneData(doc.Data));
         }
 
         if (filename is not null && filenameToDocId.TryGetValue(filename, out var docIdByName))

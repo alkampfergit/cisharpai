@@ -837,6 +837,66 @@ public sealed class OpenAiGroundedChatTests
 
     #endregion
 
+    #region Duplicate document IDs and empty-text encoding
+
+    [Test]
+    public async Task GroundedChat_DuplicateDocIds_ResolveDataByOrdinal()
+    {
+        var options = new GroundedChatOptions(
+            Documents:
+            [
+                new DocumentChunk(
+                    Id: "shared-id",
+                    Data: new Dictionary<string, string> { ["city"] = "Paris" }),
+                new DocumentChunk(
+                    Id: "shared-id",
+                    Data: new Dictionary<string, string> { ["city"] = "Berlin" })
+            ]);
+
+        var (response, _) = await ExecuteGroundedChat(
+            GroundedResponseMultipleCitations,
+            options: options);
+
+        Assert.That(response.Citations, Has.Count.EqualTo(2));
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.Citations[0].Sources[0].Data!["city"], Is.EqualTo("Paris"));
+            Assert.That(response.Citations[1].Sources[0].Data!["city"], Is.EqualTo("Berlin"));
+        });
+    }
+
+    [Test]
+    public async Task GroundedChat_EmptyTextWithData_SerializesDataNotEmptyString()
+    {
+        var options = new GroundedChatOptions(
+            Documents:
+            [
+                new DocumentChunk(
+                    Id: "doc-1",
+                    Text: "",
+                    Data: new Dictionary<string, string> { ["title"] = "France" })
+            ]);
+
+        var (_, capturedBody) = await ExecuteGroundedChat(
+            GroundedResponseWithCitations,
+            options: options);
+
+        var doc = JsonDocument.Parse(capturedBody!);
+        var input = doc.RootElement.GetProperty("input");
+        var userMessage = input.EnumerateArray()
+            .First(e => e.TryGetProperty("role", out var r) && r.GetString() == "user");
+        var firstFile = userMessage.GetProperty("content").EnumerateArray()
+            .First(e => e.TryGetProperty("type", out var t) && t.GetString() == "input_file");
+
+        var fileData = firstFile.GetProperty("file_data").GetString()!;
+        var base64 = fileData["data:text/plain;base64,".Length..];
+        var decoded = System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(base64));
+        Assert.That(decoded, Does.Contain("France"),
+            "Empty Text with populated Data should serialize Data, not produce an empty string");
+    }
+
+    #endregion
+
     #region Data cloning and id-less document lookup (Issues 5-6)
 
     [Test]
