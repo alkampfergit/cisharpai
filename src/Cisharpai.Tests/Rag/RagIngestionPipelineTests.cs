@@ -243,6 +243,17 @@ public class RagIngestionPipelineTests
     }
 
     [Test]
+    public void AddCisharpaiRag_SecondRegistrationThrows()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IEmbeddingClient>(_ => new FakeEmbeddingClient());
+        services.AddCisharpaiRag();
+        Assert.Throws<InvalidOperationException>(() => services.AddCisharpaiRag(
+            sp => sp.GetRequiredService<IEmbeddingClient>(),
+            options => options.Embedding.BatchSize = 1));
+    }
+
+    [Test]
     public void ConstructorsAndInputs_RejectNull()
     {
         var chunker = new FixedSizeChunker();

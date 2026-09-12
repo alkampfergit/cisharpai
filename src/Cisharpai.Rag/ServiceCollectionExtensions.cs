@@ -14,6 +14,7 @@ public static class ServiceCollectionExtensions
         services.AddCisharpaiRag(sp => sp.GetRequiredService<IEmbeddingClient>(), configure);
 
     /// <summary>Registers RAG ingestion with a provider factory, including keyed/scoped clients.</summary>
+    /// <exception cref="InvalidOperationException">Thrown when RAG services have already been registered.</exception>
     public static IServiceCollection AddCisharpaiRag(
         this IServiceCollection services,
         Func<IServiceProvider, IEmbeddingClient> embeddingClientFactory,
@@ -21,6 +22,9 @@ public static class ServiceCollectionExtensions
     {
         ArgumentNullException.ThrowIfNull(services);
         ArgumentNullException.ThrowIfNull(embeddingClientFactory);
+        if (services.Any(d => d.ServiceType == typeof(IRagIngestionPipeline)))
+            throw new InvalidOperationException("AddCisharpaiRag has already been called. Only a single RAG registration is supported.");
+
         services.AddOptions<RagOptions>();
         if (configure is not null)
             services.Configure(configure);

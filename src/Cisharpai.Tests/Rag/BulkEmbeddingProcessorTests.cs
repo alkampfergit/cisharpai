@@ -281,4 +281,35 @@ public class BulkEmbeddingProcessorTests
     [Test]
     public void InvalidInputType_ThrowsAtConstruction() =>
         Assert.Throws<ArgumentOutOfRangeException>(() => new BulkEmbeddingProcessor(Client(_ => Response()), new() { InputType = (EmbeddingInputType)999 }));
+
+    [Test]
+    public async Task Base64Response_YieldsExplicitError()
+    {
+        var base64Response = new EmbeddingResponse(
+            Embeddings: [],
+            Base64Embeddings: ["AAAA"],
+            Model: "model",
+            TotalTokens: 1);
+        var processor = new BulkEmbeddingProcessor(Client(_ => base64Response), new() { BatchSize = 1 });
+        var batches = await Collect(processor.EmbedAsync(new[] { Chunk(0) }));
+        Assert.That(batches, Has.Count.EqualTo(1));
+        Assert.Multiple(() =>
+        {
+            Assert.That(batches[0].IsSuccess, Is.False);
+            Assert.That(batches[0].ErrorMessage, Does.Contain("base64"));
+        });
+    }
+
+    [Test]
+    public async Task MoreVectorsThanChunks_IsRejected()
+    {
+        var processor = new BulkEmbeddingProcessor(Client(_ => Response([1], [2], [3])), new() { BatchSize = 2 });
+        var batches = await Collect(processor.EmbedAsync(new[] { Chunk(0), Chunk(1) }));
+        Assert.That(batches, Has.Count.EqualTo(1));
+        Assert.Multiple(() =>
+        {
+            Assert.That(batches[0].IsSuccess, Is.False);
+            Assert.That(batches[0].ErrorMessage, Does.Contain("count"));
+        });
+    }
 }

@@ -102,7 +102,11 @@ public sealed class BulkEmbeddingProcessor : IBulkEmbeddingProcessor
     private static string? Validate(EmbeddingResponse response, int count, int? expectedDimensions)
     {
         if (response.Embeddings is null || response.Embeddings.Count != count)
+        {
+            if (response.Base64Embeddings is { Count: > 0 })
+                return "Embedding response contains base64-encoded vectors. BulkEmbeddingProcessor requires float encoding; remove any ExtraParameters override of encoding_format.";
             return "Embedding response vector count does not match the submitted chunk count.";
+        }
         foreach (var vector in response.Embeddings)
         {
             if (vector is null || vector.Length == 0)
