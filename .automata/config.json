@@ -12,7 +12,8 @@
     }
   },
   "allowedUsers": [
-    "alkampfergit"
+    "alkampfergit",
+    "copilot"
   ],
   "agentUser": "alkampferoutlook"
 }
