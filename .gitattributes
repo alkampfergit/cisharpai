@@ -1,3 +1,18 @@
+# Normalize every text file to LF *in the repository*. Working-tree endings are
+# then decided per-type below, or by the platform default. This is what stops a
+# tool that rewrites a whole file from turning a four-line edit into a
+# whole-file diff (see PR #44, where ~1300 lines of diff were pure line-ending
+# churn).
+* text=auto
+
+# Windows-native tooling writes and expects CRLF in the working tree.
+*.sln   text eol=crlf
+*.ps1   text eol=crlf
+
+# Must be LF to execute on Linux/macOS, including inside the devcontainer.
+*.sh    text eol=lf
+*.zsh   text eol=lf
+*.cron  text eol=lf
 
 # Use bd merge for beads JSONL files
 .beads/issues.jsonl merge=beads
