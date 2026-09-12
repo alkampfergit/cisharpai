@@ -71,11 +71,33 @@ For pre-chunked input, call `processor.EmbedAsync(chunks, progress, cancellation
 
 A batch closes when **either** constraint is hit:
 
-- **`MaxBatchItems`** (int, default 32) — maximum number of chunks per request. Set this based on your provider's per-request item limit (e.g. 96 for OpenAI, 96 for Cohere, 32 as conservative fallback).
+- **`MaxBatchItems`** (int, default 32) — maximum number of chunks per request.
 - **`MaxBatchTokens`** (int?, default null) — maximum estimated tokens per request. When set, the batch closes when the next chunk would push the running estimate past the budget. The first chunk is always included regardless of budget.
 - **`TokenEstimator`** (`Func<string, int>?`, default `s => s.Length / 4`) — token estimation function. The default uses a conservative character-based heuristic. Swap in a real tokenizer for more accurate batching.
 
-Since `BulkEmbeddingProcessor` receives `IEmbeddingClient` without knowing the provider, the right ceilings must come from the caller or DI registration — not from sniffing the client type.
+### Per-provider presets
+
+`BulkEmbeddingProcessor` receives an `IEmbeddingClient` without knowing which provider is behind it, so it cannot pick ceilings itself. Select them with a profile instead of sniffing the client type:
+
+```csharp
+// New options preconfigured for a provider:
+var options = BulkEmbeddingOptions.ForProvider(EmbeddingProviderProfile.Cohere);
+
+// Or apply a profile to options you already have (e.g. after configuration binding):
+options.ApplyProfile(EmbeddingProviderProfile.AzureOpenAi);
+```
+
+| `EmbeddingProviderProfile` | `MaxBatchItems` | `MaxBatchTokens` |
+|---|---|---|
+| `Conservative` (matches the defaults) | `32` | `null` |
+| `OpenAi` | `96` | `250000` |
+| `AzureOpenAi` | `16` | `100000` |
+| `AzureAiInference` | `64` | `100000` |
+| `Cohere` | `96` | `100000` |
+
+`ApplyProfile` overwrites **only** `MaxBatchItems` and `MaxBatchTokens` and returns the same instance, so apply it *before* any explicit batch-sizing override — otherwise the profile replaces it. Every other option is left untouched.
+
+These values are conservative starting points chosen to stay inside each provider's documented per-request ceilings; they are not authoritative provider limits. Deployments, models and quotas vary — verify them for yours and override the two properties when they differ.
 
 ## Concurrency
 
@@ -83,11 +105,13 @@ Since `BulkEmbeddingProcessor` receives `IEmbeddingClient` without knowing the p
 
 `BatchIndex` ordering is preserved regardless of completion order — results are always yielded in input order. Already-completed batches are never discarded on cancellation.
 
+Out-of-order completion means a finished batch may have to wait for an earlier, slower one before it can be handed to the caller. **`MaxPendingBatches`** (int?, default `MaxConcurrency * 2`) bounds how many dispatched batches may be waiting: the producer reserves a slot before dispatching and the consumer releases it only once that batch has been delivered. Input is therefore never read further ahead than the caller can consume, and memory does not grow with corpus size no matter how slow the head batch or the consumer is. Raise it to absorb more completion-order jitter at the cost of buffered vectors; it must be at least `MaxConcurrency`. It is ignored when `MaxConcurrency` is 1, which never reorders.
+
 ## Retry
 
 **`MaxRetries`** (int, default 3) and **`RetryBaseDelay`** (TimeSpan, default 1s) control retry behavior. Transient failures (HTTP 429, 5xx) are retried with exponential backoff and jitter. Only the failed batch retries; other batches continue. After exhausting retries, the batch is surfaced as a failed `EmbeddingBatchResult` and processing continues to the next batch.
 
-Override the default transient detection with **`IsTransientError`** (`Func<EmbeddingResponse, bool>?`). The default heuristic (`BulkEmbeddingProcessor.DefaultIsTransient`) checks for `429`, `rate limit`, `too many requests`, `throttl*`, `500`–`504`, and common server error phrases in the error message.
+Override the default transient detection with **`IsTransientError`** (`Func<EmbeddingResponse, bool>?`). The default heuristic (`BulkEmbeddingProcessor.DefaultIsTransient`) scans the error message for a standalone `429` or any status in the full `500`–`599` range, plus the phrases `rate limit`, `too many requests`, `throttl*`, `internal server error`, `service unavailable`, `bad gateway` and `gateway timeout`. Digit runs that are not exactly three digits, or that are glued to a letter (a model name such as `embed-500d`), are ignored. Supply `IsTransientError` when your provider reports transient conditions differently.
 
 Set `MaxRetries = 0` to disable retry entirely.
 
@@ -121,7 +145,9 @@ The consuming application owns configuration binding. A console host can referen
       "MaxBatchItems": 96,
       "MaxBatchTokens": 8000,
       "MaxConcurrency": 3,
+      "MaxPendingBatches": 6,
       "MaxRetries": 3,
+      "RetryBaseDelay": "00:00:01",
       "Model": "text-embedding-3-small",
       "InputType": "Document",
       "IncludeRawResponse": false
@@ -133,6 +159,7 @@ The consuming application owns configuration binding. A console host can referen
 ```csharp
 using Cisharpai.OpenAi;
 using Cisharpai.Rag;
+using Cisharpai.Rag.Embeddings;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -145,6 +172,8 @@ builder.Services.AddOpenAiEmbeddingClient(options =>
 });
 builder.Services.AddCisharpaiRag(options =>
 {
+    // Provider preset first, so bound configuration can still override the batch ceilings.
+    options.Embedding.ApplyProfile(EmbeddingProviderProfile.OpenAi);
     builder.Configuration.GetSection("Rag").Bind(options);
     // Code-only overrides applied after binding:
     options.Embedding.TokenEstimator = text => text.Length / 4;
@@ -157,7 +186,7 @@ var pipeline = scope.ServiceProvider.GetRequiredService<IRagIngestionPipeline>()
 
 For code-only DI configuration, omit `Bind` and assign properties in the callback. `AddCisharpaiRag()` uses all defaults and resolves the unkeyed `IEmbeddingClient`; register that client separately. Processors and pipelines are scoped, so resolve them inside a scope. Options are validated and snapshotted when components are constructed/resolved, before provider traffic; changes to the original options do not reconfigure existing components. Configuration reload is not automatic.
 
-`TokenEstimator` and `IsTransientError` are `Func<>` delegates and cannot be bound from JSON. Set them in code after `Bind`. `RetryBaseDelay` binds from `"HH:MM:SS"` or `"SS"` format strings.
+`TokenEstimator` and `IsTransientError` are `Func<>` delegates and cannot be bound from JSON. Set them in code after `Bind`. `RetryBaseDelay` binds from standard `TimeSpan` strings such as `"00:00:01"` (one second) or `"00:00:00.250"` (250 ms). Do not use a bare number: `"1"` parses as **one day**, not one second.
 
 ### Keyed providers
 
@@ -198,6 +227,7 @@ The factory runs in the scope resolving the processor. Choose Azure OpenAI, Azur
 | `Embedding.MaxBatchTokens` | `null` | Optional positive token budget per request; closes batch when exceeded |
 | `Embedding.TokenEstimator` | `s => s.Length / 4` | Token estimation function; must not be null when `MaxBatchTokens` is set |
 | `Embedding.MaxConcurrency` | `1` | Parallel requests; 1–32 |
+| `Embedding.MaxPendingBatches` | `null` | Dispatched batches awaiting in-order delivery; positive and ≥ `MaxConcurrency`. Defaults to `MaxConcurrency * 2` |
 | `Embedding.MaxRetries` | `3` | Retry count for transient failures; ≥ 0 |
 | `Embedding.RetryBaseDelay` | `1s` | Base delay for exponential backoff; > 0 |
 | `Embedding.IsTransientError` | `null` | Custom transient detection; uses `DefaultIsTransient` when null |

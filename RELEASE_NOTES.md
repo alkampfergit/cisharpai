@@ -6,8 +6,10 @@ This file is included in the NuGet packages. Keep a single line for each user-fa
 
 - Reranking: new `IRerankerClient` abstraction (`RerankRequest` / `RerankResponse` / `RerankResult`) with a Cohere implementation over `POST {BaseUrl}rerank` — register via `services.AddCohereRerankerClient(...)` (keyed overload available) or create at runtime through `ICisharpaiClientFactory.CreateRerankerClient`; set `CohereClientOptions.BaseUrl` to target Azure-hosted or self-hosted Cohere deployments, and reach Cohere's `priority` hint through `ExtraParameters`.
 - `Cisharpai.Testing` gains `FakeRerankerClient`, `FakeResponses.Rerank`/`RerankError`, and `services.AddFakeRerankerClient()` for testing rerank-dependent code without HTTP calls.
-- New `Cisharpai.Rag` package: Unicode-aware fixed-size chunking, bounded sequential bulk float embeddings and document ingestion, with validated options, direct/DI/keyed-provider configuration, cancellation and explicit partial batch results.
+- New `Cisharpai.Rag` package: Unicode-aware fixed-size chunking, bounded bulk float embeddings and document ingestion, with validated options, direct/DI/keyed-provider configuration, cancellation and explicit partial batch results.
 - `Cisharpai.Rag` bulk embedding hardened for real corpora: dual-constraint batch sizing (item count + token budget), bounded concurrency with ordered output, transient failure retry with exponential backoff, `IProgress<BulkEmbeddingProgress>` observability, and failed batches no longer stop the run. **Breaking**: `BatchSize` renamed to `MaxBatchItems`.
+- `Cisharpai.Rag` per-provider batch presets: `BulkEmbeddingOptions.ForProvider(EmbeddingProviderProfile.OpenAi)` (or `ApplyProfile` on existing options) sets the item and token ceilings for OpenAI, Azure OpenAI, Azure AI Inference and Cohere instead of the one global default of 32.
+- `Cisharpai.Rag` concurrent bulk embedding now bounds read-ahead with `BulkEmbeddingOptions.MaxPendingBatches` (default `MaxConcurrency * 2`), so a slow batch or slow consumer can no longer buffer an entire corpus in memory.
 
 ## 0.3.0
 

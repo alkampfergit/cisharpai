@@ -609,7 +609,7 @@ fake.EnqueueResponse(FakeResponses.Embeddings(new float[][]
 }));
 var pipeline = new RagIngestionPipeline(
     new FixedSizeChunker(new FixedSizeChunkerOptions { ChunkSize = 4, Overlap = 0 }),
-    new BulkEmbeddingProcessor(fake, new BulkEmbeddingOptions { BatchSize = 2 }));
+    new BulkEmbeddingProcessor(fake, new BulkEmbeddingOptions { MaxBatchItems = 2 }));
 
 var batches = new List<EmbeddingBatchResult>();
 await foreach (var batch in pipeline.IngestAsync(new[] { new RagDocument("doc", "abcdefgh") }))
@@ -622,7 +622,7 @@ Assert.That(batches[0].Items[1].Vector, Is.EqualTo(new float[] { 0, 1 }));
 Assert.That(fake.ReceivedRequests[0].Input, Is.EqualTo(new[] { "abcd", "efgh" }));
 ```
 
-For a failed provider batch, enqueue `FakeResponses.EmbeddingError("rate limit exceeded")`; assert `IsSuccess == false`, empty `Items`, retained `Chunks`, and no later provider requests. The fake's default response contains only one vector, so explicitly queue matching responses for multi-chunk batches. Cancellation is an exception, not an ordinary failed batch.
+For a failed provider batch, enqueue `FakeResponses.EmbeddingError("invalid input")`; assert `IsSuccess == false`, empty `Items`, and retained `Chunks`. Later batches still run, because a failed batch no longer stops the enumeration. A transient message such as `"rate limit exceeded"` or any `429`/`5xx` status is retried first, so set `MaxRetries = 0` (or `RetryBaseDelay` to something tiny) when asserting a transient failure, otherwise the fake's queue is drained by the retries. The fake's default response contains only one vector, so explicitly queue matching responses for multi-chunk batches. Cancellation is an exception, not an ordinary failed batch.
 
 Repository tests are in the existing `src/Cisharpai.Tests/Rag/` folder. They cover Unicode and overlap boundaries, option snapshots, lazy bulk processing, malformed vectors, partial failures, cancellation/disposal, pipeline composition and DI/keyed providers. Run them offline on both targets:
 

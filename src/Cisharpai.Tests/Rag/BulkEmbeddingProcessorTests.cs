@@ -491,6 +491,16 @@ public class BulkEmbeddingProcessorTests
     [TestCase("502 Bad Gateway", true)]
     [TestCase("503 Service Unavailable", true)]
     [TestCase("504 Gateway Timeout", true)]
+    [TestCase("501 Not Implemented", true)]
+    [TestCase("505 HTTP Version Not Supported", true)]
+    [TestCase("529 Overloaded", true)]
+    [TestCase("599 Network Connect Timeout Error", true)]
+    [TestCase("HTTP 508 from the gateway", true)]
+    [TestCase("400 Bad Request", false)]
+    [TestCase("401 Unauthorized", false)]
+    [TestCase("404 Not Found", false)]
+    [TestCase("Model embed-500d is not deployed", false)]
+    [TestCase("Request 5000 rejected", false)]
     [TestCase("internal server error", true)]
     [TestCase("service unavailable", true)]
     [TestCase("bad gateway", true)]
@@ -657,5 +667,102 @@ public class BulkEmbeddingProcessorTests
     {
         Assert.DoesNotThrow(() =>
             new BulkEmbeddingProcessor(Client(_ => Response()), new() { MaxRetries = 0 }));
+    }
+
+    // --- Bounded reordering window ---
+
+    [TestCase(0)]
+    [TestCase(-1)]
+    public void InvalidMaxPendingBatches_ThrowAtConstruction(int maxPendingBatches) =>
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new BulkEmbeddingProcessor(Client(_ => Response()), new() { MaxPendingBatches = maxPendingBatches }));
+
+    [Test]
+    public void MaxPendingBatchesBelowMaxConcurrency_ThrowsAtConstruction() =>
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new BulkEmbeddingProcessor(Client(_ => Response()), new() { MaxConcurrency = 4, MaxPendingBatches = 3 }));
+
+    [Test]
+    public void MaxPendingBatchesEqualToMaxConcurrency_IsValid() =>
+        Assert.DoesNotThrow(() =>
+            new BulkEmbeddingProcessor(Client(_ => Response()), new() { MaxConcurrency = 4, MaxPendingBatches = 4 }));
+
+    [Test]
+    public async Task Concurrency_ReadAheadIsBoundedByMaxPendingBatches()
+    {
+        const int sourceSize = 200;
+        const int window = 4;
+        var pulled = 0;
+
+        async IAsyncEnumerable<TextChunk> Source()
+        {
+            for (var i = 0; i < sourceSize; i++)
+            {
+                await Task.Yield();
+                Interlocked.Increment(ref pulled);
+                yield return Chunk(i);
+            }
+        }
+
+        var processor = new BulkEmbeddingProcessor(
+            Client(_ => Response([1])),
+            new() { MaxBatchItems = 1, MaxConcurrency = 2, MaxPendingBatches = window });
+
+        await using var enumerator = processor.EmbedAsync(Source()).GetAsyncEnumerator();
+        Assert.That(await enumerator.MoveNextAsync(), Is.True);
+
+        // The consumer stops here. Batches already handed over do not release their window slot until
+        // the consumer asks for the next one, so at most `window` batches can be dispatched plus the
+        // one the producer collected before blocking.
+        await Task.Delay(250);
+
+        Assert.That(Volatile.Read(ref pulled), Is.LessThanOrEqualTo(window + 1));
+    }
+
+    [Test]
+    public async Task SmallPendingWindow_StillYieldsEveryBatchInOrder()
+    {
+        var processor = new BulkEmbeddingProcessor(
+            Client(request => Response(request.Input.Select(_ => SingleOneVector).ToArray())),
+            new() { MaxBatchItems = 1, MaxConcurrency = 4, MaxPendingBatches = 4 });
+
+        var results = await Collect(processor.EmbedAsync(Enumerable.Range(0, 50).Select(Chunk)));
+
+        Assert.That(results, Has.Count.EqualTo(50));
+        Assert.That(results.Select(r => r.BatchIndex), Is.EqualTo(Enumerable.Range(0, 50).Select(i => (long)i)));
+        Assert.That(results.All(r => r.IsSuccess), Is.True);
+    }
+
+    [Test]
+    public async Task PendingWindow_DefaultsToTwiceMaxConcurrency()
+    {
+        const int sourceSize = 200;
+        var pulled = 0;
+        var release = new TaskCompletionSource();
+
+        async IAsyncEnumerable<TextChunk> Source()
+        {
+            for (var i = 0; i < sourceSize; i++)
+            {
+                await Task.Yield();
+                Interlocked.Increment(ref pulled);
+                yield return Chunk(i);
+            }
+        }
+
+        var client = Substitute.For<IEmbeddingClient>();
+        client.GetEmbeddingsAsync(Arg.Any<EmbeddingRequest>(), Arg.Any<CancellationToken>())
+            .Returns(_ => release.Task.ContinueWith(_ => Response([1]), TaskScheduler.Default));
+
+        var processor = new BulkEmbeddingProcessor(client, new() { MaxBatchItems = 1, MaxConcurrency = 3 });
+
+        await using var enumerator = processor.EmbedAsync(Source()).GetAsyncEnumerator();
+        var pending = enumerator.MoveNextAsync();
+        await Task.Delay(250);
+
+        Assert.That(Volatile.Read(ref pulled), Is.LessThanOrEqualTo(3 * 2 + 1));
+
+        release.SetResult();
+        Assert.That(await pending, Is.True);
     }
 }

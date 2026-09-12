@@ -9,7 +9,7 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Chat Completions | `IChatCompletionClient` | Send messages and receive model-generated replies |
 | Text Embeddings | `IEmbeddingClient` | Generate vector embeddings from text |
 | Reranking | `IRerankerClient` | Reorder candidate documents by relevance to a query |
-| RAG Ingestion | `IRagIngestionPipeline` (`Cisharpai.Rag`) | Fixed-size chunking and sequential bulk float embeddings |
+| RAG Ingestion | `IRagIngestionPipeline` (`Cisharpai.Rag`) | Fixed-size chunking and bulk float embeddings with per-provider batch ceilings, bounded concurrency and retry |
 | JSON Output | `IJsonOutputFeature` | Force JSON Mode or Structured Outputs on chat responses |
 | Image Embeddings | `IImageEmbeddingFeature` | Generate vector embeddings from a single image |
 | Multimodal Embeddings | `IMultimodalEmbeddingFeature` | Embed mixed text + image inputs in a single request |

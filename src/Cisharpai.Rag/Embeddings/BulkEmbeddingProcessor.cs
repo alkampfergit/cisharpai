@@ -102,7 +102,14 @@ public sealed class BulkEmbeddingProcessor : IBulkEmbeddingProcessor
             new UnboundedChannelOptions { SingleReader = true, SingleWriter = false });
         var dimensionState = new DimensionState(_options.Dimensions);
 
-        var producerTask = ProduceAndProcessAsync(chunks, channel.Writer, dimensionState, linkedCts.Token);
+        // The producer must acquire a window slot before dispatching a batch and the consumer releases
+        // it only after that batch has been handed to the caller. This bounds the number of dispatched
+        // but not-yet-yielded batches - and therefore the channel plus the reordering buffer - to
+        // MaxPendingBatches, regardless of corpus size or how far ahead completion order runs.
+        // The head batch is always dispatched before any later one, so a full window can always drain.
+        var windowSize = _options.EffectiveMaxPendingBatches;
+        using var window = new SemaphoreSlim(windowSize, windowSize);
+        var producerTask = ProduceAndProcessAsync(chunks, channel.Writer, dimensionState, window, linkedCts.Token);
 
         long completedBatches = 0;
         long totalChunksProcessed = 0;
@@ -124,6 +131,7 @@ public sealed class BulkEmbeddingProcessor : IBulkEmbeddingProcessor
                     if (!next.IsSuccess) failedBatches++;
                     progress?.Report(new BulkEmbeddingProgress(completedBatches, totalChunksProcessed, failedBatches));
                     yield return next;
+                    window.Release();
                 }
             }
             consumerDone = true;
@@ -144,6 +152,7 @@ public sealed class BulkEmbeddingProcessor : IBulkEmbeddingProcessor
         IAsyncEnumerable<TextChunk> chunks,
         ChannelWriter<EmbeddingBatchResult> writer,
         DimensionState dimensionState,
+        SemaphoreSlim window,
         CancellationToken cancellationToken)
     {
         using var semaphore = new SemaphoreSlim(_options.MaxConcurrency);
@@ -163,6 +172,9 @@ public sealed class BulkEmbeddingProcessor : IBulkEmbeddingProcessor
                 cancellationToken.ThrowIfCancellationRequested();
                 if (batch.Count == 0) break;
 
+                // Reserve a delivery slot before dispatching, so input is never read arbitrarily far
+                // ahead of what the caller has actually consumed.
+                await window.WaitAsync(cancellationToken).ConfigureAwait(false);
                 await semaphore.WaitAsync(cancellationToken).ConfigureAwait(false);
                 var idx = batchIndex++;
                 tasks.Add(ProcessAndWriteAsync(batch, idx, writer, semaphore, dimensionState, cancellationToken));
@@ -265,23 +277,51 @@ public sealed class BulkEmbeddingProcessor : IBulkEmbeddingProcessor
         return TimeSpan.FromMilliseconds(exponential + jitter);
     }
 
+    /// <summary>
+    /// Default transient classification: any HTTP 429 or 5xx status code mentioned in the error message,
+    /// plus the common throttling and server-error phrases providers return without a status code.
+    /// </summary>
     public static bool DefaultIsTransient(EmbeddingResponse response)
     {
         if (response.IsSuccess) return false;
         var msg = response.ErrorMessage;
         if (string.IsNullOrEmpty(msg)) return false;
-        return msg.Contains("429", StringComparison.Ordinal) ||
+        return ContainsTransientStatusCode(msg) ||
                msg.Contains("rate limit", StringComparison.OrdinalIgnoreCase) ||
                msg.Contains("too many requests", StringComparison.OrdinalIgnoreCase) ||
                msg.Contains("throttl", StringComparison.OrdinalIgnoreCase) ||
-               msg.Contains("500", StringComparison.Ordinal) ||
-               msg.Contains("502", StringComparison.Ordinal) ||
-               msg.Contains("503", StringComparison.Ordinal) ||
-               msg.Contains("504", StringComparison.Ordinal) ||
                msg.Contains("internal server error", StringComparison.OrdinalIgnoreCase) ||
                msg.Contains("service unavailable", StringComparison.OrdinalIgnoreCase) ||
                msg.Contains("bad gateway", StringComparison.OrdinalIgnoreCase) ||
                msg.Contains("gateway timeout", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Scans for a standalone three-digit number that is an HTTP 429 or any 5xx status. Digit runs of a
+    /// different length, or ones glued to a letter (a model name such as <c>embed-500d</c>), are skipped.
+    /// </summary>
+    private static bool ContainsTransientStatusCode(string message)
+    {
+        var index = 0;
+        while (index < message.Length)
+        {
+            if (!char.IsAsciiDigit(message[index]))
+            {
+                index++;
+                continue;
+            }
+
+            var start = index;
+            while (index < message.Length && char.IsAsciiDigit(message[index])) index++;
+            if (index - start != 3) continue;
+            if (start > 0 && char.IsAsciiLetter(message[start - 1])) continue;
+            if (index < message.Length && char.IsAsciiLetter(message[index])) continue;
+
+            var code = (message[start] - '0') * 100 + (message[start + 1] - '0') * 10 + (message[start + 2] - '0');
+            if (code == 429 || code is >= 500 and <= 599) return true;
+        }
+
+        return false;
     }
 
     private async Task<(List<TextChunk> Batch, TextChunk? Carryover)> CollectBatchAsync(
