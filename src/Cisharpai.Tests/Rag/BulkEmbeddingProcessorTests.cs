@@ -344,8 +344,8 @@ public class BulkEmbeddingProcessorTests
         var batches = await Collect(processor.EmbedAsync(chunks));
 
         Assert.That(batches, Has.Count.EqualTo(2));
-        Assert.That(requests[0].Input.Count, Is.EqualTo(2));
-        Assert.That(requests[1].Input.Count, Is.EqualTo(2));
+        Assert.That(requests[0].Input, Has.Count.EqualTo(2));
+        Assert.That(requests[1].Input, Has.Count.EqualTo(2));
         Assert.That(requests[0].Input[0], Is.EqualTo("aaaa"));
         Assert.That(requests[0].Input[1], Is.EqualTo("bbbb"));
         Assert.That(requests[1].Input[0], Is.EqualTo("cccccc"));
@@ -369,9 +369,9 @@ public class BulkEmbeddingProcessorTests
         }));
 
         Assert.That(batches, Has.Count.EqualTo(2));
-        Assert.That(requests[0].Input.Count, Is.EqualTo(1));
+        Assert.That(requests[0].Input, Has.Count.EqualTo(1));
         Assert.That(requests[0].Input[0], Is.EqualTo("this-exceeds-budget"));
-        Assert.That(requests[1].Input.Count, Is.EqualTo(1));
+        Assert.That(requests[1].Input, Has.Count.EqualTo(1));
     }
 
     [Test]
@@ -385,9 +385,9 @@ public class BulkEmbeddingProcessorTests
         }), new() { MaxBatchItems = 2, MaxBatchTokens = 10000, TokenEstimator = s => s.Length });
 
         var batches = await Collect(processor.EmbedAsync(Enumerable.Range(0, 5).Select(Chunk)));
-        Assert.That(requests[0].Input.Count, Is.EqualTo(2));
-        Assert.That(requests[1].Input.Count, Is.EqualTo(2));
-        Assert.That(requests[2].Input.Count, Is.EqualTo(1));
+        Assert.That(requests[0].Input, Has.Count.EqualTo(2));
+        Assert.That(requests[1].Input, Has.Count.EqualTo(2));
+        Assert.That(requests[2].Input, Has.Count.EqualTo(1));
     }
 
     // --- Retry ---

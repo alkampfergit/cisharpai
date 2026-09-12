@@ -21,21 +21,7 @@ public sealed class BulkEmbeddingOptions
 
     internal BulkEmbeddingOptions Snapshot()
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(MaxBatchItems);
-        if (Dimensions is <= 0)
-            throw new ArgumentOutOfRangeException(nameof(Dimensions), Dimensions, "Dimensions must be positive when specified.");
-        if (!Enum.IsDefined(InputType))
-            throw new ArgumentOutOfRangeException(nameof(InputType), InputType, "Unknown embedding input type.");
-        if (MaxBatchTokens is <= 0)
-            throw new ArgumentOutOfRangeException(nameof(MaxBatchTokens), MaxBatchTokens, "MaxBatchTokens must be positive when specified.");
-        if (MaxBatchTokens is not null && TokenEstimator is null)
-            throw new ArgumentException("TokenEstimator must not be null when MaxBatchTokens is set.", nameof(TokenEstimator));
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(MaxConcurrency);
-        if (MaxConcurrency > 32)
-            throw new ArgumentOutOfRangeException(nameof(MaxConcurrency), MaxConcurrency, "MaxConcurrency must not exceed 32.");
-        ArgumentOutOfRangeException.ThrowIfNegative(MaxRetries);
-        if (RetryBaseDelay <= TimeSpan.Zero)
-            throw new ArgumentOutOfRangeException(nameof(RetryBaseDelay), RetryBaseDelay, "RetryBaseDelay must be positive.");
+        ValidateOptions(MaxBatchItems, Dimensions, InputType, MaxBatchTokens, TokenEstimator, MaxConcurrency, MaxRetries, RetryBaseDelay);
 
         return new BulkEmbeddingOptions
         {
@@ -52,5 +38,27 @@ public sealed class BulkEmbeddingOptions
             IncludeRawResponse = IncludeRawResponse,
             ExtraParameters = ExtraParameters?.Clone()
         };
+    }
+
+    private static void ValidateOptions(
+        int maxBatchItems, int? dimensions, EmbeddingInputType inputType,
+        int? maxBatchTokens, Func<string, int>? tokenEstimator,
+        int maxConcurrency, int maxRetries, TimeSpan retryBaseDelay)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxBatchItems);
+        if (dimensions is <= 0)
+            throw new ArgumentOutOfRangeException(nameof(dimensions), dimensions, "Dimensions must be positive when specified.");
+        if (!Enum.IsDefined(inputType))
+            throw new ArgumentOutOfRangeException(nameof(inputType), inputType, "Unknown embedding input type.");
+        if (maxBatchTokens is <= 0)
+            throw new ArgumentOutOfRangeException(nameof(maxBatchTokens), maxBatchTokens, "MaxBatchTokens must be positive when specified.");
+        if (maxBatchTokens is not null && tokenEstimator is null)
+            throw new ArgumentException("TokenEstimator must not be null when MaxBatchTokens is set.", nameof(tokenEstimator));
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxConcurrency);
+        if (maxConcurrency > 32)
+            throw new ArgumentOutOfRangeException(nameof(maxConcurrency), maxConcurrency, "MaxConcurrency must not exceed 32.");
+        ArgumentOutOfRangeException.ThrowIfNegative(maxRetries);
+        if (retryBaseDelay <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(retryBaseDelay), retryBaseDelay, "RetryBaseDelay must be positive.");
     }
 }

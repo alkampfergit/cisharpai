@@ -133,7 +133,10 @@ public sealed class BulkEmbeddingProcessor : IBulkEmbeddingProcessor
             if (!consumerDone)
                 await linkedCts.CancelAsync().ConfigureAwait(false);
             try { await producerTask.ConfigureAwait(false); }
-            catch (OperationCanceledException) when (linkedCts.IsCancellationRequested) { }
+            catch (OperationCanceledException) when (linkedCts.IsCancellationRequested)
+            {
+                // Expected when the consumer breaks out early — cancellation is the normal shutdown path
+            }
         }
     }
 
@@ -221,7 +224,8 @@ public sealed class BulkEmbeddingProcessor : IBulkEmbeddingProcessor
             ExtraParameters: _options.ExtraParameters);
         var isTransient = _options.IsTransientError ?? DefaultIsTransient;
 
-        for (int attempt = 0; ; attempt++)
+        var attempt = 0;
+        while (true)
         {
             var response = await _client.GetEmbeddingsAsync(request, cancellationToken).ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
@@ -245,6 +249,7 @@ public sealed class BulkEmbeddingProcessor : IBulkEmbeddingProcessor
             {
                 var delay = ComputeRetryDelay(attempt);
                 await Task.Delay(delay, cancellationToken).ConfigureAwait(false);
+                attempt++;
                 continue;
             }
 
