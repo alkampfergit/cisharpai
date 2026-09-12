@@ -409,14 +409,46 @@ public sealed class AnthropicGroundedChatTests
     [Test]
     public async Task GroundedChat_IdRoundTrip_ViaDocumentTitle()
     {
+        const string responseWithCustomId = """
+            {
+                "model": "claude-sonnet-4-20250514",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "The capital of France is Paris.",
+                        "citations": [
+                            {
+                                "type": "char_location",
+                                "cited_text": "Paris is the capital of France.",
+                                "document_index": 0,
+                                "document_title": "my-custom-id",
+                                "start_char_index": 0,
+                                "end_char_index": 31
+                            }
+                        ]
+                    }
+                ],
+                "usage": { "input_tokens": 50, "output_tokens": 15 },
+                "stop_reason": "end_turn"
+            }
+            """;
+
         var docs = new GroundedChatOptions(Documents:
         [
             new DocumentChunk(Id: "my-custom-id", Text: "Paris is the capital of France.")
         ]);
 
-        var (response, _) = await ExecuteGroundedChat(GroundedResponseWithCitations, options: docs);
+        var (response, capturedBody) = await ExecuteGroundedChat(responseWithCustomId, options: docs);
 
-        Assert.That(response.Citations[0].Sources[0].Id, Is.EqualTo("doc-1"));
+        Assert.That(response.Citations[0].Sources[0].Id, Is.EqualTo("my-custom-id"));
+
+        var requestDoc = JsonDocument.Parse(capturedBody!);
+        var messages = requestDoc.RootElement.GetProperty("messages");
+        var lastMessage = messages[messages.GetArrayLength() - 1];
+        var content = lastMessage.GetProperty("content");
+        var docBlock = content.EnumerateArray()
+            .First(b => b.GetProperty("type").GetString() == "document");
+        Assert.That(docBlock.GetProperty("title").GetString(), Is.EqualTo("my-custom-id"));
     }
 
     [Test]
@@ -513,6 +545,60 @@ public sealed class AnthropicGroundedChatTests
             Assert.That(data, Is.Not.Null);
             Assert.That(data!["title"], Is.EqualTo("France"));
             Assert.That(data["snippet"], Is.EqualTo("Paris is the capital of France."));
+        });
+    }
+
+    [Test]
+    public async Task GroundedChat_MaxTokens_SetsIncompleteReason()
+    {
+        const string responseMaxTokens = """
+            {
+                "model": "claude-sonnet-4-20250514",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "The capital of France is"
+                    }
+                ],
+                "usage": { "input_tokens": 50, "output_tokens": 5 },
+                "stop_reason": "max_tokens"
+            }
+            """;
+
+        var (response, _) = await ExecuteGroundedChat(responseMaxTokens);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.True);
+            Assert.That(response.ChatCompletion.IncompleteReason, Is.EqualTo("max_tokens"));
+            Assert.That(response.ChatCompletion.Status, Is.EqualTo("max_tokens"));
+        });
+    }
+
+    [Test]
+    public async Task GroundedChat_Refusal_SetsRefusalAndClearsContent()
+    {
+        const string responseRefusal = """
+            {
+                "model": "claude-sonnet-4-20250514",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "I cannot help with that request."
+                    }
+                ],
+                "usage": { "input_tokens": 50, "output_tokens": 8 },
+                "stop_reason": "refusal"
+            }
+            """;
+
+        var (response, _) = await ExecuteGroundedChat(responseRefusal);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.True);
+            Assert.That(response.ChatCompletion.Refusal, Is.EqualTo("I cannot help with that request."));
+            Assert.That(response.ChatCompletion.Content, Is.Empty);
         });
     }
 

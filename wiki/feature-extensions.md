@@ -47,7 +47,7 @@ The `is { }` pattern is the idiomatic way to null-check and bind in one step.
 | `IJsonOutputFeature` | JSON Mode and Structured Outputs | All 5 |
 | `IToolCallingFeature` | Function/tool calling | All 5 |
 | `IStreamingChatFeature` | Token-by-token streaming via `IAsyncEnumerable` | All 5 |
-| `IGroundedChatFeature` | RAG with document citations | Cohere only |
+| `IGroundedChatFeature` | RAG with document citations | Anthropic, Cohere |
 
 ### Embedding Features (on `IEmbeddingClient`)
 

@@ -253,6 +253,12 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
 
             var (content, citations) = ExtractContentAndCitations(raw.Content, groundedChatOptions.Documents);
 
+            var refusal = raw.StopReason == "refusal" ? content : null;
+            if (refusal is not null)
+                content = string.Empty;
+
+            var incompleteReason = raw.StopReason == "max_tokens" ? "max_tokens" : null;
+
             var chatCompletion = new ChatCompletionResponse(
                 Content: content,
                 Model: raw.Model,
@@ -260,7 +266,9 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
                 CompletionTokens: raw.Usage.OutputTokens,
                 RawResponseJson: rawResponseJson,
                 RawRequestJson: rawRequestJson,
-                Status: raw.StopReason);
+                Status: raw.StopReason,
+                IncompleteReason: incompleteReason,
+                Refusal: refusal);
 
             return new GroundedChatCompletionResponse(chatCompletion, citations);
         }
@@ -352,8 +360,6 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
 
             foreach (var cite in block.Citations)
             {
-                var citedText = cite.CitedText ?? string.Empty;
-
                 var responseStart = blockStart;
                 var responseEnd = blockStart + blockText.Length;
 
@@ -364,13 +370,16 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
                 {
                     var doc = documents[cite.DocumentIndex.Value];
                     sourceId ??= doc.Id;
-                    sourceData = doc.Data;
+                    sourceData = doc.Data is not null
+                        ? new System.Collections.ObjectModel.ReadOnlyDictionary<string, string>(
+                            new Dictionary<string, string>(doc.Data))
+                        : null;
                 }
 
                 var citationSource = new CitationSource(
                     Id: sourceId ?? $"doc-{cite.DocumentIndex}",
                     Data: sourceData,
-                    CitedText: citedText);
+                    CitedText: cite.CitedText);
 
                 citations.Add(new Citation(
                     Start: responseStart,
