@@ -3,8 +3,6 @@ using System.Text.Json.Serialization;
 using Cisharpai.Features;
 using Cisharpai.Models;
 using Cisharpai.Cohere.Models;
-using Cisharpai;
-using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.Cohere;

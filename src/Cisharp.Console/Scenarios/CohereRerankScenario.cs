@@ -24,11 +24,11 @@ public sealed class CohereRerankScenario : IScenario
     {
         var apiKey = ScenarioHelpers.RequireEnv(DotEnv.CohereApiKey);
 
-        var model = AnsiConsole.Ask("Model?", CohereModels.Rerank.RerankV3_5);
-        var query = AnsiConsole.Ask("Query?", "What is the capital of France?");
+        var model = await AnsiConsole.AskAsync("Model?", CohereModels.Rerank.RerankV3_5, cancellationToken);
+        var query = await AnsiConsole.AskAsync("Query?", "What is the capital of France?", cancellationToken);
 
         var documents = new List<string>();
-        if (AnsiConsole.Confirm("Use the sample documents?"))
+        if (await AnsiConsole.ConfirmAsync("Use the sample documents?", true, cancellationToken))
         {
             documents.AddRange(SampleDocuments);
         }
@@ -36,7 +36,7 @@ public sealed class CohereRerankScenario : IScenario
         {
             while (true)
             {
-                var document = AnsiConsole.Ask<string>("Document (blank to finish)?", string.Empty);
+                var document = await AnsiConsole.AskAsync("Document (blank to finish)?", string.Empty, cancellationToken);
                 if (string.IsNullOrWhiteSpace(document))
                     break;
                 documents.Add(document);
@@ -49,7 +49,7 @@ public sealed class CohereRerankScenario : IScenario
             }
         }
 
-        var topN = AnsiConsole.Ask("Top N?", documents.Count);
+        var topN = await AnsiConsole.AskAsync("Top N?", documents.Count, cancellationToken);
 
         var services = ScenarioHelpers.CreateServiceCollection();
         services.AddCohereRerankerClient(options =>
