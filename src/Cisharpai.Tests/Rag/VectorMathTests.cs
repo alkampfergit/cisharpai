@@ -60,6 +60,18 @@ public class VectorMathTests
         Assert.That(VectorMath.DotProduct(a, b), Is.EqualTo(23f));
     }
 
+    [Test]
+    public void DotProduct_HighDimensionAccumulation_DoubleReducesRoundingError()
+    {
+        var dim = 1536;
+        var a = new float[dim];
+        var b = new float[dim];
+        Array.Fill(a, 1f);
+        Array.Fill(b, 1f);
+        var result = VectorMath.DotProduct(a, b);
+        Assert.That(result, Is.EqualTo(1536f));
+    }
+
     #endregion
 
     #region CosineSimilarity

@@ -14,10 +14,10 @@ public static class VectorMath
     {
         ThrowIfDimensionMismatch(a.Length, b.Length);
 
-        var sum = 0f;
+        var sum = 0.0;
         for (var i = 0; i < a.Length; i++)
-            sum += a[i] * b[i];
-        return sum;
+            sum += (double)a[i] * b[i];
+        return (float)sum;
     }
 
     /// <inheritdoc cref="DotProduct(ReadOnlySpan{float}, ReadOnlySpan{float})"/>
