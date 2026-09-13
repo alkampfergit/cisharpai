@@ -270,6 +270,7 @@ public sealed class RecursiveChunker : ITextChunker
             }
             else
             {
+                // MaxChunkSize counts scalars but this arithmetic uses UTF-16 code units; code units ≥ scalars, so the cap can only under-shoot overlap, never exceed the budget.
                 var maxStart = chunk.End - _options.MaxChunkSize;
                 if (overlapStart < maxStart)
                 {
