@@ -32,20 +32,23 @@ public sealed class SemanticChunkerOptions
         int maxChunkCharacters,
         int maxChunkSentences)
     {
+        if (!Enum.IsDefined(strategy))
+            throw new ArgumentOutOfRangeException(nameof(strategy), strategy, "Unknown threshold strategy.");
+
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxChunkCharacters);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxChunkSentences);
 
         if (strategy == SemanticThresholdStrategy.Percentile)
         {
-            if (breakPercentile is <= 0f or > 100f)
+            if (!float.IsFinite(breakPercentile) || breakPercentile is <= 0f or > 100f)
                 throw new ArgumentOutOfRangeException(nameof(breakPercentile), breakPercentile,
-                    "BreakPercentile must be between 0 (exclusive) and 100 (inclusive).");
+                    "BreakPercentile must be a finite value between 0 (exclusive) and 100 (inclusive).");
         }
         else
         {
-            if (absoluteThreshold is < -1f or > 1f)
+            if (!float.IsFinite(absoluteThreshold) || absoluteThreshold is < -1f or > 1f)
                 throw new ArgumentOutOfRangeException(nameof(absoluteThreshold), absoluteThreshold,
-                    "AbsoluteThreshold must be between -1 and 1.");
+                    "AbsoluteThreshold must be a finite value between -1 and 1.");
         }
 
         return new SemanticChunkerOptions

@@ -11,13 +11,15 @@ namespace Cisharpai.Rag.Chunking;
 /// <see cref="FixedSizeChunker"/> for this one should expect an additional embedding call
 /// covering every sentence in the document.
 /// <para>
-/// In <see cref="SemanticThresholdStrategy.Percentile"/> mode (the default), all sentence
-/// embeddings are buffered in memory before the first chunk is emitted. Memory usage is
-/// proportional to <c>sentences × embedding dimensions × 4 bytes</c>.
+/// Both <see cref="SemanticThresholdStrategy.Percentile"/> and
+/// <see cref="SemanticThresholdStrategy.Absolute"/> modes buffer all sentence embeddings in
+/// memory before the first chunk is emitted. Memory usage is proportional to
+/// <c>sentences × embedding dimensions × 4 bytes</c>.
 /// </para>
 /// <para>
-/// In <see cref="SemanticThresholdStrategy.Absolute"/> mode, chunks can be emitted as
-/// embedding batches return — true streaming.
+/// If a single sentence exceeds <see cref="SemanticChunkerOptions.MaxChunkCharacters"/>,
+/// an <see cref="InvalidOperationException"/> is thrown — use a larger limit or a sentence
+/// splitter that produces shorter segments.
 /// </para>
 /// </summary>
 public sealed class SemanticChunker : ITextChunker
@@ -26,6 +28,14 @@ public sealed class SemanticChunker : ITextChunker
     private readonly ISentenceSplitter _sentenceSplitter;
     private readonly SemanticChunkerOptions _options;
 
+    /// <param name="embeddingProcessor">
+    /// The processor to embed sentences. Must be configured with
+    /// <see cref="EmbeddingInputType.Document"/> — sentence embeddings are corpus text,
+    /// not queries. Using a query-configured processor silently degrades similarity quality
+    /// on providers that honour the input-type hint (Cohere in particular).
+    /// </param>
+    /// <param name="options">Chunker options. Snapshotted at construction time.</param>
+    /// <param name="sentenceSplitter">Custom sentence splitter; defaults to <see cref="RegexSentenceSplitter"/>.</param>
     public SemanticChunker(
         IBulkEmbeddingProcessor embeddingProcessor,
         SemanticChunkerOptions? options = null,
@@ -57,7 +67,9 @@ public sealed class SemanticChunker : ITextChunker
             yield break;
         if (sentences.Count == 1)
         {
-            yield return MakeChunk(document.Id, 0, sentences, 0, 1);
+            cancellationToken.ThrowIfCancellationRequested();
+            ThrowIfSentenceExceedsBackstop(sentences, 0);
+            yield return MakeChunk(document.Id, 0, document.Text, sentences, 0, 1);
             yield break;
         }
 
@@ -72,11 +84,11 @@ public sealed class SemanticChunker : ITextChunker
         var start = 0;
         foreach (var boundary in boundaries)
         {
-            yield return MakeChunk(document.Id, chunkIndex++, sentences, start, boundary);
+            yield return MakeChunk(document.Id, chunkIndex++, document.Text, sentences, start, boundary);
             start = boundary;
         }
         if (start < sentences.Count)
-            yield return MakeChunk(document.Id, chunkIndex, sentences, start, sentences.Count);
+            yield return MakeChunk(document.Id, chunkIndex, document.Text, sentences, start, sentences.Count);
     }
 
     private async IAsyncEnumerable<TextChunk> ChunkAbsoluteAsync(
@@ -88,7 +100,9 @@ public sealed class SemanticChunker : ITextChunker
             yield break;
         if (sentences.Count == 1)
         {
-            yield return MakeChunk(document.Id, 0, sentences, 0, 1);
+            cancellationToken.ThrowIfCancellationRequested();
+            ThrowIfSentenceExceedsBackstop(sentences, 0);
+            yield return MakeChunk(document.Id, 0, document.Text, sentences, 0, 1);
             yield break;
         }
 
@@ -97,33 +111,32 @@ public sealed class SemanticChunker : ITextChunker
 
         var chunkIndex = 0;
         var chunkStart = 0;
-        var chunkCharCount = sentences[0].Text.Length;
         var chunkSentenceCount = 1;
+        ThrowIfSentenceExceedsBackstop(sentences, 0);
 
         for (var i = 1; i < sentences.Count; i++)
         {
             var sim = VectorMath.CosineSimilarity(embeddings[i - 1], embeddings[i]);
-            var sentLen = sentences[i].Text.Length;
-            var wouldExceedChars = chunkCharCount + sentLen > _options.MaxChunkCharacters;
+            var candidateSpan = sentences[i].EndOffset - sentences[chunkStart].StartOffset;
+            var wouldExceedChars = candidateSpan > _options.MaxChunkCharacters;
             var wouldExceedSentences = chunkSentenceCount + 1 > _options.MaxChunkSentences;
             var belowThreshold = sim < _options.AbsoluteThreshold;
 
             if (belowThreshold || wouldExceedChars || wouldExceedSentences)
             {
-                yield return MakeChunk(document.Id, chunkIndex++, sentences, chunkStart, i);
+                yield return MakeChunk(document.Id, chunkIndex++, document.Text, sentences, chunkStart, i);
                 chunkStart = i;
-                chunkCharCount = sentLen;
                 chunkSentenceCount = 1;
+                ThrowIfSentenceExceedsBackstop(sentences, i);
             }
             else
             {
-                chunkCharCount += sentLen;
                 chunkSentenceCount++;
             }
         }
 
         if (chunkStart < sentences.Count)
-            yield return MakeChunk(document.Id, chunkIndex, sentences, chunkStart, sentences.Count);
+            yield return MakeChunk(document.Id, chunkIndex, document.Text, sentences, chunkStart, sentences.Count);
     }
 
     private List<(string Text, int StartOffset, int EndOffset)> SplitWithOffsets(string text)
@@ -188,6 +201,10 @@ public sealed class SemanticChunker : ITextChunker
 
         var sorted = (float[])similarities.Clone();
         Array.Sort(sorted);
+
+        if (sorted[0] == sorted[^1])
+            return float.NegativeInfinity;
+
         var rank = breakPercentile / 100f * (sorted.Length - 1);
         var lower = (int)Math.Floor(rank);
         var upper = Math.Min(lower + 1, sorted.Length - 1);
@@ -201,41 +218,54 @@ public sealed class SemanticChunker : ITextChunker
         float threshold)
     {
         var boundaries = new List<int>();
-        var chunkCharCount = sentences[0].Text.Length;
+        var chunkStartIdx = 0;
         var chunkSentenceCount = 1;
+        ThrowIfSentenceExceedsBackstop(sentences, 0);
 
         for (var i = 0; i < similarities.Length; i++)
         {
-            var sentLen = sentences[i + 1].Text.Length;
-            var wouldExceedChars = chunkCharCount + sentLen > _options.MaxChunkCharacters;
+            var candidateSpan = sentences[i + 1].EndOffset - sentences[chunkStartIdx].StartOffset;
+            var wouldExceedChars = candidateSpan > _options.MaxChunkCharacters;
             var wouldExceedSentences = chunkSentenceCount + 1 > _options.MaxChunkSentences;
             var belowThreshold = similarities[i] <= threshold;
 
             if (belowThreshold || wouldExceedChars || wouldExceedSentences)
             {
                 boundaries.Add(i + 1);
-                chunkCharCount = sentLen;
+                chunkStartIdx = i + 1;
                 chunkSentenceCount = 1;
+                ThrowIfSentenceExceedsBackstop(sentences, i + 1);
             }
             else
             {
-                chunkCharCount += sentLen;
                 chunkSentenceCount++;
             }
         }
         return boundaries;
     }
 
+    private void ThrowIfSentenceExceedsBackstop(
+        List<(string Text, int StartOffset, int EndOffset)> sentences, int index)
+    {
+        var span = sentences[index].EndOffset - sentences[index].StartOffset;
+        if (span > _options.MaxChunkCharacters)
+            throw new InvalidOperationException(
+                $"Sentence at offset {sentences[index].StartOffset} is {span} characters, " +
+                $"which exceeds MaxChunkCharacters ({_options.MaxChunkCharacters}). " +
+                "Use a larger MaxChunkCharacters or a sentence splitter that produces shorter segments.");
+    }
+
     private static TextChunk MakeChunk(
         string documentId,
         int chunkIndex,
+        string documentText,
         List<(string Text, int StartOffset, int EndOffset)> sentences,
         int fromInclusive,
         int toExclusive)
     {
         var startOffset = sentences[fromInclusive].StartOffset;
         var endOffset = sentences[toExclusive - 1].EndOffset;
-        var text = string.Join(" ", sentences.Skip(fromInclusive).Take(toExclusive - fromInclusive).Select(s => s.Text));
+        var text = documentText[startOffset..endOffset];
         return new TextChunk(documentId, chunkIndex, startOffset, endOffset, text);
     }
 }

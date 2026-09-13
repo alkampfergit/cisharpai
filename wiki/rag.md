@@ -445,7 +445,8 @@ var chunker = new SemanticChunker(processor, new SemanticChunkerOptions
 
 await foreach (var chunk in chunker.ChunkAsync(new RagDocument("handbook", text)))
 {
-    Console.WriteLine($"{chunk.DocumentId}:{chunk.Index} @ {chunk.StartOffset}–{chunk.EndOffset}: {chunk.Text[..50]}…");
+    var preview = chunk.Text.Length <= 50 ? chunk.Text : chunk.Text[..50] + "…";
+    Console.WriteLine($"{chunk.DocumentId}:{chunk.Index} @ {chunk.StartOffset}–{chunk.EndOffset}: {preview}");
 }
 ```
 
@@ -454,7 +455,7 @@ await foreach (var chunk in chunker.ChunkAsync(new RagDocument("handbook", text)
 | Strategy | Default | Behaviour |
 |---|---|---|
 | `Percentile` (default) | `BreakPercentile = 10` | Bottom N-th percentile of similarity drops in *this* document become boundaries. Self-calibrating across models and domains. **Buffers all sentence embeddings in memory** before emitting the first chunk — memory is proportional to `sentences × embedding dimensions × 4 bytes`. |
-| `Absolute` | `AbsoluteThreshold = 0.5` | Boundary when cosine similarity drops below a fixed threshold. The right number varies by embedding model and domain — tune per model. **Enables true streaming**: chunks can be emitted as embedding batches return. |
+| `Absolute` | `AbsoluteThreshold = 0.5` | Boundary when cosine similarity drops below a fixed threshold. The right number varies by embedding model and domain — tune per model. Buffers all sentence embeddings like Percentile mode. |
 
 ### Backstops
 

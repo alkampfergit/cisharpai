@@ -12,7 +12,6 @@ public enum SemanticThresholdStrategy
     /// <summary>
     /// Boundary when cosine similarity drops below an absolute threshold.
     /// The right number varies by embedding model and domain — tune per model.
-    /// Enables true streaming: chunks can be emitted as embedding batches return.
     /// </summary>
     Absolute
 }
