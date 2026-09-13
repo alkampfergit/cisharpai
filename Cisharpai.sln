@@ -27,6 +27,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cisharpai.Tests.Common", "s
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cisharpai.Rag", "src\Cisharpai.Rag\Cisharpai.Rag.csproj", "{8458811B-8E66-443D-9767-73315C7BD579}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cisharpai.Rag.Tokenizers", "src\Cisharpai.Rag.Tokenizers\Cisharpai.Rag.Tokenizers.csproj", "{E8F1EC29-EDC4-4B5F-A0B2-8AA8E3CE3C4C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -169,6 +171,18 @@ Global
 		{8458811B-8E66-443D-9767-73315C7BD579}.Release|x64.Build.0 = Release|Any CPU
 		{8458811B-8E66-443D-9767-73315C7BD579}.Release|x86.ActiveCfg = Release|Any CPU
 		{8458811B-8E66-443D-9767-73315C7BD579}.Release|x86.Build.0 = Release|Any CPU
+		{E8F1EC29-EDC4-4B5F-A0B2-8AA8E3CE3C4C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E8F1EC29-EDC4-4B5F-A0B2-8AA8E3CE3C4C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E8F1EC29-EDC4-4B5F-A0B2-8AA8E3CE3C4C}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{E8F1EC29-EDC4-4B5F-A0B2-8AA8E3CE3C4C}.Debug|x64.Build.0 = Debug|Any CPU
+		{E8F1EC29-EDC4-4B5F-A0B2-8AA8E3CE3C4C}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{E8F1EC29-EDC4-4B5F-A0B2-8AA8E3CE3C4C}.Debug|x86.Build.0 = Debug|Any CPU
+		{E8F1EC29-EDC4-4B5F-A0B2-8AA8E3CE3C4C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E8F1EC29-EDC4-4B5F-A0B2-8AA8E3CE3C4C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E8F1EC29-EDC4-4B5F-A0B2-8AA8E3CE3C4C}.Release|x64.ActiveCfg = Release|Any CPU
+		{E8F1EC29-EDC4-4B5F-A0B2-8AA8E3CE3C4C}.Release|x64.Build.0 = Release|Any CPU
+		{E8F1EC29-EDC4-4B5F-A0B2-8AA8E3CE3C4C}.Release|x86.ActiveCfg = Release|Any CPU
+		{E8F1EC29-EDC4-4B5F-A0B2-8AA8E3CE3C4C}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -185,5 +199,6 @@ Global
 		{61939F5E-FDEA-4DAC-BC16-5213731122AC} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{AD509961-7C29-4A26-8908-37E436734631} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{8458811B-8E66-443D-9767-73315C7BD579} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{E8F1EC29-EDC4-4B5F-A0B2-8AA8E3CE3C4C} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal

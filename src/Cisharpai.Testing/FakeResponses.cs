@@ -172,4 +172,10 @@ public static class FakeResponses
     /// </summary>
     public static RerankResponse RerankError(string errorMessage) =>
         RerankResponse.Error(errorMessage);
+
+    /// <summary>
+    /// Creates a pre-configured <see cref="FakeTokenCounter"/> with a fixed default count.
+    /// </summary>
+    public static FakeTokenCounter TokenCounter(int defaultCount = 10) =>
+        new() { DefaultCount = defaultCount };
 }

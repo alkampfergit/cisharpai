@@ -9,6 +9,7 @@ The only dependency needed by consuming applications.
 - **`IChatCompletionClient.cs`** — Primary chat interface. Inherits `IHasFeatures`.
 - **`IEmbeddingClient.cs`** — Primary embedding interface. Inherits `IHasFeatures`.
 - **`IRerankerClient.cs`** — Primary reranking interface (`RerankAsync`). Inherits `IHasFeatures`. Cohere only.
+- **`ITokenCounter.cs`** — Token counting interface (`CountAsync`). One instance per model. Implementations: `TiktokenCounter` (local, in `Cisharpai.Rag.Tokenizers`), `CohereTokenCounter` (API-backed, in `Cisharpai.Cohere`).
 - **`Features/`** — Feature Collection Pattern for optional capabilities:
   - `IFeatureCollection.cs` / `FeatureCollection.cs` — Thread-safe `Get<T>()`/`Set<T>()` backed by `ConcurrentDictionary`.
   - `Chat/IJsonOutputFeature.cs` — JSON Mode + Structured Outputs.
@@ -75,6 +76,7 @@ Consolidated package for all Azure AI services. Uses HttpClient directly (no SDK
 - `CohereChatCompletionClient` — Chat + JSON + grounded chat (RAG) + tool calling + streaming. Vision: image parts silently skipped. Static `Create(IHttpMessageHandlerFactory, options, ...)` for runtime construction.
 - `CohereEmbeddingClient` — Text + image + multimodal (Embed v4) embeddings. Images sent as data URIs. Static `Create(IHttpMessageHandlerFactory, options, ...)` for runtime construction.
 - `CohereRerankerClient` — Reranking via `POST {BaseUrl}rerank`. Model from request or `DefaultModel` (throws if neither). `priority` reachable through `ExtraParameters`. Static `Create(IHttpMessageHandlerFactory, options, ...)` for runtime construction.
+- `CohereTokenCounter` — Token counting via `POST /v1/tokenize`. Constructed for one model. Chunk-and-sum for text over 65,536 characters (upper-bound approximation, splits on whitespace). Static `Create(IHttpMessageHandlerFactory, options, model, ...)` for runtime construction.
 - `CohereModels` — Constants: `Chat.CommandA`, `Embedding.EmbedV4`, `Rerank.RerankV3_5`, etc.
 - `CohereClientOptions` — BaseUrl, ApiKey, DefaultModel.
 - `CohereClientConfiguration` — Factory config record.
@@ -91,15 +93,24 @@ Consolidated package for all Azure AI services. Uses HttpClient directly (no SDK
 - `Models/BulkEmbeddingProgress` — progress record: `CompletedBatches`, `TotalChunksProcessed`, `FailedBatches`.
 - `IRagIngestionPipeline` / `RagIngestionPipeline` — compose document chunking with bulk embedding; collection and async-stream overloads, cancellation, progress pass-through, and partial batch results.
 - `RagOptions` and `AddCisharpaiRag` — validated option snapshots, callback configuration and embedding-client factory for keyed DI; scoped processors/pipelines.
-- No storage, retrieval or tokenization. Token estimation uses a pluggable `Func<string, int>` seam (default: `s.Length / 4`). Existing embedding fakes support offline tests without core interface changes.
+- Token estimation uses a pluggable `Func<string, int>` seam (default: `s.Length / 4`); real counting available via `TiktokenCounter.ToTokenEstimator()` from the separate `Cisharpai.Rag.Tokenizers` package.
+- No storage or retrieval. Existing embedding fakes support offline tests without core interface changes.
 - Consumer guide: `wiki/rag.md`; unit tests: `src/Cisharpai.Tests/Rag/`.
+
+## RAG Tokenizers — `src/Cisharpai.Rag.Tokenizers/`
+
+- Opt-in local token counting for RAG pipelines, separate from `Cisharpai.Rag` so consumers who only need bulk embeddings avoid the multi-megabyte tokenizer data files.
+- `Tokenization/TiktokenCounter` — local, synchronous, `Microsoft.ML.Tokenizers`-backed, supports o200k_base (gpt-4o) and cl100k_base (gpt-4, gpt-3.5-turbo). OpenAI-compatible tokenizers only.
+- `Tokenization/TokenCounterExtensions.ToTokenEstimator()` — adapter returning `Func<string, int>` for `BulkEmbeddingOptions.TokenEstimator`. Defined on `TiktokenCounter` (not `ITokenCounter`) to prevent blocking on async/remote counters.
+- References `Microsoft.ML.Tokenizers`, `Microsoft.ML.Tokenizers.Data.O200kBase`, `Microsoft.ML.Tokenizers.Data.Cl100kBase`.
 
 ## Testing Package — `src/Cisharpai.Testing/`
 
 - `FakeChatCompletionClient` — Fake for `IChatCompletionClient` + all chat features. Response queues, defaults, request capture.
 - `FakeEmbeddingClient` — Fake for `IEmbeddingClient` + embedding features.
 - `FakeRerankerClient` — Fake for `IRerankerClient`. Response queue, default, request capture, `Reset()`. No feature flags (no optional rerank features exist).
-- `FakeResponses` — Static factories: `Chat`, `ChatError`, `ToolCall`, `ToolCalls`, `GroundedChat`, `StreamingChunks`, `Embedding`, `Rerank`, `RerankError`, etc.
+- `FakeTokenCounter` — Fake for `ITokenCounter`. Count queue, default, text capture, `Reset()`. No feature flags.
+- `FakeResponses` — Static factories: `Chat`, `ChatError`, `ToolCall`, `ToolCalls`, `GroundedChat`, `StreamingChunks`, `Embedding`, `Rerank`, `RerankError`, `TokenCounter`, etc.
 - `FakeChatFeatures` / `FakeEmbeddingFeatures` — `[Flags]` enums for selective feature registration.
 - `FakeServiceCollectionExtensions` — DI helpers.
 
@@ -129,5 +140,5 @@ Pages: `index.md`, `getting-started.md`, `openai.md`, `embeddings.md`, `rag.md`,
 - `.github/workflows/ci.yml` — Build + unit tests + integration tests. .NET 8 & 10.
 - `.github/workflows/pipeline.yml` — Versioned build + NuGet publish on tags.
 - `.github/workflows/codeql.yml` — CodeQL security scanning.
-- `scripts/build.ps1` — PowerShell build script: restore, build, test, pack 7 projects.
+- `scripts/build.ps1` — PowerShell build script: restore, build, test, pack 8 projects.
 - `GitVersion.yml` — ContinuousDeployment mode.

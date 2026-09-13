@@ -30,6 +30,11 @@
     <PackageVersion Include="NUnit.Analyzers" Version="4.7.0" />
     <PackageVersion Include="NUnit3TestAdapter" Version="5.0.0" />
 
+    <!-- Tokenization -->
+    <PackageVersion Include="Microsoft.ML.Tokenizers" Version="2.0.0" />
+    <PackageVersion Include="Microsoft.ML.Tokenizers.Data.O200kBase" Version="2.0.0" />
+    <PackageVersion Include="Microsoft.ML.Tokenizers.Data.Cl100kBase" Version="2.0.0" />
+
     <!-- Console application -->
     <PackageVersion Include="Spectre.Console" Version="0.50.0" />
   </ItemGroup>

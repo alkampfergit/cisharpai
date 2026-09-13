@@ -44,4 +44,19 @@ public static class FakeServiceCollectionExtensions
         services.AddSingleton<IRerankerClient>(fake);
         return fake;
     }
+
+    /// <summary>
+    /// Registers a <see cref="FakeTokenCounter"/> as <see cref="ITokenCounter"/>.
+    /// Returns the fake instance for setup and assertions.
+    /// </summary>
+    public static FakeTokenCounter AddFakeTokenCounter(
+        this IServiceCollection services,
+        int? defaultCount = null)
+    {
+        var fake = new FakeTokenCounter();
+        if (defaultCount is not null)
+            fake.DefaultCount = defaultCount.Value;
+        services.AddSingleton<ITokenCounter>(fake);
+        return fake;
+    }
 }

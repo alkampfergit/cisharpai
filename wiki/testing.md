@@ -274,6 +274,31 @@ fake.EnqueueResponse(FakeResponses.RerankError("rate limited"));
 `IRerankerClient` has no optional feature interfaces today, so `FakeRerankerClient` takes no
 feature flags -- its `Features` collection is empty.
 
+## FakeTokenCounter
+
+Same queue/default/capture shape as the other fakes.
+
+```csharp
+var fake = new FakeTokenCounter { DefaultCount = 10 };
+int count = await fake.CountAsync("Hello, world!"); // returns 10
+
+// Queue specific counts for a sequence of calls:
+fake.EnqueueCount(42);
+fake.EnqueueCount(7);
+
+// Inspect captured texts:
+Assert.That(fake.ReceivedTexts[0], Is.EqualTo("Hello, world!"));
+Assert.That(fake.CallCount, Is.EqualTo(1));
+```
+
+Or create one from `FakeResponses`:
+
+```csharp
+var fake = FakeResponses.TokenCounter(defaultCount: 25);
+```
+
+`ITokenCounter` has no optional feature interfaces, so `FakeTokenCounter` takes no feature flags.
+
 ## Feature Opt-Out
 
 Both fake chat and embedding clients register all feature interfaces by default. Use the flags enums to control which features are available -- useful for testing feature-detection code paths.
@@ -328,6 +353,9 @@ fakeEmbeddingClient.DefaultResponse = FakeResponses.Embedding();
 // Register fake reranker client
 var fakeRerankerClient = services.AddFakeRerankerClient();
 fakeRerankerClient.DefaultResponse = FakeResponses.Rerank(3);
+
+// Register fake token counter
+var fakeTokenCounter = services.AddFakeTokenCounter(defaultCount: 10);
 
 var provider = services.BuildServiceProvider();
 
@@ -565,6 +593,16 @@ public async Task ConversationAgent_HandlesMultipleTurns()
 | `CallCount` | `int` | Number of `RerankAsync` calls |
 | `ReceivedRequests` | `IReadOnlyList<RerankRequest>` | Captured rerank requests |
 | `Reset()` | `void` | Clears the queue and captured requests |
+
+### FakeTokenCounter
+
+| Member | Type | Description |
+|--------|------|-------------|
+| `DefaultCount` | `int?` | Fallback used when the queue is empty |
+| `EnqueueCount(count)` | `void` | Queue a count (FIFO) |
+| `CallCount` | `int` | Number of `CountAsync` calls |
+| `ReceivedTexts` | `IReadOnlyList<string>` | Captured input texts |
+| `Reset()` | `void` | Clears the queue and captured texts |
 
 ### FakeClientFactoryProvider
 
