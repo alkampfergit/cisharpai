@@ -14,7 +14,7 @@ The only dependency needed by consuming applications.
   - `Chat/IJsonOutputFeature.cs` — JSON Mode + Structured Outputs.
   - `Chat/IToolCallingFeature.cs` — Tool/function calling.
   - `Chat/IStreamingChatFeature.cs` — Token-by-token streaming via `IAsyncEnumerable<ChatCompletionChunk>`.
-  - `Chat/IGroundedChatFeature.cs` — RAG with document citations.
+  - `Chat/IGroundedChatFeature.cs` — RAG with document citations (native or synthesized via prompt-injection fallback).
   - `Embeddings/IImageEmbeddingFeature.cs` — Single image embedding.
   - `Embeddings/IMultimodalEmbeddingFeature.cs` — Mixed text+image embedding (Cohere Embed v4).
 - **`Models/`** — Unified DTOs (all immutable records):
@@ -27,9 +27,9 @@ The only dependency needed by consuming applications.
   - `ChatCompletionChunk` (streaming) with `ToolCallDelta`
   - Tool calling: `ToolDefinition`, `ToolCall`, `ToolResult`, `ToolChoice` (Auto/None/Required/Specific), `ToolCallingOptions`, `ToolCallingResponse`
   - JSON output: `JsonOutputMode`, `JsonOutputOptions`
-  - Grounded chat: `DocumentChunk`, `Citation`, `CitationSource`, `CitationMode`, `GroundedChatOptions`, `GroundedChatCompletionResponse`
+  - Grounded chat: `DocumentChunk`, `Citation`, `CitationSource`, `CitationMode`, `GroundingKind`, `GroundedChatOptions`, `GroundedChatCompletionResponse`
   - Multimodal: `MultimodalEmbeddingInput`, `EmbeddingContentPart`, `TextEmbeddingContent`, `ImageEmbeddingContent`
-- **`Helpers/`** — Shared utilities: `JsonOutputHelper`, `RoleMapper`, `ContentPartHelper`, `ToolCallingHelper`, `EmbeddingHelper`
+- **`Helpers/`** — Shared utilities: `JsonOutputHelper`, `RoleMapper`, `ContentPartHelper`, `ToolCallingHelper`, `EmbeddingHelper`, `GroundedChatHelper`, `GroundedChatFallbackHelper`
 - **`JsonDeepMerge.cs`** — Deep-merges ExtraParameters JSON into request payloads.
 - **`ImageDataUriHelper.cs`** — Converts image files to data URIs (PNG, JPEG, WebP, GIF).
 - **`LlmHttpClient.cs`** — Internal HTTP helper with deep merge, raw request/response capture, SSE streaming.
@@ -58,7 +58,7 @@ Consolidated package for all Azure AI services. Uses HttpClient directly (no SDK
 
 - **`Common/`** — `AzureClientOptionsBase`, `AzureAuthenticationHandler` (API key + Azure AD), `AzureErrorMapper`.
 - **`AzureOpenAi/`** — `AzureOpenAiChatCompletionClient` (chat + JSON + tools + streaming + grounded chat for GPT-5 deployments), `AzureOpenAiEmbeddingClient`. Endpoint: `openai/deployments/{deployment}/...`. Three-way model routing (Legacy / Reasoning / Gpt5): gpt-5 deployments use the Responses API at `.../responses?api-version=...`; o-series uses Chat Completions with `reasoning_effort`; everything else is standard Chat Completions. Options: `DeploymentName`, `DefaultModel`, `ReasoningEffort`, `TextVerbosity` (gpt-5 Responses API), `ModelName` (explicit routing hint when the deployment name is opaque). Learned route mismatches are cached in-process per `(Endpoint, DeploymentName, ApiVersion)` so new client instances reuse the discovered route. Both have static `Create(IHttpMessageHandlerFactory, options, TokenCredential?, ...)`.
-- **`AzureAiInference/`** — `AzureAiInferenceChatCompletionClient` (chat + JSON + tools + streaming), `AzureAiInferenceEmbeddingClient` (+ `IImageEmbeddingFeature`). Endpoint: `models/...`. Options: `ModelId`. Both have static `Create(IHttpMessageHandlerFactory, options, TokenCredential?, ...)`.
+- **`AzureAiInference/`** — `AzureAiInferenceChatCompletionClient` (chat + JSON + tools + streaming + grounded chat via prompt-injection fallback), `AzureAiInferenceEmbeddingClient` (+ `IImageEmbeddingFeature`). Endpoint: `models/...`. Options: `ModelId`. Both have static `Create(IHttpMessageHandlerFactory, options, TokenCredential?, ...)`.
 - **`Extensions/`** — DI registration with keyed service overloads. `AzureFactoryBuilderExtensions` for factory support.
 - **Factory configs**: `AzureOpenAiClientConfiguration`, `AzureAiInferenceClientConfiguration` + corresponding factory providers.
 

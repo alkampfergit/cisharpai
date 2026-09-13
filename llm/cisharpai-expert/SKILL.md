@@ -280,7 +280,7 @@ All feature interfaces live in the `Cisharpai.Features.Chat` namespace (not `Cis
 | JSON Output | `IJsonOutputFeature` | All 5 |
 | Tool Calling | `IToolCallingFeature` | All 5 |
 | Streaming | `IStreamingChatFeature` | All 5 |
-| Grounded Chat | `IGroundedChatFeature` | OpenAI (GPT-5), Azure OpenAI (GPT-5), Anthropic, Cohere |
+| Grounded Chat | `IGroundedChatFeature` | OpenAI (GPT-5, native), Azure OpenAI (GPT-5, native), Azure AI Inference (synthesized fallback), Anthropic (native), Cohere (native) |
 | Image Embedding | `IImageEmbeddingFeature` | Azure AI Inference, Cohere |
 | Multimodal Embedding | `IMultimodalEmbeddingFeature` | Cohere only |
 

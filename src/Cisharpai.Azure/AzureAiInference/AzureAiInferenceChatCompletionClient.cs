@@ -16,7 +16,7 @@ namespace Cisharpai.Azure.AzureAiInference;
 /// Azure AI Inference chat completion client using HttpClient.
 /// Supports Azure AI model-as-a-service offerings including Phi-3, Llama-3, Mistral, and others.
 /// </summary>
-public sealed class AzureAiInferenceChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature, IStreamingChatFeature
+public sealed class AzureAiInferenceChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature, IStreamingChatFeature, IGroundedChatFeature
 {
     private static readonly JsonSerializerOptions StreamJsonOptions = new()
     {
@@ -40,6 +40,7 @@ public sealed class AzureAiInferenceChatCompletionClient : IChatCompletionClient
         features.Set<IJsonOutputFeature>(this);
         features.Set<IToolCallingFeature>(this);
         features.Set<IStreamingChatFeature>(this);
+        features.Set<IGroundedChatFeature>(this);
         Features = features;
     }
 
@@ -264,6 +265,55 @@ public sealed class AzureAiInferenceChatCompletionClient : IChatCompletionClient
                     PromptTokens: chunk.Usage.PromptTokens,
                     CompletionTokens: chunk.Usage.CompletionTokens);
             }
+        }
+    }
+
+    public async Task<GroundedChatCompletionResponse> GetGroundedChatCompletionAsync(
+        ChatCompletionRequest request,
+        GroundedChatOptions groundedChatOptions,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            groundedChatOptions.Validate();
+
+            var groundedMessages = GroundedChatFallbackHelper.BuildGroundingMessages(
+                request.Messages, groundedChatOptions.Documents);
+
+            var groundedRequest = request with { Messages = groundedMessages };
+            var chatResponse = await GetChatCompletionAsync(groundedRequest, cancellationToken);
+
+            if (!chatResponse.IsSuccess)
+            {
+                return new GroundedChatCompletionResponse(
+                    ChatCompletion: chatResponse,
+                    Citations: [],
+                    GroundingKind: GroundingKind.Synthesized);
+            }
+
+            var (cleanContent, citations) = GroundedChatFallbackHelper.ParseAndStripMarkers(
+                chatResponse.Content, groundedChatOptions.Documents);
+
+            var adjustedResponse = chatResponse with { Content = cleanContent };
+
+            return new GroundedChatCompletionResponse(
+                ChatCompletion: adjustedResponse,
+                Citations: citations,
+                GroundingKind: GroundingKind.Synthesized);
+        }
+        catch (ArgumentException ex)
+        {
+            return new GroundedChatCompletionResponse(
+                ChatCompletion: ChatCompletionResponse.Error(ex.Message),
+                Citations: [],
+                GroundingKind: GroundingKind.Synthesized);
+        }
+        catch (Exception ex)
+        {
+            return new GroundedChatCompletionResponse(
+                ChatCompletion: ChatCompletionResponse.Error(ex.Message),
+                Citations: [],
+                GroundingKind: GroundingKind.Synthesized);
         }
     }
 
