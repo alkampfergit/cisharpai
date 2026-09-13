@@ -93,10 +93,19 @@ public sealed class AzureOpenAiResponsesUsage
 
     [JsonPropertyName("output_tokens_details")]
     public AzureOpenAiOutputTokensDetails? OutputTokensDetails { get; set; }
+
+    [JsonPropertyName("input_tokens_details")]
+    public AzureOpenAiInputTokensDetails? InputTokensDetails { get; set; }
 }
 
 public sealed class AzureOpenAiOutputTokensDetails
 {
     [JsonPropertyName("reasoning_tokens")]
     public int ReasoningTokens { get; set; }
+}
+
+public sealed class AzureOpenAiInputTokensDetails
+{
+    [JsonPropertyName("cached_tokens")]
+    public int CachedTokens { get; set; }
 }

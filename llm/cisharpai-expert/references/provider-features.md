@@ -12,6 +12,7 @@
 | Image Embeddings | -- | -- | Yes | -- | Yes |
 | Multimodal Embeddings | -- | -- | -- | -- | Yes |
 | Grounded Chat (RAG) | Yes (GPT-5) | Yes (GPT-5) | -- | Yes | Yes |
+| Prompt Caching | Report-only (automatic) | Report-only (automatic) | -- | Yes (explicit control) | -- |
 | Tool Calling | Yes | Yes | Yes | Yes | Yes |
 | Vision | Yes | Yes | Varies | Yes | Partial |
 | Streaming | Yes | Yes | Yes | Yes | Yes |
@@ -35,6 +36,7 @@ if (feature is not null)
 | `IToolCallingFeature` | Function/tool calling |
 | `IStreamingChatFeature` | Token-by-token streaming |
 | `IGroundedChatFeature` | Document-grounded RAG with citations |
+| `IPromptCachingFeature` | Explicit cache breakpoints (Anthropic only) |
 | `IImageEmbeddingFeature` | Single image embedding |
 | `IMultimodalEmbeddingFeature` | Mixed text + image embedding |
 

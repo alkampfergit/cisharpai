@@ -15,7 +15,9 @@ public sealed record ChatCompletionResponse(
     /// When using Structured Outputs, the model may refuse to generate output for safety reasons.
     /// When non-null, Content may be empty and the caller should check this field.
     /// </summary>
-    string? Refusal = null)
+    string? Refusal = null,
+    int? CachedInputTokens = null,
+    int? CacheCreationInputTokens = null)
 {
     public static ChatCompletionResponse Error(string errorMessage, string? rawResponseJson = null) =>
         new(

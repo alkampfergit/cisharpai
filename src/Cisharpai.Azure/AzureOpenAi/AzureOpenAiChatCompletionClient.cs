@@ -217,40 +217,54 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
 
         await foreach (var json in _client.PostStreamAsync<object>(uri, providerRequest, request.ExtraParameters, cancellationToken))
         {
-            AzureOpenAiStreamChunk? chunk;
-            try
-            {
-                chunk = JsonSerializer.Deserialize<AzureOpenAiStreamChunk>(json, StreamJsonOptions);
-            }
-            catch
-            {
-                continue;
-            }
-
-            if (chunk is null) continue;
-
-            if (chunk.Choices is { Count: > 0 })
-            {
-                var choice = chunk.Choices[0];
-                var toolDelta = ToolCallingHelper.MapStreamToolCallDelta(
-                    choice.Delta?.ToolCalls,
-                    tc => (tc.Index, tc.Id, tc.Function?.Name, tc.Function?.Arguments));
-                yield return new ChatCompletionChunk(
-                    Content: choice.Delta?.Content ?? string.Empty,
-                    FinishReason: choice.FinishReason,
-                    Model: chunk.Model,
-                    PromptTokens: chunk.Usage?.PromptTokens,
-                    CompletionTokens: chunk.Usage?.CompletionTokens,
-                    ToolCallDelta: toolDelta);
-            }
-            else if (chunk.Usage is not null)
-            {
-                yield return new ChatCompletionChunk(
-                    Content: string.Empty,
-                    PromptTokens: chunk.Usage.PromptTokens,
-                    CompletionTokens: chunk.Usage.CompletionTokens);
-            }
+            var mapped = ParseChatStreamChunk(json);
+            if (mapped is not null)
+                yield return mapped;
         }
+    }
+
+    private static ChatCompletionChunk? ParseChatStreamChunk(string json)
+    {
+        AzureOpenAiStreamChunk? chunk;
+        try
+        {
+            chunk = JsonSerializer.Deserialize<AzureOpenAiStreamChunk>(json, StreamJsonOptions);
+        }
+        catch
+        {
+            return null;
+        }
+
+        if (chunk is null) return null;
+
+        if (chunk.Choices is { Count: > 0 })
+        {
+            var choice = chunk.Choices[0];
+            var toolDelta = ToolCallingHelper.MapStreamToolCallDelta(
+                choice.Delta?.ToolCalls,
+                tc => (tc.Index, tc.Id, tc.Function?.Name, tc.Function?.Arguments));
+            var cached = chunk.Usage?.PromptTokensDetails?.CachedTokens;
+            return new ChatCompletionChunk(
+                Content: choice.Delta?.Content ?? string.Empty,
+                FinishReason: choice.FinishReason,
+                Model: chunk.Model,
+                PromptTokens: chunk.Usage?.PromptTokens,
+                CompletionTokens: chunk.Usage?.CompletionTokens,
+                ToolCallDelta: toolDelta,
+                CachedInputTokens: cached > 0 ? cached : null);
+        }
+
+        if (chunk.Usage is not null)
+        {
+            var cached = chunk.Usage.PromptTokensDetails?.CachedTokens;
+            return new ChatCompletionChunk(
+                Content: string.Empty,
+                PromptTokens: chunk.Usage.PromptTokens,
+                CompletionTokens: chunk.Usage.CompletionTokens,
+                CachedInputTokens: cached > 0 ? cached : null);
+        }
+
+        return null;
     }
 
     public async Task<GroundedChatCompletionResponse> GetGroundedChatCompletionAsync(
@@ -560,6 +574,7 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
             ResponsesApiUri, providerRequest, request, cancellationToken);
 
         var parsed = ParseResponsesApiOutput(raw);
+        var cachedTokens = raw.Usage.InputTokensDetails?.CachedTokens;
 
         return new ChatCompletionResponse(
             Content: parsed.Content,
@@ -572,7 +587,8 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
             IncompleteReason: parsed.IsIncomplete ? parsed.IncompleteReason : null,
             IsSuccess: !parsed.IsError,
             ErrorMessage: parsed.ErrorMessage,
-            Refusal: parsed.Refusal);
+            Refusal: parsed.Refusal,
+            CachedInputTokens: cachedTokens > 0 ? cachedTokens : null);
     }
 
     private async IAsyncEnumerable<ChatCompletionChunk> StreamResponsesApiAsync(
@@ -596,40 +612,51 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
 
         await foreach (var json in _client.PostStreamAsync(ResponsesApiUri, providerRequest, request.ExtraParameters, cancellationToken))
         {
-            AzureOpenAiResponsesStreamEvent? evt;
-            try
-            {
-                evt = JsonSerializer.Deserialize<AzureOpenAiResponsesStreamEvent>(json, StreamJsonOptions);
-            }
-            catch
-            {
-                continue;
-            }
-
-            if (evt is null) continue;
-
-            switch (evt.Type)
-            {
-                case "response.output_text.delta":
-                    yield return new ChatCompletionChunk(
-                        Content: evt.Delta ?? string.Empty,
-                        Model: model);
-                    break;
-
-                case "response.completed":
-                    if (evt.Response is not null)
-                    {
-                        model = evt.Response.Model;
-                        yield return new ChatCompletionChunk(
-                            Content: string.Empty,
-                            FinishReason: evt.Response.Status,
-                            Model: model,
-                            PromptTokens: evt.Response.Usage?.InputTokens,
-                            CompletionTokens: evt.Response.Usage?.OutputTokens);
-                    }
-                    break;
-            }
+            var (mapped, evtModel) = ParseResponsesStreamEvent(json, model);
+            if (evtModel is not null) model = evtModel;
+            if (mapped is not null)
+                yield return mapped;
         }
+    }
+
+    private static (ChatCompletionChunk? Chunk, string? Model) ParseResponsesStreamEvent(string json, string? currentModel)
+    {
+        AzureOpenAiResponsesStreamEvent? evt;
+        try
+        {
+            evt = JsonSerializer.Deserialize<AzureOpenAiResponsesStreamEvent>(json, StreamJsonOptions);
+        }
+        catch
+        {
+            return (null, null);
+        }
+
+        if (evt is null) return (null, null);
+
+        return evt.Type switch
+        {
+            "response.output_text.delta" => (
+                new ChatCompletionChunk(Content: evt.Delta ?? string.Empty, Model: currentModel),
+                null),
+
+            "response.completed" when evt.Response is not null => MapCompletedResponseEvent(evt.Response),
+
+            _ => (null, null)
+        };
+    }
+
+    private static (ChatCompletionChunk Chunk, string? Model) MapCompletedResponseEvent(AzureOpenAiResponsesApiResponse response)
+    {
+        var cached = response.Usage?.InputTokensDetails?.CachedTokens;
+        return (
+            new ChatCompletionChunk(
+                Content: string.Empty,
+                FinishReason: response.Status,
+                Model: response.Model,
+                PromptTokens: response.Usage?.InputTokens,
+                CompletionTokens: response.Usage?.OutputTokens,
+                CachedInputTokens: cached > 0 ? cached : null),
+            response.Model);
     }
 
     private static AzureOpenAiTextFormat BuildResponsesApiTextFormat(JsonOutputOptions options)
@@ -661,6 +688,8 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         var finishReason = choice?.FinishReason;
         var isIncomplete = IsIncompleteFinishReason(finishReason);
 
+        var cachedTokens = raw.Usage.PromptTokensDetails?.CachedTokens;
+
         return new ChatCompletionResponse(
             Content: ContentPartHelper.ExtractStringContent(choice?.Message.Content),
             Model: raw.Model,
@@ -674,7 +703,8 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
             ErrorMessage: isIncomplete
                 ? $"Azure OpenAI response was incomplete because finish_reason was '{finishReason}'."
                 : null,
-            Refusal: choice?.Message.Refusal);
+            Refusal: choice?.Message.Refusal,
+            CachedInputTokens: cachedTokens > 0 ? cachedTokens : null);
     }
 
     private async Task<ToolCallingResponse> ExecuteToolCallingRequestAsync(
@@ -837,6 +867,7 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         var finishReason = choice?.FinishReason;
         var isIncomplete = IsIncompleteFinishReason(finishReason);
         var content = ContentPartHelper.ExtractStringContent(choice?.Message.Content);
+        var cachedTokens = raw.Usage.PromptTokensDetails?.CachedTokens;
 
         var chatCompletion = new ChatCompletionResponse(
             Content: content,
@@ -850,7 +881,8 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
             IsSuccess: !isIncomplete,
             ErrorMessage: isIncomplete
                 ? $"Azure OpenAI response was incomplete because finish_reason was '{finishReason}'."
-                : null);
+                : null,
+            CachedInputTokens: cachedTokens > 0 ? cachedTokens : null);
 
         var toolCalls = ToolCallingHelper.MapResponseToolCalls(
             choice?.Message.ToolCalls,
@@ -1119,6 +1151,7 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         string? rawRequestJson)
     {
         var parsed = ParseResponsesApiOutput(raw);
+        var cachedTokens = raw.Usage.InputTokensDetails?.CachedTokens;
 
         var chatCompletion = new ChatCompletionResponse(
             Content: parsed.Content,
@@ -1131,7 +1164,8 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
             IncompleteReason: parsed.IsIncomplete ? parsed.IncompleteReason : null,
             IsSuccess: !parsed.IsError,
             ErrorMessage: parsed.ErrorMessage,
-            Refusal: parsed.Refusal);
+            Refusal: parsed.Refusal,
+            CachedInputTokens: cachedTokens > 0 ? cachedTokens : null);
 
         var annotations = raw.Output
             .Where(o => o.Type == "message")

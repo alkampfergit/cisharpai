@@ -17,4 +17,8 @@ public sealed class AnthropicDocumentBlock
     public string? Title { get; set; }
 
     public AnthropicCitationConfig Citations { get; set; } = new() { Enabled = true };
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    [JsonPropertyName("cache_control")]
+    public AnthropicCacheControl? CacheControl { get; set; }
 }

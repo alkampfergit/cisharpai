@@ -20,7 +20,12 @@ public sealed class AnthropicChatRequest
 
     public List<AnthropicMessage> Messages { get; set; } = [];
 
-    public string? System { get; set; }
+    /// <summary>
+    /// System prompt. Can be a string (simple case) or a List&lt;AnthropicSystemBlock&gt;
+    /// (when cache breakpoints are needed). Serialized as-is by System.Text.Json.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public object? System { get; set; }
 
     public double? Temperature { get; set; }
 

@@ -11,6 +11,10 @@ public sealed class AnthropicToolDefinition
 
     [JsonPropertyName("input_schema")]
     public JsonElement InputSchema { get; set; }
+
+    [JsonPropertyName("cache_control")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AnthropicCacheControl? CacheControl { get; set; }
 }
 
 public sealed class AnthropicToolChoice

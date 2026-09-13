@@ -95,6 +95,23 @@ public static class FakeResponses
     }
 
     /// <summary>
+    /// Creates a chat completion response with cache usage information.
+    /// </summary>
+    public static ChatCompletionResponse CachedChat(
+        string content,
+        int? cachedInputTokens = null,
+        int? cacheCreationInputTokens = null,
+        string model = DefaultModel,
+        int? promptTokens = null,
+        int completionTokens = 5)
+    {
+        var effectivePromptTokens = promptTokens
+            ?? (cachedInputTokens ?? 0) + (cacheCreationInputTokens ?? 0) + 10;
+        return new(Content: content, Model: model, PromptTokens: effectivePromptTokens, CompletionTokens: completionTokens,
+            CachedInputTokens: cachedInputTokens, CacheCreationInputTokens: cacheCreationInputTokens);
+    }
+
+    /// <summary>
     /// Creates a successful embedding response.
     /// </summary>
     public static EmbeddingResponse Embedding(
