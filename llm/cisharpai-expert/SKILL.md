@@ -266,6 +266,11 @@ var options = new BulkEmbeddingOptions
 `ToTokenEstimator()` hangs off `TiktokenCounter` (not `ITokenCounter`) — remote async counters
 cannot be accidentally used in the synchronous batching loop.
 
+`TiktokenCounter` also exposes `GetIndexByTokenCount(text, maxTokenCount)` and
+`GetIndexByTokenCountFromEnd(text, maxTokenCount)` for O(n) single-pass token-boundary
+slicing. Use `ToTokenSlicerFromStart()` / `ToTokenSlicerFromEnd()` to get `Func<string, int, int>`
+delegates for `RecursiveChunkerOptions.TokenSlicerFromStart` / `TokenSlicerFromEnd`.
+
 **Cohere counter (`CohereTokenCounter` in `Cisharpai.Cohere`):** calls `POST /v1/tokenize`.
 
 ```csharp
@@ -349,7 +354,7 @@ implemented by Cohere only.
 Use the separate `Cisharpai.Rag` package for ingestion with any `IEmbeddingClient`. This is independent of `IGroundedChatFeature`; it does not provide storage, retrieval or generation.
 
 - Root namespace `Cisharpai.Rag`: `IRagIngestionPipeline`, `RagIngestionPipeline`, `RagOptions`, `AddCisharpaiRag`.
-- `.Chunking`: `ITextChunker.ChunkAsync(RagDocument, CancellationToken)` returns `IAsyncEnumerable<TextChunk>`, `FixedSizeChunker`, `FixedSizeChunkerOptions`. `SemanticChunker(IBulkEmbeddingProcessor, SemanticChunkerOptions?, ISentenceSplitter?)` — similarity-based chunking; `SemanticThresholdStrategy.Percentile` (default, self-calibrating) or `Absolute`; both modes buffer all sentence embeddings in memory before emitting the first chunk; backstops via `MaxChunkCharacters` (default 8000) and `MaxChunkSentences` (default 50). `ISentenceSplitter` / `RegexSentenceSplitter` — pluggable sentence splitting (default targets English prose, will mis-split on abbreviations). **This chunker embeds the entire document at chunking time — costs money and latency on top of downstream embedding.**
+- `.Chunking`: `ITextChunker.ChunkAsync(RagDocument, CancellationToken)` returns `IAsyncEnumerable<TextChunk>`, `FixedSizeChunker`, `FixedSizeChunkerOptions`. `SemanticChunker(IBulkEmbeddingProcessor, SemanticChunkerOptions?, ISentenceSplitter?)` — similarity-based chunking; `SemanticThresholdStrategy.Percentile` (default, self-calibrating) or `Absolute`; both modes buffer all sentence embeddings in memory before emitting the first chunk; backstops via `MaxChunkCharacters` (default 8000) and `MaxChunkSentences` (default 50). `ISentenceSplitter` / `RegexSentenceSplitter` — pluggable sentence splitting (default targets English prose, will mis-split on abbreviations). **This chunker embeds the entire document at chunking time — costs money and latency on top of downstream embedding.** `RecursiveChunker(RecursiveChunkerOptions?)` — structure-aware recursive splitting with a configurable separator ladder (default: `["\n\n", "\n", ". ", " ", ""]` — paragraph, line, sentence, word, hard cut). Character-based sizing by default (`string.Length`); set `TokenCounter` to an `ITokenCounter` for token-based sizing. Token mode requires `TokenSlicerFromStart` / `TokenSlicerFromEnd` delegates for O(n) single-pass hard cuts — use `TiktokenCounter.ToTokenSlicerFromStart()` / `ToTokenSlicerFromEnd()`. Options: `MaxChunkSize` (1024), `ChunkOverlap` (128, same unit as size), `Separators`. The empty-string terminal separator guarantees every chunk fits the budget; without it, oversized atomic units are emitted as-is.
 - `.Embeddings`: `IBulkEmbeddingProcessor.EmbedAsync(chunks, progress?, ct)`, `BulkEmbeddingProcessor`, `BulkEmbeddingOptions`, `EmbeddingProviderProfile`.
 - `.Models`: `RagDocument(Id, Text)`, `TextChunk(DocumentId, Index, StartOffset, EndOffset, Text, Metadata)`, `ChunkEmbedding(Chunk, Vector)`, `EmbeddingBatchResult`, `BulkEmbeddingProgress(CompletedBatches, TotalChunksProcessed, FailedBatches)`.
 - `TextChunk.EndOffset` is the exclusive UTF-16 end offset (for verbatim chunks: `StartOffset + Text.Length`); stored rather than derived to support non-verbatim chunkers that prepend context. `Metadata` is `IReadOnlyDictionary<string, object?>`, always non-null, empty by default. `object?` values support numeric metadata (similarity scores) without stringification.
