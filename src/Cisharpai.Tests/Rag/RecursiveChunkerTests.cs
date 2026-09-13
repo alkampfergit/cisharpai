@@ -33,6 +33,23 @@ public class RecursiveChunkerTests
         Assert.That(reconstructed, Is.EqualTo(covered), "Concatenated chunks must reconstruct source span");
     }
 
+    private static void AssertFullCoverageWithOverlap(List<TextChunk> chunks, string sourceText)
+    {
+        if (chunks.Count == 0)
+        {
+            Assert.That(sourceText, Has.Length.EqualTo(0));
+            return;
+        }
+        Assert.That(chunks[0].StartOffset, Is.EqualTo(0), "First chunk must start at offset 0");
+        Assert.That(chunks[^1].EndOffset, Is.EqualTo(sourceText.Length), "Last chunk must end at document length");
+        var covered = new bool[sourceText.Length];
+        foreach (var c in chunks)
+            for (var j = c.StartOffset; j < c.EndOffset; j++)
+                covered[j] = true;
+        for (var j = 0; j < sourceText.Length; j++)
+            Assert.That(covered[j], Is.True, $"Offset {j} not covered by any chunk");
+    }
+
     // --- Separator ladder ---
 
     [Test]
@@ -360,6 +377,13 @@ public class RecursiveChunkerTests
     {
         Assert.Throws<ArgumentException>(() =>
             new RecursiveChunker(new RecursiveChunkerOptions { Separators = [] }));
+    }
+
+    [Test]
+    public void Options_RejectsNullSeparatorEntry()
+    {
+        Assert.Throws<ArgumentException>(() =>
+            new RecursiveChunker(new RecursiveChunkerOptions { Separators = ["\n", null!, ""] }));
     }
 
     [Test]
@@ -694,8 +718,12 @@ public class RecursiveChunkerTests
         var chunker = new RecursiveChunker();
         var chunks = await Collect(chunker.ChunkAsync(new RagDocument("doc", text)));
 
-        Assert.That(chunks, Has.Count.EqualTo(2));
+        Assert.That(chunks, Has.Count.GreaterThanOrEqualTo(2));
+        foreach (var c in chunks)
+            Assert.That(c.Text, Has.Length.LessThanOrEqualTo(1024),
+                $"Chunk {c.Index} exceeds default MaxChunkSize");
         AssertVerbatimContract(chunks, text);
+        AssertFullCoverageWithOverlap(chunks, text);
     }
 
     // --- Separator without terminal empty string ---
@@ -717,7 +745,7 @@ public class RecursiveChunkerTests
         Assert.That(chunks[0].Text, Is.EqualTo(text));
     }
 
-    // --- Finding 1: Overlap must not break max-size guarantee ---
+    // --- Overlap must not break max-size guarantee ---
 
     [Test]
     public async Task Overlap_NeverExceedsMaxChunkSize_CharacterMode()
@@ -786,6 +814,91 @@ public class RecursiveChunkerTests
             Assert.That(c.Text, Has.Length.LessThanOrEqualTo(40),
                 $"Chunk {c.Index} ({c.Text.Length} chars) exceeds MaxChunkSize");
         AssertVerbatimContract(chunks, text);
+    }
+
+    // --- Emoji overlap: cap must use scalars, not code units (finding 1 counter-example) ---
+
+    [Test]
+    public async Task Overlap_EmojiText_NeverDropsSourceText()
+    {
+        var text = "😀😀😀😀";
+        var chunker = new RecursiveChunker(new RecursiveChunkerOptions
+        {
+            MaxChunkSize = 2,
+            ChunkOverlap = 1
+        });
+
+        var chunks = await Collect(chunker.ChunkAsync(new RagDocument("doc", text)));
+
+        AssertVerbatimContract(chunks, text);
+        AssertFullCoverageWithOverlap(chunks, text);
+    }
+
+    // --- De-overlapped chunks must reconstruct the full document ---
+
+    [Test]
+    public async Task DeOverlappedChunks_ReconstructDocument()
+    {
+        var text = "The quick brown fox jumps over the lazy dog and " +
+                   "then runs around the park several times before resting.";
+        var chunker = new RecursiveChunker(new RecursiveChunkerOptions
+        {
+            MaxChunkSize = 30,
+            ChunkOverlap = 8
+        });
+
+        var chunks = await Collect(chunker.ChunkAsync(new RagDocument("doc", text)));
+
+        Assert.That(chunks, Has.Count.GreaterThanOrEqualTo(2));
+        AssertVerbatimContract(chunks, text);
+        AssertFullCoverageWithOverlap(chunks, text);
+    }
+
+    // --- Hard-cut adjacent exactly-max chunks must maintain overlap (finding 2) ---
+
+    [Test]
+    public async Task HardCut_AdjacentExactlyMaxChunks_MaintainOverlap()
+    {
+        var text = "abcdefgh";
+        var chunker = new RecursiveChunker(new RecursiveChunkerOptions
+        {
+            MaxChunkSize = 4,
+            ChunkOverlap = 1,
+            Separators = [""]
+        });
+
+        var chunks = await Collect(chunker.ChunkAsync(new RagDocument("doc", text)));
+
+        Assert.That(chunks, Has.Count.GreaterThanOrEqualTo(2));
+        for (var i = 1; i < chunks.Count; i++)
+            Assert.That(chunks[i].StartOffset, Is.LessThan(chunks[i - 1].EndOffset),
+                $"Chunk {i} should overlap with chunk {i - 1}");
+        foreach (var c in chunks)
+            Assert.That(c.Text, Has.Length.LessThanOrEqualTo(4),
+                $"Chunk {c.Index} exceeds max size");
+        AssertVerbatimContract(chunks, text);
+        AssertFullCoverageWithOverlap(chunks, text);
+    }
+
+    // --- Oversized piece without terminal empty separator preserves prefix (finding 3) ---
+
+    [Test]
+    public async Task OversizedPiece_WithoutTerminalEmptySep_PreservesFullText()
+    {
+        var text = "ab cdefghijklmnop";
+        var chunker = new RecursiveChunker(new RecursiveChunkerOptions
+        {
+            MaxChunkSize = 4,
+            ChunkOverlap = 1,
+            Separators = [" "]
+        });
+
+        var chunks = await Collect(chunker.ChunkAsync(new RagDocument("doc", text)));
+
+        AssertVerbatimContract(chunks, text);
+        AssertFullCoverageWithOverlap(chunks, text);
+        var oversized = chunks.FirstOrDefault(c => c.Text.Contains("cdefghijklmnop"));
+        Assert.That(oversized, Is.Not.Null, "The oversized piece must be emitted intact");
     }
 
     // --- Finding 2: No empty chunks emitted ---

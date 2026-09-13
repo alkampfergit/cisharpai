@@ -577,7 +577,7 @@ The separator ladder tries each separator in order. The default is paragraph (`\
 
 ### Character mode vs token mode
 
-By default, sizes are measured in UTF-16 code units (`string.Length`). Set `TokenCounter` to measure in real tokens instead:
+By default, sizes are measured in Unicode scalar values — a supplementary character (e.g. an emoji) counts as one, regardless of how many UTF-16 code units it occupies. This matches `FixedSizeChunker`. Set `TokenCounter` to measure in real tokens instead:
 
 ```csharp
 using Cisharpai.Rag.Tokenization;
@@ -593,7 +593,9 @@ var chunker = new RecursiveChunker(new RecursiveChunkerOptions
 });
 ```
 
-`TokenSlicerFromStart` and `TokenSlicerFromEnd` use `Microsoft.ML.Tokenizers`' O(n) single-pass `GetIndexByTokenCount` — no counting loop. They are required for the hard-cut terminal case in token mode (the chunker throws rather than silently falling back to a binary search over a potentially network-backed counter). The `Cisharpai.Rag.Tokenizers` package is only needed when token-based sizing is used; character-based consumers never install it.
+`TokenSlicerFromStart` and `TokenSlicerFromEnd` use `Microsoft.ML.Tokenizers`' O(n) single-pass `GetIndexByTokenCount` — no counting loop. They are required for the hard-cut terminal case in token mode (the chunker throws rather than silently falling back to a binary search over a potentially network-backed counter). `TokenSlicerFromEnd` is also required when `ChunkOverlap > 0` (the default is 128), since overlap computation in token mode needs it — set `ChunkOverlap = 0` if you want token mode without a from-end slicer. The `Cisharpai.Rag.Tokenizers` package is only needed when token-based sizing is used; character-based consumers never install it.
+
+**Performance note:** token mode issues one `CountAsync` call per candidate split boundary during recursive splitting. With a remote counter (e.g. `CohereTokenCounter`), each call is an HTTP round-trip — impractical for large documents. `TiktokenCounter` (local, synchronous) is strongly recommended.
 
 ### Custom separators
 
@@ -618,7 +620,7 @@ Include `""` as the final entry to guarantee max-size compliance.
 | `Separators` | `["\n\n", "\n", ". ", " ", ""]` | Ordered separator ladder; must not be empty |
 | `TokenCounter` | `null` | Token counter for token-based sizing; `null` = character mode |
 | `TokenSlicerFromStart` | `null` | `(text, maxTokens) → charIndex` for hard cuts; required in token mode |
-| `TokenSlicerFromEnd` | `null` | `(text, maxTokens) → charIndex` for overlap; optional in token mode |
+| `TokenSlicerFromEnd` | `null` | `(text, maxTokens) → charIndex` for overlap; **required** in token mode when `ChunkOverlap > 0` (the default) |
 
 ## Offline tests
 

@@ -49,6 +49,12 @@ public sealed class RecursiveChunkerOptions
     /// <summary>
     /// When set, sizes are measured in tokens via this counter instead of characters.
     /// Local counters (<c>TiktokenCounter</c>) complete synchronously.
+    /// <para>
+    /// <b>Performance warning:</b> token mode issues one counter call per candidate split
+    /// boundary during recursive splitting. With a remote counter (e.g. <c>CohereTokenCounter</c>),
+    /// each call is an HTTP round-trip — impractical for large documents.
+    /// <c>TiktokenCounter</c> (local, synchronous) is strongly recommended.
+    /// </para>
     /// </summary>
     public ITokenCounter? TokenCounter { get; set; }
 
@@ -91,6 +97,8 @@ public sealed class RecursiveChunkerOptions
         separators ??= DefaultSeparators;
         if (separators.Count == 0)
             throw new ArgumentException("Separators must contain at least one entry.", nameof(separators));
+        if (separators.Any(s => s == null))
+            throw new ArgumentException("Separators must not contain null entries.", nameof(separators));
 
         separators = separators.ToList().AsReadOnly();
 
