@@ -636,6 +636,30 @@ public class SemanticChunkerTests
         AssertVerbatimContract(chunks, text);
     }
 
+    [Test]
+    public async Task PercentileMode_NearUniformSimilarities_TreatedAsUniform()
+    {
+        var text = "One. Two. Three. Four. Five.";
+        var v1 = new[] { 1f, 0f };
+        var v2 = new[] { 1f, 1e-7f };
+        var vectors = new[] { v1, v2, v1, v2, v1 };
+        var client = CreateFakeClient(MakeEmbeddingResponse(vectors));
+        var processor = CreateProcessor(client);
+        var chunker = new SemanticChunker(processor, new SemanticChunkerOptions
+        {
+            Strategy = SemanticThresholdStrategy.Percentile,
+            BreakPercentile = 10f,
+            MaxChunkCharacters = 10000,
+            MaxChunkSentences = 100
+        });
+
+        var chunks = await Collect(chunker.ChunkAsync(new RagDocument("doc", text)));
+
+        Assert.That(chunks, Has.Count.EqualTo(1),
+            "Near-uniform similarities (spread < epsilon) should produce no semantic boundaries");
+        AssertVerbatimContract(chunks, text);
+    }
+
     private sealed class PipeSplitter : ISentenceSplitter
     {
         public IReadOnlyList<string> Split(string text) =>

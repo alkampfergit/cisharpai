@@ -24,6 +24,8 @@ namespace Cisharpai.Rag.Chunking;
 /// </summary>
 public sealed class SemanticChunker : ITextChunker
 {
+    private const float MinimumSimilaritySpread = 1e-6f;
+
     private readonly IBulkEmbeddingProcessor _embeddingProcessor;
     private readonly ISentenceSplitter _sentenceSplitter;
     private readonly SemanticChunkerOptions _options;
@@ -202,7 +204,7 @@ public sealed class SemanticChunker : ITextChunker
         var sorted = (float[])similarities.Clone();
         Array.Sort(sorted);
 
-        if (sorted[0] == sorted[^1])
+        if (sorted[^1] - sorted[0] <= MinimumSimilaritySpread)
             return float.NegativeInfinity;
 
         var rank = breakPercentile / 100f * (sorted.Length - 1);
