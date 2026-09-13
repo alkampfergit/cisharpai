@@ -6,6 +6,8 @@ namespace Cisharpai.Tests.Testing;
 
 public sealed class PromptCachingFakeTests
 {
+    private static readonly int[] ExpectedBreakpoints = [0, 2];
+
     [Test]
     public void FakeChatCompletionClient_RegistersPromptCachingFeature_ByDefault()
     {
@@ -68,7 +70,7 @@ public sealed class PromptCachingFakeTests
 
         Assert.That(client.ReceivedPromptCachingRequests, Has.Count.EqualTo(1));
         Assert.That(client.ReceivedPromptCachingRequests[0].Options.CacheSystemMessage, Is.True);
-        Assert.That(client.ReceivedPromptCachingRequests[0].Options.MessageBreakpoints, Is.EqualTo(new[] { 0, 2 }));
+        Assert.That(client.ReceivedPromptCachingRequests[0].Options.MessageBreakpoints, Is.EqualTo(ExpectedBreakpoints));
     }
 
     [Test]

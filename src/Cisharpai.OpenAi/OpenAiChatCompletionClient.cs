@@ -304,50 +304,54 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         };
 
         string? model = null;
-        int? promptTokens = null;
-        int? completionTokens = null;
 
         await foreach (var json in _client.PostStreamAsync(ResponsesEndpoint, providerRequest, request.ExtraParameters, cancellationToken))
         {
-            OpenAiResponsesStreamEvent? evt;
-            try
-            {
-                evt = JsonSerializer.Deserialize<OpenAiResponsesStreamEvent>(json, StreamJsonOptions);
-            }
-            catch
-            {
-                continue;
-            }
-
-            if (evt is null) continue;
-
-            switch (evt.Type)
-            {
-                case "response.output_text.delta":
-                    yield return new ChatCompletionChunk(
-                        Content: evt.Delta ?? string.Empty,
-                        Model: model);
-                    break;
-
-                case "response.completed":
-                    if (evt.Response is not null)
-                    {
-                        model = evt.Response.Model;
-                        promptTokens = evt.Response.Usage?.InputTokens;
-                        completionTokens = evt.Response.Usage?.OutputTokens;
-                        var respCached = evt.Response.Usage?.InputTokensDetails?.CachedTokens;
-
-                        yield return new ChatCompletionChunk(
-                            Content: string.Empty,
-                            FinishReason: evt.Response.Status,
-                            Model: model,
-                            PromptTokens: promptTokens,
-                            CompletionTokens: completionTokens,
-                            CachedInputTokens: respCached > 0 ? respCached : null);
-                    }
-                    break;
-            }
+            var (mapped, evtModel) = ParseResponsesStreamEvent(json, model);
+            if (evtModel is not null) model = evtModel;
+            if (mapped is not null)
+                yield return mapped;
         }
+    }
+
+    private static (ChatCompletionChunk? Chunk, string? Model) ParseResponsesStreamEvent(string json, string? currentModel)
+    {
+        OpenAiResponsesStreamEvent? evt;
+        try
+        {
+            evt = JsonSerializer.Deserialize<OpenAiResponsesStreamEvent>(json, StreamJsonOptions);
+        }
+        catch
+        {
+            return (null, null);
+        }
+
+        if (evt is null) return (null, null);
+
+        return evt.Type switch
+        {
+            "response.output_text.delta" => (
+                new ChatCompletionChunk(Content: evt.Delta ?? string.Empty, Model: currentModel),
+                null),
+
+            "response.completed" when evt.Response is not null => MapCompletedResponseEvent(evt.Response),
+
+            _ => (null, null)
+        };
+    }
+
+    private static (ChatCompletionChunk Chunk, string? Model) MapCompletedResponseEvent(OpenAiResponsesApiResponse response)
+    {
+        var cached = response.Usage?.InputTokensDetails?.CachedTokens;
+        return (
+            new ChatCompletionChunk(
+                Content: string.Empty,
+                FinishReason: response.Status,
+                Model: response.Model,
+                PromptTokens: response.Usage?.InputTokens,
+                CompletionTokens: response.Usage?.OutputTokens,
+                CachedInputTokens: cached > 0 ? cached : null),
+            response.Model);
     }
 
     private async Task<ChatCompletionResponse> SendLegacyChatAsync(

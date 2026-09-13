@@ -13,6 +13,7 @@ namespace Cisharpai.Anthropic;
 public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature, IStreamingChatFeature, IGroundedChatFeature, IPromptCachingFeature
 {
     private const string MessagesEndpoint = "messages";
+    private const string EphemeralCacheType = "ephemeral";
 
     private static readonly JsonSerializerOptions StreamJsonOptions = new()
     {
@@ -324,49 +325,56 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
                 {
                     Type = "text",
                     Text = systemText,
-                    CacheControl = new AnthropicCacheControl { Type = "ephemeral" }
+                    CacheControl = new AnthropicCacheControl { Type = EphemeralCacheType }
                 }
             };
         }
 
         foreach (var index in cachingOptions.MessageBreakpoints)
         {
-            if (index < 0 || index >= providerRequest.Messages.Count)
-                continue;
-
-            var msg = providerRequest.Messages[index];
-            if (msg.Content is string text)
-            {
-                msg.Content = new List<AnthropicContentBlock>
-                {
-                    new()
-                    {
-                        Type = "text",
-                        Text = text,
-                        CacheControl = new AnthropicCacheControl { Type = "ephemeral" }
-                    }
-                };
-            }
-            else if (msg.Content is List<AnthropicContentBlock> blocks && blocks.Count > 0)
-            {
-                blocks[^1].CacheControl = new AnthropicCacheControl { Type = "ephemeral" };
-            }
-            else if (msg.Content is IList<object> mixedBlocks && mixedBlocks.Count > 0)
-            {
-                if (mixedBlocks[^1] is AnthropicContentBlock lastBlock)
-                    lastBlock.CacheControl = new AnthropicCacheControl { Type = "ephemeral" };
-            }
+            if (index >= 0 && index < providerRequest.Messages.Count)
+                ApplyCacheControlToMessage(providerRequest.Messages[index]);
         }
 
-        if (providerRequest.Tools is not null)
-        {
-            foreach (var index in cachingOptions.ToolBreakpoints)
-            {
-                if (index < 0 || index >= providerRequest.Tools.Count)
-                    continue;
+        ApplyCacheControlToTools(providerRequest.Tools, cachingOptions.ToolBreakpoints);
+    }
 
-                providerRequest.Tools[index].CacheControl = new AnthropicCacheControl { Type = "ephemeral" };
-            }
+    private static void ApplyCacheControlToMessage(AnthropicMessage msg)
+    {
+        if (msg.Content is string text)
+        {
+            msg.Content = new List<AnthropicContentBlock>
+            {
+                new()
+                {
+                    Type = "text",
+                    Text = text,
+                    CacheControl = new AnthropicCacheControl { Type = EphemeralCacheType }
+                }
+            };
+        }
+        else if (msg.Content is List<AnthropicContentBlock> blocks && blocks.Count > 0)
+        {
+            blocks[^1].CacheControl = new AnthropicCacheControl { Type = EphemeralCacheType };
+        }
+        else if (msg.Content is IList<object> mixedBlocks && mixedBlocks.Count > 0
+            && mixedBlocks[^1] is AnthropicContentBlock lastBlock)
+        {
+            lastBlock.CacheControl = new AnthropicCacheControl { Type = EphemeralCacheType };
+        }
+    }
+
+    private static void ApplyCacheControlToTools(
+        List<AnthropicToolDefinition>? tools,
+        IReadOnlyList<int> toolBreakpoints)
+    {
+        if (tools is null)
+            return;
+
+        foreach (var index in toolBreakpoints)
+        {
+            if (index >= 0 && index < tools.Count)
+                tools[index].CacheControl = new AnthropicCacheControl { Type = EphemeralCacheType };
         }
     }
 
