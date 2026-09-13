@@ -36,13 +36,13 @@ public sealed class TiktokenCounterTests
     }
 
     [Test]
-    public void CountTokens_MatchesCountAsync()
+    public async Task CountTokens_MatchesCountAsync()
     {
         var counter = new TiktokenCounter("gpt-4o");
         var text = "The quick brown fox jumps over the lazy dog.";
 
         var sync = counter.CountTokens(text);
-        var async_ = counter.CountAsync(text).GetAwaiter().GetResult();
+        var async_ = await counter.CountAsync(text);
 
         Assert.That(sync, Is.EqualTo(async_));
     }

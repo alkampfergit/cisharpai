@@ -259,4 +259,95 @@ public sealed class CohereDiRegistrationTests
 
         Assert.That(defaultClient, Is.Not.SameAs(specialClient));
     }
+
+    [Test]
+    public void SingleTokenCounter_ResolvesCorrectly()
+    {
+        var services = new ServiceCollection();
+
+        services.AddCohereTokenCounter("embed-english-v3.0", opt =>
+        {
+            opt.ApiKey = "test-key";
+        });
+
+        using var provider = services.BuildServiceProvider();
+
+        var counter = provider.GetRequiredService<ITokenCounter>();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(counter, Is.Not.Null);
+            Assert.That(counter, Is.InstanceOf<CohereTokenCounter>());
+        });
+    }
+
+    [Test]
+    public void KeyedTokenCounters_ResolveIndependentlyByKey()
+    {
+        var services = new ServiceCollection();
+
+        services.AddCohereTokenCounter("english", "embed-english-v3.0", opt =>
+        {
+            opt.ApiKey = "key-a";
+        });
+
+        services.AddCohereTokenCounter("multilingual", "embed-multilingual-v3.0", opt =>
+        {
+            opt.ApiKey = "key-b";
+        });
+
+        using var provider = services.BuildServiceProvider();
+
+        var english = provider.GetRequiredKeyedService<ITokenCounter>("english");
+        var multilingual = provider.GetRequiredKeyedService<ITokenCounter>("multilingual");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(english, Is.InstanceOf<CohereTokenCounter>());
+            Assert.That(multilingual, Is.InstanceOf<CohereTokenCounter>());
+            Assert.That(english, Is.Not.SameAs(multilingual));
+        });
+    }
+
+    [Test]
+    public void KeyedAndNonKeyedTokenCounters_CoexistIndependently()
+    {
+        var services = new ServiceCollection();
+
+        services.AddCohereTokenCounter("embed-english-v3.0", opt => opt.ApiKey = "default-key");
+        services.AddCohereTokenCounter("special", "embed-english-v3.0", opt => opt.ApiKey = "special-key");
+
+        using var provider = services.BuildServiceProvider();
+
+        var defaultCounter = provider.GetRequiredService<ITokenCounter>();
+        var specialCounter = provider.GetRequiredKeyedService<ITokenCounter>("special");
+
+        Assert.That(defaultCounter, Is.Not.SameAs(specialCounter));
+    }
+
+    [Test]
+    public void TokenCounter_CoexistsWithOtherClients()
+    {
+        var services = new ServiceCollection();
+
+        services.AddCohereEmbeddingClient(opt => opt.ApiKey = "embed-key");
+        services.AddCohereChatClient(opt => opt.ApiKey = "chat-key");
+        services.AddCohereRerankerClient(opt => opt.ApiKey = "rerank-key");
+        services.AddCohereTokenCounter("embed-english-v3.0", opt => opt.ApiKey = "token-key");
+
+        using var provider = services.BuildServiceProvider();
+
+        var embeddingClient = provider.GetRequiredService<IEmbeddingClient>();
+        var chatClient = provider.GetRequiredService<IChatCompletionClient>();
+        var rerankerClient = provider.GetRequiredService<IRerankerClient>();
+        var tokenCounter = provider.GetRequiredService<ITokenCounter>();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(tokenCounter, Is.InstanceOf<CohereTokenCounter>());
+            Assert.That(tokenCounter, Is.Not.SameAs(embeddingClient));
+            Assert.That(tokenCounter, Is.Not.SameAs(chatClient));
+            Assert.That(tokenCounter, Is.Not.SameAs(rerankerClient));
+        });
+    }
 }

@@ -110,7 +110,7 @@ public sealed class CohereTokenCounterTests
             var root = JsonDocument.Parse(body).RootElement;
             var text = root.GetProperty("text").GetString()!;
 
-            Assert.That(text.Length, Is.LessThanOrEqualTo(CohereTokenCounter.MaxCharactersPerRequest),
+            Assert.That(text, Has.Length.LessThanOrEqualTo(CohereTokenCounter.MaxCharactersPerRequest),
                 $"Chunk {callCount} exceeds max character limit");
 
             Interlocked.Increment(ref callCount);
@@ -165,13 +165,13 @@ public sealed class CohereTokenCounterTests
     }
 
     [Test]
-    public void CountAsync_ThrowsOnNullText()
+    public void CountAsync_ThrowsOnNullText_Synchronously()
     {
         var handler = OkHandler();
         var counter = CreateCounter(handler, out var httpClient);
         using var _ = httpClient;
 
-        Assert.That(async () => await counter.CountAsync(null!), Throws.ArgumentNullException);
+        Assert.That(() => counter.CountAsync(null!), Throws.ArgumentNullException);
     }
 
     [Test]
@@ -221,5 +221,120 @@ public sealed class CohereTokenCounterTests
 
         Assert.That(handler.LastRequest!.RequestUri!.ToString(),
             Does.Contain("my-cohere.inference.ai.azure.com/v1/tokenize"));
+    }
+
+    [Test]
+    public void CountAsync_PropagatesHttpRequestException()
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromException<HttpResponseMessage>(new HttpRequestException("Service unavailable")));
+        var counter = CreateCounter(handler, out var httpClient);
+        using var _ = httpClient;
+
+        Assert.That(async () => await counter.CountAsync("test"),
+            Throws.InstanceOf<HttpRequestException>());
+    }
+
+    [Test]
+    public void CountAsync_PropagatesCancellation()
+    {
+        var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        var handler = new MockHttpMessageHandler((_, ct) =>
+        {
+            ct.ThrowIfCancellationRequested();
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK));
+        });
+        var counter = CreateCounter(handler, out var httpClient);
+        using var _ = httpClient;
+
+        Assert.That(async () => await counter.CountAsync("test", cts.Token),
+            Throws.InstanceOf<OperationCanceledException>());
+    }
+
+    [Test]
+    public async Task CountAsync_ChunkedPath_SumsTokenCounts()
+    {
+        var callIndex = 0;
+        var handler = new MockHttpMessageHandler(async (request, _) =>
+        {
+            await request.Content!.ReadAsStringAsync(CancellationToken.None);
+            var count = Interlocked.Increment(ref callIndex);
+            var tokens = string.Join(", ", Enumerable.Range(1, count + 2).Select(i => i.ToString()));
+            var tokenStrings = string.Join(", ", Enumerable.Range(1, count + 2).Select(_ => "\"a\""));
+
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(
+                    $"{{\"tokens\": [{tokens}], \"token_strings\": [{tokenStrings}]}}",
+                    System.Text.Encoding.UTF8, "application/json")
+            };
+        });
+
+        var counter = CreateCounter(handler, out var httpClient);
+        using var _ = httpClient;
+
+        var textPart1 = new string('a', CohereTokenCounter.MaxCharactersPerRequest - 1) + " ";
+        var textPart2 = new string('b', 100);
+        var count = await counter.CountAsync(textPart1 + textPart2);
+
+        Assert.That(count, Is.GreaterThan(0));
+        Assert.That(callIndex, Is.EqualTo(2));
+    }
+
+    [Test]
+    public void CountAsync_ChunkedPath_PropagatesHttpError()
+    {
+        var callCount = 0;
+        var handler = new MockHttpMessageHandler((request, _) =>
+        {
+            if (Interlocked.Increment(ref callCount) == 2)
+                return Task.FromException<HttpResponseMessage>(new HttpRequestException("Chunk 2 failed"));
+
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(TokenizeResponseJson,
+                    System.Text.Encoding.UTF8, "application/json")
+            });
+        });
+
+        var counter = CreateCounter(handler, out var httpClient);
+        using var _ = httpClient;
+
+        var longText = new string('a', CohereTokenCounter.MaxCharactersPerRequest - 1)
+                       + " " + new string('b', CohereTokenCounter.MaxCharactersPerRequest);
+
+        Assert.That(async () => await counter.CountAsync(longText),
+            Throws.InstanceOf<HttpRequestException>());
+    }
+
+    [Test]
+    public async Task CountAsync_BaseUrlWithoutVersionPath_UsesAsIs()
+    {
+        var handler = OkHandler();
+        var counter = CreateCounter(handler, out var httpClient,
+            baseUrl: "https://custom-endpoint.example.com/api/");
+        using var _ = httpClient;
+
+        await counter.CountAsync("test");
+
+        Assert.That(handler.LastRequest!.RequestUri!.ToString(),
+            Does.Contain("custom-endpoint.example.com/api/tokenize"));
+    }
+
+    [Test]
+    public void Constructor_ThrowsOnNullHttpClient()
+    {
+        Assert.That(() => new CohereTokenCounter(null!, new CohereClientOptions(), "model"),
+            Throws.ArgumentNullException);
+    }
+
+    [Test]
+    public void Constructor_ThrowsOnNullOptions()
+    {
+        using var httpClient = new HttpClient();
+        Assert.That(() => new CohereTokenCounter(httpClient, null!, "model"),
+            Throws.ArgumentNullException);
     }
 }

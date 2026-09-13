@@ -64,17 +64,17 @@ public sealed class CohereTokenCounter : ITokenCounter
     /// token counts are summed. The result is an upper-bound approximation because BPE merges
     /// across the split point are lost.
     /// </remarks>
-    public async ValueTask<int> CountAsync(string text, CancellationToken cancellationToken = default)
+    public ValueTask<int> CountAsync(string text, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(text);
 
         if (text.Length == 0)
-            return 0;
+            return new ValueTask<int>(0);
 
         if (text.Length <= MaxCharactersPerRequest)
-            return await CountSingleAsync(text, cancellationToken).ConfigureAwait(false);
+            return CountSingleAsync(text, cancellationToken);
 
-        return await CountChunkedAsync(text, cancellationToken).ConfigureAwait(false);
+        return CountChunkedAsync(text, cancellationToken);
     }
 
     private async ValueTask<int> CountSingleAsync(string text, CancellationToken cancellationToken)
@@ -82,20 +82,9 @@ public sealed class CohereTokenCounter : ITokenCounter
         var request = new CohereTokenizeRequest { Text = text, Model = _model };
         var tokenizeUrl = new Uri(_tokenizeBaseUri, TokenizeEndpoint).ToString();
 
-        try
-        {
-            var response = await _client.PostAsync<CohereTokenizeRequest, CohereTokenizeResponse>(
-                tokenizeUrl, request, cancellationToken: cancellationToken).ConfigureAwait(false);
-            return response.Tokens.Length;
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
-        }
-        catch (HttpRequestException)
-        {
-            throw;
-        }
+        var response = await _client.PostAsync<CohereTokenizeRequest, CohereTokenizeResponse>(
+            tokenizeUrl, request, cancellationToken: cancellationToken).ConfigureAwait(false);
+        return response.Tokens.Length;
     }
 
     private async ValueTask<int> CountChunkedAsync(string text, CancellationToken cancellationToken)
