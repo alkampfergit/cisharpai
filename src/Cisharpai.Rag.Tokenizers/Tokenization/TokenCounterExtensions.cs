@@ -21,7 +21,7 @@ public static class TokenCounterExtensions
     /// <summary>
     /// Returns a <c>Func&lt;string, int, int&gt;</c> that delegates to
     /// <see cref="TiktokenCounter.GetIndexByTokenCount"/>. Use as
-    /// <see cref="Chunking.RecursiveChunkerOptions.TokenSlicerFromStart"/> for O(1)
+    /// <see cref="Chunking.RecursiveChunkerOptions.TokenSlicerFromStart"/> for O(n)
     /// token-boundary hard cuts in the recursive chunker.
     /// </summary>
     public static Func<string, int, int> ToTokenSlicerFromStart(this TiktokenCounter counter)

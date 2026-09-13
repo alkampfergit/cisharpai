@@ -13,15 +13,18 @@ namespace Cisharpai.Rag.Chunking;
 /// chunk fits within <see cref="RecursiveChunkerOptions.MaxChunkSize"/>.
 /// </para>
 /// <para>
-/// <b>Sizing modes:</b> by default, sizes are UTF-16 code unit counts. Set
-/// <see cref="RecursiveChunkerOptions.TokenCounter"/> to measure in real tokens instead.
-/// The token counter does not force a dependency on <c>Cisharpai.Rag.Tokenizers</c> —
-/// consumers who only want character-based sizing never install it.
+/// <b>Sizing modes:</b> by default, sizes count Unicode scalar values (not tokens).
+/// A supplementary character (e.g. an emoji) counts as one scalar, regardless of how many
+/// UTF-16 code units it occupies. Set <see cref="RecursiveChunkerOptions.TokenCounter"/>
+/// to measure in real tokens instead. The token counter does not force a dependency on
+/// <c>Cisharpai.Rag.Tokenizers</c> — consumers who only want character-based sizing never
+/// install it.
 /// </para>
 /// <para>
 /// <b>Overlap:</b> consecutive chunks share <see cref="RecursiveChunkerOptions.ChunkOverlap"/>
-/// units (characters or tokens) of trailing/leading text so that context is preserved across
-/// chunk boundaries.
+/// units (Unicode scalars or tokens) of trailing/leading text so that context is preserved
+/// across chunk boundaries. The overlap never causes a chunk to exceed
+/// <see cref="RecursiveChunkerOptions.MaxChunkSize"/>.
 /// </para>
 /// </summary>
 public sealed class RecursiveChunker : ITextChunker
@@ -164,11 +167,11 @@ public sealed class RecursiveChunker : ITextChunker
             }
         }
 
-        if (chunkFrom < numPieces)
+        if (chunkFrom < numPieces && contentStarts[chunkFrom] < regionEnd)
             result.Add((contentStarts[chunkFrom], regionEnd));
     }
 
-    private async Task HardCutAsync(
+    private Task HardCutAsync(
         string sourceText,
         int regionStart,
         int regionEnd,
@@ -180,14 +183,6 @@ public sealed class RecursiveChunker : ITextChunker
         {
             ct.ThrowIfCancellationRequested();
 
-            var remainingSize = await MeasureSizeAsync(sourceText, pos, regionEnd, ct)
-                .ConfigureAwait(false);
-            if (remainingSize <= _options.MaxChunkSize)
-            {
-                result.Add((pos, regionEnd));
-                break;
-            }
-
             int cutEnd;
             if (_options.TokenCounter != null)
             {
@@ -197,10 +192,25 @@ public sealed class RecursiveChunker : ITextChunker
                         "to handle oversized text that cannot be split by any separator. " +
                         "Use TiktokenCounter.ToTokenSlicerFromStart() or provide a custom delegate.");
 
-                cutEnd = pos + _options.TokenSlicerFromStart(sourceText[pos..regionEnd], _options.MaxChunkSize);
+                var remaining = sourceText[pos..regionEnd];
+                var sliceEnd = _options.TokenSlicerFromStart(remaining, _options.MaxChunkSize);
+
+                if (sliceEnd >= remaining.Length)
+                {
+                    result.Add((pos, regionEnd));
+                    break;
+                }
+
+                cutEnd = pos + sliceEnd;
             }
             else
             {
+                if (regionEnd - pos <= _options.MaxChunkSize)
+                {
+                    result.Add((pos, regionEnd));
+                    break;
+                }
+
                 cutEnd = pos + AdvanceScalars(sourceText, pos, _options.MaxChunkSize);
             }
 
@@ -213,6 +223,8 @@ public sealed class RecursiveChunker : ITextChunker
             result.Add((pos, cutEnd));
             pos = cutEnd;
         }
+
+        return Task.CompletedTask;
     }
 
     private List<(int Start, int End)> ApplyOverlap(
@@ -231,23 +243,40 @@ public sealed class RecursiveChunker : ITextChunker
             var chunk = rawChunks[i];
 
             int overlapStart;
-            if (_options.TokenCounter != null && _options.TokenSlicerFromEnd != null)
+            if (_options.TokenCounter != null)
             {
                 var prevText = sourceText[prev.Start..prev.End];
-                overlapStart = prev.Start + _options.TokenSlicerFromEnd(prevText, _options.ChunkOverlap);
-            }
-            else if (_options.TokenCounter == null)
-            {
-                overlapStart = RetreatScalars(sourceText, prev.Start, prev.End, _options.ChunkOverlap);
+                overlapStart = prev.Start + _options.TokenSlicerFromEnd!(prevText, _options.ChunkOverlap);
             }
             else
             {
-                overlapStart = chunk.Start;
+                overlapStart = RetreatScalars(sourceText, prev.Start, prev.End, _options.ChunkOverlap);
             }
 
             overlapStart = Math.Max(overlapStart, prev.Start);
             overlapStart = Math.Min(overlapStart, chunk.Start);
             overlapStart = AdjustSurrogateStart(sourceText, overlapStart, prev.Start);
+
+            if (_options.TokenCounter != null)
+            {
+                var overlappedText = sourceText[overlapStart..chunk.End];
+                var capIndex = _options.TokenSlicerFromEnd!(overlappedText, _options.MaxChunkSize);
+                var cappedStart = overlapStart + capIndex;
+                if (cappedStart > overlapStart)
+                {
+                    overlapStart = cappedStart;
+                    overlapStart = AdjustSurrogateStart(sourceText, overlapStart, prev.Start);
+                }
+            }
+            else
+            {
+                var maxStart = chunk.End - _options.MaxChunkSize;
+                if (overlapStart < maxStart)
+                {
+                    overlapStart = Math.Max(maxStart, prev.Start);
+                    overlapStart = AdjustSurrogateStart(sourceText, overlapStart, prev.Start);
+                }
+            }
 
             result.Add((overlapStart, chunk.End));
         }

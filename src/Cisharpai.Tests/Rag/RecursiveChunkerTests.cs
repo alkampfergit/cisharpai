@@ -716,4 +716,149 @@ public class RecursiveChunkerTests
         Assert.That(chunks, Has.Count.EqualTo(1));
         Assert.That(chunks[0].Text, Is.EqualTo(text));
     }
+
+    // --- Finding 1: Overlap must not break max-size guarantee ---
+
+    [Test]
+    public async Task Overlap_NeverExceedsMaxChunkSize_CharacterMode()
+    {
+        var text = "aaaa bbbb cccc dddd eeee ffff";
+        var chunker = new RecursiveChunker(new RecursiveChunkerOptions
+        {
+            MaxChunkSize = 10,
+            ChunkOverlap = 3,
+            Separators = [" ", ""]
+        });
+
+        var chunks = await Collect(chunker.ChunkAsync(new RagDocument("doc", text)));
+
+        Assert.That(chunks, Has.Count.GreaterThanOrEqualTo(2));
+        foreach (var c in chunks)
+            Assert.That(c.Text, Has.Length.LessThanOrEqualTo(10),
+                $"Chunk {c.Index} ({c.Text.Length} chars) exceeds MaxChunkSize");
+        AssertVerbatimContract(chunks, text);
+    }
+
+    [Test]
+    public async Task Overlap_NeverExceedsMaxChunkSize_TokenMode()
+    {
+        var counter = new TiktokenCounter("gpt-4o");
+        var text = string.Join(" ", Enumerable.Range(0, 100).Select(i => $"word{i}"));
+        var chunker = new RecursiveChunker(new RecursiveChunkerOptions
+        {
+            MaxChunkSize = 20,
+            ChunkOverlap = 5,
+            TokenCounter = counter,
+            TokenSlicerFromStart = counter.ToTokenSlicerFromStart(),
+            TokenSlicerFromEnd = counter.ToTokenSlicerFromEnd(),
+            Separators = [" ", ""]
+        });
+
+        var chunks = await Collect(chunker.ChunkAsync(new RagDocument("doc", text)));
+
+        Assert.That(chunks, Has.Count.GreaterThanOrEqualTo(2));
+        foreach (var c in chunks)
+        {
+            var tokens = counter.CountTokens(c.Text);
+            Assert.That(tokens, Is.LessThanOrEqualTo(20),
+                $"Chunk {c.Index} ({tokens} tokens) exceeds MaxChunkSize");
+        }
+        AssertVerbatimContract(chunks, text);
+    }
+
+    [Test]
+    public async Task Overlap_CorpusGuarantee_AllChunksFitBudget()
+    {
+        var rng = new Random(42);
+        var words = Enumerable.Range(0, 500).Select(_ =>
+            new string((char)rng.Next('a', 'z' + 1), rng.Next(1, 12)));
+        var text = string.Join(" ", words);
+
+        var chunker = new RecursiveChunker(new RecursiveChunkerOptions
+        {
+            MaxChunkSize = 40,
+            ChunkOverlap = 10
+        });
+
+        var chunks = await Collect(chunker.ChunkAsync(new RagDocument("doc", text)));
+
+        foreach (var c in chunks)
+            Assert.That(c.Text, Has.Length.LessThanOrEqualTo(40),
+                $"Chunk {c.Index} ({c.Text.Length} chars) exceeds MaxChunkSize");
+        AssertVerbatimContract(chunks, text);
+    }
+
+    // --- Finding 2: No empty chunks emitted ---
+
+    [Test]
+    public async Task NoEmptyChunks_WhenSeparatorAtEnd()
+    {
+        var text = "abc ";
+        var chunker = new RecursiveChunker(new RecursiveChunkerOptions
+        {
+            MaxChunkSize = 2,
+            ChunkOverlap = 0,
+            Separators = [" ", ""]
+        });
+
+        var chunks = await Collect(chunker.ChunkAsync(new RagDocument("doc", text)));
+
+        foreach (var c in chunks)
+            Assert.That(c.Text, Has.Length.GreaterThan(0),
+                $"Chunk {c.Index} is empty");
+        AssertVerbatimContract(chunks, text);
+    }
+
+    [Test]
+    public async Task NoEmptyChunks_VariousInputs()
+    {
+        string[] inputs = ["a ", "ab\n", "x\n\n", "hello world ", "a b c "];
+
+        foreach (var text in inputs)
+        {
+            var chunker = new RecursiveChunker(new RecursiveChunkerOptions
+            {
+                MaxChunkSize = 2,
+                ChunkOverlap = 0
+            });
+
+            var chunks = await Collect(chunker.ChunkAsync(new RagDocument("doc", text)));
+
+            foreach (var c in chunks)
+                Assert.That(c.Text, Has.Length.GreaterThan(0),
+                    $"Empty chunk in input '{text}' at index {c.Index}");
+        }
+    }
+
+    // --- Finding 5: Token overlap without TokenSlicerFromEnd is rejected ---
+
+    [Test]
+    public void TokenMode_OverlapWithoutSlicerFromEnd_IsRejected()
+    {
+        var counter = new FakeTokenCounter { DefaultCount = 5 };
+        var ex = Assert.Throws<ArgumentException>(() =>
+            new RecursiveChunker(new RecursiveChunkerOptions
+            {
+                MaxChunkSize = 10,
+                ChunkOverlap = 2,
+                TokenCounter = counter,
+                TokenSlicerFromStart = (_, _) => 5,
+                TokenSlicerFromEnd = null
+            }));
+        Assert.That(ex!.Message, Does.Contain("TokenSlicerFromEnd"));
+    }
+
+    [Test]
+    public void TokenMode_ZeroOverlapWithoutSlicerFromEnd_IsAccepted()
+    {
+        var counter = new FakeTokenCounter { DefaultCount = 5 };
+        Assert.DoesNotThrow(() =>
+            new RecursiveChunker(new RecursiveChunkerOptions
+            {
+                MaxChunkSize = 10,
+                ChunkOverlap = 0,
+                TokenCounter = counter,
+                TokenSlicerFromEnd = null
+            }));
+    }
 }

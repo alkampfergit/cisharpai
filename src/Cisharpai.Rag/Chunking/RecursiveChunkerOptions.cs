@@ -6,16 +6,18 @@ namespace Cisharpai.Rag.Chunking;
 /// An empty string as the final separator triggers a hard character- or token-level cut,
 /// guaranteeing that every emitted chunk fits the budget.
 /// <para>
-/// <b>Character mode (default):</b> sizes are UTF-16 code unit counts (<c>string.Length</c>).
+/// <b>Character mode (default):</b> sizes count Unicode scalar values (not tokens).
+/// A supplementary character (e.g. an emoji) counts as one, regardless of how many
+/// UTF-16 code units it occupies — matching <see cref="FixedSizeChunkerOptions"/>.
 /// No additional dependencies required.
 /// </para>
 /// <para>
 /// <b>Token mode:</b> set <see cref="TokenCounter"/> to measure in real tokens. For the
-/// hard-cut terminal case, provide <see cref="TokenSlicerFromStart"/> and
-/// <see cref="TokenSlicerFromEnd"/> via <c>TiktokenCounter.ToTokenSlicerFromStart()</c> /
-/// <c>TiktokenCounter.ToTokenSlicerFromEnd()</c> (in the <c>Cisharpai.Rag.Tokenizers</c>
-/// package). Without slicers, the chunker throws if it encounters a single word that
-/// exceeds the budget — it will not silently fall back to a counting loop.
+/// hard-cut terminal case, provide <see cref="TokenSlicerFromStart"/>; for overlap,
+/// provide <see cref="TokenSlicerFromEnd"/> as well. Both are available via
+/// <c>TiktokenCounter.ToTokenSlicerFromStart()</c> / <c>TiktokenCounter.ToTokenSlicerFromEnd()</c>
+/// (in the <c>Cisharpai.Rag.Tokenizers</c> package). Without slicers, the chunker
+/// throws — it will not silently fall back to a counting loop.
 /// </para>
 /// </summary>
 public sealed class RecursiveChunkerOptions
@@ -24,7 +26,7 @@ public sealed class RecursiveChunkerOptions
     public static readonly IReadOnlyList<string> DefaultSeparators =
         ["\n\n", "\n", ". ", " ", ""];
 
-    /// <summary>Maximum chunk size in characters (default) or tokens when <see cref="TokenCounter"/> is set. Must be positive.</summary>
+    /// <summary>Maximum chunk size in Unicode scalar values (default) or tokens when <see cref="TokenCounter"/> is set. Must be positive.</summary>
     public int MaxChunkSize { get; set; } = 1024;
 
     /// <summary>
@@ -79,6 +81,12 @@ public sealed class RecursiveChunkerOptions
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxChunkSize);
         ArgumentOutOfRangeException.ThrowIfNegative(chunkOverlap);
         ArgumentOutOfRangeException.ThrowIfGreaterThanOrEqual(chunkOverlap, maxChunkSize);
+
+        if (tokenCounter != null && chunkOverlap > 0 && tokenSlicerFromEnd == null)
+            throw new ArgumentException(
+                "Token-based sizing with ChunkOverlap > 0 requires RecursiveChunkerOptions.TokenSlicerFromEnd. " +
+                "Use TiktokenCounter.ToTokenSlicerFromEnd() or provide a custom delegate.",
+                nameof(tokenSlicerFromEnd));
 
         separators ??= DefaultSeparators;
         if (separators.Count == 0)
