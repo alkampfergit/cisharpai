@@ -7,7 +7,7 @@
 | Chat Completions | Yes | Yes | Yes | Yes | Yes |
 | Text Embeddings | Yes | Yes | Yes | -- | Yes |
 | Reranking | -- | -- | -- | -- | Yes |
-| Token Counting | Local* | Local* | -- | -- | Yes (local + API) |
+| Token Counting | Local* | Local* | -- | -- | API only |
 | JSON Mode | Yes | Yes | Yes | Yes | Yes |
 | Structured Outputs | Yes | Yes | Varies | Yes | Yes |
 | Image Embeddings | -- | -- | Yes | -- | Yes |

@@ -41,7 +41,8 @@ public sealed class CohereTokenCounter : ITokenCounter
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
         }, loggerFactory?.CreateLogger<LlmHttpClient>());
         _model = model;
-        _tokenizeBaseUri = DeriveV1BaseUri(options.BaseUrl);
+        var effectiveBaseUrl = httpClient.BaseAddress?.ToString() ?? options.BaseUrl;
+        _tokenizeBaseUri = DeriveV1BaseUri(effectiveBaseUrl);
     }
 
     public static CohereTokenCounter Create(
@@ -124,7 +125,11 @@ public sealed class CohereTokenCounter : ITokenCounter
             if (char.IsWhiteSpace(text[i]))
                 return i - offset + 1;
         }
-        return maxLength;
+
+        var length = maxLength;
+        if (char.IsHighSurrogate(text[offset + length - 1]))
+            length--;
+        return length;
     }
 
     private static Uri DeriveV1BaseUri(string baseUrl)

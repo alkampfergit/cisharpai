@@ -4,6 +4,7 @@ Local token counting for Cisharpai RAG pipelines via `Microsoft.ML.Tokenizers`. 
 
 ```csharp
 using Cisharpai.Rag.Tokenization;
+using Cisharpai.Rag.Embeddings;
 
 // Offline, synchronous, thread-safe — cached tokenizer instance per counter.
 var counter = new TiktokenCounter("gpt-4o"); // o200k_base

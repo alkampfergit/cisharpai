@@ -376,6 +376,73 @@ public sealed class CohereTokenCounterTests
     }
 
     [Test]
+    public void FindWhitespaceSplitPoint_BacksOffSurrogatePair()
+    {
+        // U+1F600 (😀) is encoded as a surrogate pair: 😀
+        var emoji = "\U0001F600";
+        var text = new string('a', 9) + emoji; // 9 chars + 2 char surrogate = 11 chars
+        // maxLength=10 would land between the high and low surrogate
+        var splitPoint = CohereTokenCounter.FindWhitespaceSplitPoint(text, 0, 10);
+
+        Assert.That(splitPoint, Is.EqualTo(9),
+            "Should back off by one to avoid bisecting the surrogate pair");
+    }
+
+    [Test]
+    public async Task CountAsync_EmojiStraddlingChunkBoundary_DoesNotSplitSurrogatePair()
+    {
+        var receivedTexts = new List<string>();
+        var handler = new MockHttpMessageHandler(async (request, _) =>
+        {
+            var body = await request.Content!.ReadAsStringAsync(CancellationToken.None);
+            var root = JsonDocument.Parse(body).RootElement;
+            receivedTexts.Add(root.GetProperty("text").GetString()!);
+
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent("""{"tokens": [1], "token_strings": ["a"]}""",
+                    System.Text.Encoding.UTF8, "application/json")
+            };
+        });
+
+        var counter = CreateCounter(handler, out var httpClient);
+        using var _ = httpClient;
+
+        // Place a surrogate pair exactly at the chunk boundary
+        var filler = new string('a', CohereTokenCounter.MaxCharactersPerRequest - 1);
+        var text = filler + "\U0001F600" + "bbb"; // filler(65535) + emoji(2) + bbb(3) = 65540
+        await counter.CountAsync(text);
+
+        // First chunk should NOT end with an unpaired high surrogate
+        foreach (var chunk in receivedTexts)
+        {
+            if (chunk.Length > 0)
+                Assert.That(char.IsHighSurrogate(chunk[^1]), Is.False,
+                    $"Chunk ends with unpaired high surrogate: '{chunk[^3..]}'");
+        }
+    }
+
+    [Test]
+    public async Task CountAsync_PrefersHttpClientBaseAddress()
+    {
+        var handler = OkHandler();
+        var httpClient = new HttpClient(handler)
+        {
+            BaseAddress = new Uri("https://my-proxy.example.com/v2/")
+        };
+        var counter = new CohereTokenCounter(
+            httpClient,
+            new CohereClientOptions { BaseUrl = "https://api.cohere.com/v2/" },
+            "embed-english-v3.0");
+        using var _ = httpClient;
+
+        await counter.CountAsync("test");
+
+        Assert.That(handler.LastRequest!.RequestUri!.Host, Is.EqualTo("my-proxy.example.com"));
+        Assert.That(handler.LastRequest!.RequestUri!.AbsolutePath, Is.EqualTo("/v1/tokenize"));
+    }
+
+    [Test]
     public void Constructor_ThrowsOnNullHttpClient()
     {
         Assert.That(() => new CohereTokenCounter(null!, new CohereClientOptions(), "model"),

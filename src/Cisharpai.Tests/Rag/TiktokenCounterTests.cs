@@ -113,17 +113,31 @@ public sealed class TiktokenCounterTests
         var o200k = new TiktokenCounter("gpt-4o");
         var cl100k = new TiktokenCounter("gpt-4");
 
-        var text = "The quick brown fox jumps over the lazy dog. " +
-                   "This is a longer text to ensure meaningful differences in tokenization.";
+        // "tiktoken" is a single token in cl100k_base but two in o200k_base,
+        // making it a reliable discriminator between the two encodings.
+        var text = "tiktoken tiktoken tiktoken tiktoken tiktoken";
 
         var countO200k = await o200k.CountAsync(text);
         var countCl100k = await cl100k.CountAsync(text);
 
         Assert.Multiple(() =>
         {
+            Assert.That(countO200k, Is.Not.EqualTo(countCl100k),
+                "The two encodings must produce different counts for this input");
             Assert.That(countO200k, Is.GreaterThan(0));
             Assert.That(countCl100k, Is.GreaterThan(0));
         });
+    }
+
+    [Test]
+    public void CountAsync_ThrowsOnPreCancelledToken()
+    {
+        var counter = new TiktokenCounter("gpt-4o");
+        var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        Assert.That(() => counter.CountAsync("Hello, world!", cts.Token),
+            Throws.InstanceOf<OperationCanceledException>());
     }
 
     [Test]

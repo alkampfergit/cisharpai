@@ -27,6 +27,7 @@ public sealed class TiktokenCounter : ITokenCounter
     public ValueTask<int> CountAsync(string text, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(text);
+        cancellationToken.ThrowIfCancellationRequested();
         return new ValueTask<int>(_tokenizer.CountTokens(text));
     }
 

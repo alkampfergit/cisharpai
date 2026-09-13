@@ -9,7 +9,7 @@ The only dependency needed by consuming applications.
 - **`IChatCompletionClient.cs`** — Primary chat interface. Inherits `IHasFeatures`.
 - **`IEmbeddingClient.cs`** — Primary embedding interface. Inherits `IHasFeatures`.
 - **`IRerankerClient.cs`** — Primary reranking interface (`RerankAsync`). Inherits `IHasFeatures`. Cohere only.
-- **`ITokenCounter.cs`** — Token counting interface (`CountAsync`). One instance per model. Implementations: `TiktokenCounter` (local, in `Cisharpai.Rag`), `CohereTokenCounter` (API-backed, in `Cisharpai.Cohere`).
+- **`ITokenCounter.cs`** — Token counting interface (`CountAsync`). One instance per model. Implementations: `TiktokenCounter` (local, in `Cisharpai.Rag.Tokenizers`), `CohereTokenCounter` (API-backed, in `Cisharpai.Cohere`).
 - **`Features/`** — Feature Collection Pattern for optional capabilities:
   - `IFeatureCollection.cs` / `FeatureCollection.cs` — Thread-safe `Get<T>()`/`Set<T>()` backed by `ConcurrentDictionary`.
   - `Chat/IJsonOutputFeature.cs` — JSON Mode + Structured Outputs.

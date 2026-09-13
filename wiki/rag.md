@@ -120,6 +120,9 @@ int tokensAsync = await counter.CountAsync("Hello, world!"); // ValueTask — co
 Wire it into `BulkEmbeddingOptions.TokenEstimator` with the `ToTokenEstimator()` extension:
 
 ```csharp
+using Cisharpai.Rag.Tokenization;
+using Cisharpai.Rag.Embeddings;
+
 var counter = new TiktokenCounter("gpt-4o");
 var options = new BulkEmbeddingOptions
 {

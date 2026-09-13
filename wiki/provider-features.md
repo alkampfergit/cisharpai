@@ -31,7 +31,7 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Chat Completions | Yes | Yes | Yes | Yes | Yes |
 | Text Embeddings | Yes | Yes | Yes | -- | Yes |
 | Reranking | -- | -- | -- | -- | Yes |
-| Token Counting | Local* | Local* | -- | -- | Yes (local + API) |
+| Token Counting | Local* | Local* | -- | -- | API only |
 | RAG Ingestion | Yes | Yes | Yes | -- | Yes |
 | JSON Mode | Yes | Yes | Yes | Yes | Yes |
 | Structured Outputs | Yes | Yes | Yes | Yes | Yes |
