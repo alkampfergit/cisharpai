@@ -287,8 +287,8 @@ public sealed class AzureAiInferenceChatCompletionClient : IChatCompletionClient
             {
                 return new GroundedChatCompletionResponse(
                     ChatCompletion: chatResponse,
-                    Citations: [],
-                    GroundingKind: GroundingKind.Synthesized);
+                    Citations: [])
+                { GroundingKind = GroundingKind.Synthesized };
             }
 
             var (cleanContent, citations) = GroundedChatFallbackHelper.ParseAndStripMarkers(
@@ -298,22 +298,22 @@ public sealed class AzureAiInferenceChatCompletionClient : IChatCompletionClient
 
             return new GroundedChatCompletionResponse(
                 ChatCompletion: adjustedResponse,
-                Citations: citations,
-                GroundingKind: GroundingKind.Synthesized);
+                Citations: citations)
+            { GroundingKind = GroundingKind.Synthesized };
         }
         catch (ArgumentException ex)
         {
             return new GroundedChatCompletionResponse(
                 ChatCompletion: ChatCompletionResponse.Error(ex.Message),
-                Citations: [],
-                GroundingKind: GroundingKind.Synthesized);
+                Citations: [])
+            { GroundingKind = GroundingKind.Synthesized };
         }
         catch (Exception ex)
         {
             return new GroundedChatCompletionResponse(
                 ChatCompletion: ChatCompletionResponse.Error(ex.Message),
-                Citations: [],
-                GroundingKind: GroundingKind.Synthesized);
+                Citations: [])
+            { GroundingKind = GroundingKind.Synthesized };
         }
     }
 

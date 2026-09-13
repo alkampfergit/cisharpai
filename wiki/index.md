@@ -40,7 +40,7 @@ Cisharpai is a unified .NET client library providing a single `IChatCompletionCl
 - [RAG Ingestion](rag.md) — fixed-size chunking, bounded bulk embeddings, host configuration and keyed providers
 - [Embeddings](embeddings.md) — text, image, and multimodal embeddings
 - [Reranking](reranking.md) — relevance reranking via `IRerankerClient` (Cohere)
-- [Grounded Chat (RAG)](grounded-chat.md) — document grounding with citations via `IGroundedChatFeature` (Anthropic, Cohere)
+- [Grounded Chat (RAG)](grounded-chat.md) — document grounding with citations via `IGroundedChatFeature` (all providers)
 - [Prompt Caching](prompt-caching.md) — cache usage reporting (all providers) and explicit cache control via `IPromptCachingFeature` (Anthropic)
 
 ### Operations

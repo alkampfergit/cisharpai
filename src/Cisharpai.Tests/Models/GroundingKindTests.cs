@@ -19,8 +19,8 @@ public sealed class GroundingKindTests
     {
         var response = new GroundedChatCompletionResponse(
             ChatCompletion: new ChatCompletionResponse("content", "model", 10, 5),
-            Citations: [],
-            GroundingKind: GroundingKind.Synthesized);
+            Citations: [])
+        { GroundingKind = GroundingKind.Synthesized };
 
         Assert.That(response.GroundingKind, Is.EqualTo(GroundingKind.Synthesized));
     }
