@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using Cisharpai.Models;
 using Cisharpai.Rag.Embeddings;
 using Cisharpai.Rag.Models;
 

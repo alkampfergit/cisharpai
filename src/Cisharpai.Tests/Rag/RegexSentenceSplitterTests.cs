@@ -5,7 +5,7 @@ namespace Cisharpai.Tests.Rag;
 [TestFixture]
 public class RegexSentenceSplitterTests
 {
-    private readonly ISentenceSplitter _splitter = new RegexSentenceSplitter();
+    private readonly RegexSentenceSplitter _splitter = new();
 
     [Test]
     public void SplitOnPeriodFollowedByWhitespace()

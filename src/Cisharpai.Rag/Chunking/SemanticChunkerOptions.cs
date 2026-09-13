@@ -22,31 +22,39 @@ public sealed class SemanticChunkerOptions
     /// <summary>Secondary backstop: force a cut after this many sentences regardless of similarity. Must be positive.</summary>
     public int MaxChunkSentences { get; set; } = 50;
 
-    internal SemanticChunkerOptions Snapshot()
-    {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(MaxChunkCharacters, nameof(MaxChunkCharacters));
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(MaxChunkSentences, nameof(MaxChunkSentences));
+    internal SemanticChunkerOptions Snapshot() =>
+        ValidateAndClone(Strategy, BreakPercentile, AbsoluteThreshold, MaxChunkCharacters, MaxChunkSentences);
 
-        if (Strategy == SemanticThresholdStrategy.Percentile)
+    private static SemanticChunkerOptions ValidateAndClone(
+        SemanticThresholdStrategy strategy,
+        float breakPercentile,
+        float absoluteThreshold,
+        int maxChunkCharacters,
+        int maxChunkSentences)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxChunkCharacters);
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxChunkSentences);
+
+        if (strategy == SemanticThresholdStrategy.Percentile)
         {
-            if (BreakPercentile is <= 0f or > 100f)
-                throw new ArgumentOutOfRangeException(nameof(BreakPercentile), BreakPercentile,
+            if (breakPercentile is <= 0f or > 100f)
+                throw new ArgumentOutOfRangeException(nameof(breakPercentile), breakPercentile,
                     "BreakPercentile must be between 0 (exclusive) and 100 (inclusive).");
         }
         else
         {
-            if (AbsoluteThreshold is < -1f or > 1f)
-                throw new ArgumentOutOfRangeException(nameof(AbsoluteThreshold), AbsoluteThreshold,
+            if (absoluteThreshold is < -1f or > 1f)
+                throw new ArgumentOutOfRangeException(nameof(absoluteThreshold), absoluteThreshold,
                     "AbsoluteThreshold must be between -1 and 1.");
         }
 
         return new SemanticChunkerOptions
         {
-            Strategy = Strategy,
-            BreakPercentile = BreakPercentile,
-            AbsoluteThreshold = AbsoluteThreshold,
-            MaxChunkCharacters = MaxChunkCharacters,
-            MaxChunkSentences = MaxChunkSentences
+            Strategy = strategy,
+            BreakPercentile = breakPercentile,
+            AbsoluteThreshold = absoluteThreshold,
+            MaxChunkCharacters = maxChunkCharacters,
+            MaxChunkSentences = maxChunkSentences
         };
     }
 }

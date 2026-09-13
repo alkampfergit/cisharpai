@@ -20,7 +20,7 @@ public class SemanticChunkerTests
     private static EmbeddingResponse MakeEmbeddingResponse(params float[][] vectors) =>
         new(vectors, null, "test-model", vectors.Length * 10);
 
-    private static IBulkEmbeddingProcessor CreateProcessor(FakeEmbeddingClient client) =>
+    private static BulkEmbeddingProcessor CreateProcessor(FakeEmbeddingClient client) =>
         new BulkEmbeddingProcessor(client, new BulkEmbeddingOptions
         {
             MaxBatchItems = 100,

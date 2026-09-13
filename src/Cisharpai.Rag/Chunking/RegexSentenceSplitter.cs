@@ -18,13 +18,8 @@ public sealed partial class RegexSentenceSplitter : ISentenceSplitter
         if (string.IsNullOrWhiteSpace(text))
             return [];
 
-        var parts = SentenceBoundary().Split(text);
-        var result = new List<string>(parts.Length);
-        foreach (var part in parts)
-        {
-            if (!string.IsNullOrWhiteSpace(part))
-                result.Add(part);
-        }
-        return result;
+        return SentenceBoundary().Split(text)
+            .Where(part => !string.IsNullOrWhiteSpace(part))
+            .ToList();
     }
 }
