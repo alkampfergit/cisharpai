@@ -33,7 +33,7 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Multimodal Embeddings | -- | -- | -- | -- | Yes |
 | Reasoning Models | Yes | Yes | Yes | -- | -- |
 | Responses API (GPT-5) | Yes | Yes | -- | -- | -- |
-| Grounded Chat (RAG) | Yes | Yes | -- | Yes | Yes |
+| Grounded Chat (RAG) | Yes (native) | Yes (native) | Yes (fallback) | Yes (native) | Yes (native) |
 | Tool Calling | Yes | Yes | Yes | Yes | Yes |
 | Vision (Image Input) | Yes | Yes | Yes | Yes | Partial* |
 | Streaming | Yes | Yes | Yes | Yes | Yes |
@@ -100,6 +100,7 @@ Azure OpenAI truncation is surfaced as a failed unified response when the provid
 | JSON Mode | Via `response_format`; availability varies by deployed model |
 | Structured Outputs | Via `response_format.json_schema`; availability varies by deployed model |
 | Reasoning Models | o1/o3/o4/gpt-5 detected automatically |
+| Grounded Chat (RAG) | `IGroundedChatFeature` via prompt-injection fallback; documents serialized into system message; model instructed to emit `«cite:N»…«/cite»` markers; markers parsed and stripped to produce `Citation` records with correct offsets; `GroundingKind.Synthesized`; all `CitationMode` values accepted (no server-side distinction); graceful degradation when model emits no markers |
 | Tool Calling | Model-dependent; uses OpenAI-compatible `tools` array and `tool_choice`; all `ToolChoice` variants supported |
 | Vision | Same data URI format as OpenAI; availability depends on deployed model |
 | Streaming | `IStreamingChatFeature`; supports both standard and reasoning request formats; `[DONE]` terminates the stream |

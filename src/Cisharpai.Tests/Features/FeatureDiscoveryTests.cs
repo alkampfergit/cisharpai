@@ -380,13 +380,18 @@ public sealed class FeatureDiscoveryTests
     }
 
     [Test]
-    public void AzureAiInferenceChatCompletionClient_DoesNotExposeGroundedChatFeature()
+    public void AzureAiInferenceChatCompletionClient_ExposesGroundedChatFeature()
     {
         using var httpClient = new HttpClient { BaseAddress = new Uri("https://test.inference.azure.com/") };
         var options = new AzureAiInferenceClientOptions { ModelId = "test-model", ApiKey = "key" };
         var client = new AzureAiInferenceChatCompletionClient(httpClient, options);
 
-        Assert.That(client.Features.Get<IGroundedChatFeature>(), Is.Null);
+        var feature = client.Features.Get<IGroundedChatFeature>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
     }
 
     // --- Cohere chat client: exposes JSON output feature ---

@@ -12,7 +12,14 @@ public sealed record GroundedChatCompletionResponse(
     /// <summary>
     /// Citations extracted from the response. Empty list if no citations were generated.
     /// </summary>
-    IReadOnlyList<Citation> Citations)
+    IReadOnlyList<Citation> Citations,
+
+    /// <summary>
+    /// Indicates whether citations were produced natively by the provider or synthesized
+    /// via prompt injection. Defaults to <see cref="GroundingKind.Native"/> for backward
+    /// compatibility with providers that have native citation support.
+    /// </summary>
+    GroundingKind GroundingKind = GroundingKind.Native)
 {
     /// <summary>
     /// Convenience: delegates to <see cref="ChatCompletionResponse.IsSuccess"/>.
