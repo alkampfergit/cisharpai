@@ -14,36 +14,67 @@ public sealed class ContextPacker : IContextPacker
         _counter = counter;
     }
 
-    public async Task<ContextPackingResult> PackAsync(
+    public Task<ContextPackingResult> PackAsync(
         IReadOnlyList<ScoredChunk> rankedChunks,
         ContextPackingOptions options,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(rankedChunks);
         ArgumentNullException.ThrowIfNull(options);
-        var opts = options.Snapshot();
+        return PackCoreAsync(rankedChunks, options.Snapshot(), cancellationToken);
+    }
 
+    private async Task<ContextPackingResult> PackCoreAsync(
+        IReadOnlyList<ScoredChunk> rankedChunks,
+        ContextPackingOptions opts,
+        CancellationToken cancellationToken)
+    {
         var effectiveBudget = opts.TokenBudget - opts.ReservedTokens;
         var separatorTokens = opts.Separator.Length > 0
             ? await _counter.CountAsync(opts.Separator, cancellationToken).ConfigureAwait(false)
             : 0;
 
-        // Count each chunk once
-        var chunkTokenCounts = new int[rankedChunks.Count];
+        var chunkTokenCounts = await CountChunkTokensAsync(
+            rankedChunks, cancellationToken).ConfigureAwait(false);
+
+        var (selected, dropped, tokensUsed) = SelectChunks(
+            rankedChunks, chunkTokenCounts, effectiveBudget, separatorTokens, opts.OverflowStrategy);
+
+        IReadOnlyList<ScoredChunk> ordered = opts.UseLostInMiddleOrdering && selected.Count > 1
+            ? ApplyLostInMiddleOrdering(selected.Select(s => s.Chunk).ToList())
+            : selected.Select(s => s.Chunk).ToList();
+
+        return new ContextPackingResult(ordered, dropped, tokensUsed, effectiveBudget - tokensUsed);
+    }
+
+    private async Task<int[]> CountChunkTokensAsync(
+        IReadOnlyList<ScoredChunk> rankedChunks,
+        CancellationToken cancellationToken)
+    {
+        var counts = new int[rankedChunks.Count];
         for (var i = 0; i < rankedChunks.Count; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            chunkTokenCounts[i] = await _counter.CountAsync(
+            counts[i] = await _counter.CountAsync(
                 rankedChunks[i].Chunk.Text, cancellationToken).ConfigureAwait(false);
         }
 
+        return counts;
+    }
+
+    private static (List<(ScoredChunk Chunk, int TokenCount)> Selected, List<DroppedChunk> Dropped, int TokensUsed) SelectChunks(
+        IReadOnlyList<ScoredChunk> rankedChunks,
+        int[] chunkTokenCounts,
+        int effectiveBudget,
+        int separatorTokens,
+        OverflowStrategy strategy)
+    {
         var selected = new List<(ScoredChunk Chunk, int TokenCount)>();
         var dropped = new List<DroppedChunk>();
         var tokensUsed = 0;
 
         for (var i = 0; i < rankedChunks.Count; i++)
         {
-            cancellationToken.ThrowIfCancellationRequested();
             var chunkTokens = chunkTokenCounts[i];
             var separatorCost = selected.Count > 0 ? separatorTokens : 0;
             var totalCost = chunkTokens + separatorCost;
@@ -56,7 +87,7 @@ public sealed class ContextPacker : IContextPacker
 
             if (tokensUsed + totalCost > effectiveBudget)
             {
-                if (opts.OverflowStrategy == OverflowStrategy.StopAtFirstMisfit)
+                if (strategy == OverflowStrategy.StopAtFirstMisfit)
                 {
                     dropped.Add(new DroppedChunk(rankedChunks[i], chunkTokens, DropReason.BudgetExhausted));
                     for (var j = i + 1; j < rankedChunks.Count; j++)
@@ -72,22 +103,9 @@ public sealed class ContextPacker : IContextPacker
             selected.Add((rankedChunks[i], chunkTokens));
         }
 
-        IReadOnlyList<ScoredChunk> ordered = opts.UseLostInMiddleOrdering && selected.Count > 1
-            ? ApplyLostInMiddleOrdering(selected.Select(s => s.Chunk).ToList())
-            : selected.Select(s => s.Chunk).ToList();
-
-        return new ContextPackingResult(
-            ordered,
-            dropped,
-            tokensUsed,
-            opts.TokenBudget - opts.ReservedTokens - tokensUsed);
+        return (selected, dropped, tokensUsed);
     }
 
-    /// <summary>
-    /// Places the highest-ranked chunks at the edges (start and end) and the
-    /// weakest in the middle, because models attend most reliably to context edges.
-    /// Input order is rank order (index 0 = highest rank).
-    /// </summary>
     internal static IReadOnlyList<ScoredChunk> ApplyLostInMiddleOrdering(
         IReadOnlyList<ScoredChunk> rankOrdered)
     {
