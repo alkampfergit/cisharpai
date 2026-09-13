@@ -22,6 +22,7 @@ namespace Cisharpai.Cohere;
 public sealed class CohereTokenCounter : ITokenCounter
 {
     internal const int MaxCharactersPerRequest = 65_536;
+    private const char UriPathSeparator = '/';
     private const string TokenizeEndpoint = "tokenize";
 
     private readonly LlmHttpClient _client;
@@ -136,15 +137,15 @@ public sealed class CohereTokenCounter : ITokenCounter
         {
             var newPath = path.Replace("/v2/", "/v1/", StringComparison.OrdinalIgnoreCase)
                               .Replace("/v2", "/v1", StringComparison.OrdinalIgnoreCase);
-            if (!newPath.EndsWith('/'))
-                newPath += '/';
+            if (!newPath.EndsWith(UriPathSeparator))
+                newPath += UriPathSeparator;
             var builder = new UriBuilder(uri) { Path = newPath };
             return builder.Uri;
         }
 
-        if (!path.EndsWith('/'))
+        if (!path.EndsWith(UriPathSeparator))
         {
-            var builder = new UriBuilder(uri) { Path = path + '/' };
+            var builder = new UriBuilder(uri) { Path = path + UriPathSeparator };
             return builder.Uri;
         }
 
