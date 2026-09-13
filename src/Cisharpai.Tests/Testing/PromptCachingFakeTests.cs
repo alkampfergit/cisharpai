@@ -102,6 +102,32 @@ public sealed class PromptCachingFakeTests
     }
 
     [Test]
+    public void FakeResponses_CachedChat_DerivesPromptTokensFromCacheCounts()
+    {
+        var response = FakeResponses.CachedChat("test", cachedInputTokens: 500, cacheCreationInputTokens: 200);
+
+        Assert.That(response.PromptTokens, Is.EqualTo(710), "Should be cachedInputTokens + cacheCreationInputTokens + 10 (fresh)");
+        Assert.That(response.PromptTokens - (response.CachedInputTokens ?? 0), Is.GreaterThan(0),
+            "fresh = PromptTokens - CachedInputTokens should always be positive");
+    }
+
+    [Test]
+    public void FakeResponses_CachedChat_ExplicitPromptTokens_Preserved()
+    {
+        var response = FakeResponses.CachedChat("test", cachedInputTokens: 500, promptTokens: 600);
+
+        Assert.That(response.PromptTokens, Is.EqualTo(600), "Explicitly supplied promptTokens should be used as-is");
+    }
+
+    [Test]
+    public void FakeResponses_CachedChat_NoCacheCounts_DefaultsToTen()
+    {
+        var response = FakeResponses.CachedChat("test");
+
+        Assert.That(response.PromptTokens, Is.EqualTo(10));
+    }
+
+    [Test]
     public async Task FakeChatCompletionClient_Reset_ClearsPromptCachingState()
     {
         var client = new FakeChatCompletionClient();

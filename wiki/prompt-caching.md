@@ -40,7 +40,7 @@ For Anthropic, `PromptTokens = input_tokens + cache_read_input_tokens + cache_cr
 
 ### Streaming
 
-Cache fields appear on the final `ChatCompletionChunk` (the one with `FinishReason` set):
+Cache fields appear on the final usage-bearing `ChatCompletionChunk` (which may or may not carry a `FinishReason` — legacy OpenAI/Azure streams emit cache counts on a separate usage-only chunk):
 
 ```csharp
 var feature = client.Features.Get<IStreamingChatFeature>()!;
@@ -168,20 +168,26 @@ Use `FakeResponses.CachedChat` to create responses with cache fields. Both `cach
 ```csharp
 var fake = new FakeChatCompletionClient();
 
-// Cache hit response (second+ call)
+// Cache creation response (first call) — enqueue takes priority
+fake.EnqueuePromptCachingResponse(FakeResponses.CachedChat(
+    "first call", cacheCreationInputTokens: 1000));
+
+// Cache hit response (second+ call) — default after queue drains
 fake.DefaultPromptCachingResponse = FakeResponses.CachedChat(
     "cached response",
     cachedInputTokens: 500,
     cacheCreationInputTokens: 200);
 
-// Cache creation response (first call)
-fake.EnqueuePromptCachingResponse(FakeResponses.CachedChat(
-    "first call", cacheCreationInputTokens: 1000));
-
 var feature = fake.Features.Get<IPromptCachingFeature>()!;
-var response = await feature.GetChatCompletionWithCachingAsync(request, options);
 
-Assert.That(response.CachedInputTokens, Is.EqualTo(500));
+// First call dequeues the creation response
+var first = await feature.GetChatCompletionWithCachingAsync(request, options);
+Assert.That(first.CacheCreationInputTokens, Is.EqualTo(1000));
+Assert.That(first.CachedInputTokens, Is.Null);
+
+// Second call uses the default (cache hit)
+var second = await feature.GetChatCompletionWithCachingAsync(request, options);
+Assert.That(second.CachedInputTokens, Is.EqualTo(500));
 ```
 
 The `FakeChatCompletionClient` registers `IPromptCachingFeature` by default (included in `FakeChatFeatures.All`). Disable it with:

@@ -337,10 +337,19 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         {
             blocks[^1].CacheControl = new AnthropicCacheControl { Type = EphemeralCacheType };
         }
-        else if (msg.Content is IList<object> mixedBlocks && mixedBlocks.Count > 0
-            && mixedBlocks[^1] is AnthropicContentBlock lastBlock)
+        else if (msg.Content is IList<object> mixedBlocks && mixedBlocks.Count > 0)
         {
-            lastBlock.CacheControl = new AnthropicCacheControl { Type = EphemeralCacheType };
+            for (var i = mixedBlocks.Count - 1; i >= 0; i--)
+            {
+                if (mixedBlocks[i] is AnthropicDocumentBlock docBlock)
+                {
+                    docBlock.CacheControl = new AnthropicCacheControl { Type = EphemeralCacheType };
+                    return;
+                }
+            }
+
+            if (mixedBlocks[^1] is AnthropicContentBlock lastBlock)
+                lastBlock.CacheControl = new AnthropicCacheControl { Type = EphemeralCacheType };
         }
     }
 

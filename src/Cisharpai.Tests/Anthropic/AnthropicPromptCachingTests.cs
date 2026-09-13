@@ -468,6 +468,24 @@ public sealed class AnthropicPromptCachingTests
         var firstMsg = doc.RootElement.GetProperty("messages")[0];
         var content = firstMsg.GetProperty("content");
         Assert.That(content.GetArrayLength(), Is.GreaterThan(1), "Should contain document blocks + user text");
+
+        var lastDocIndex = -1;
+        for (var i = content.GetArrayLength() - 1; i >= 0; i--)
+        {
+            if (content[i].TryGetProperty("type", out var t) && t.GetString() == "document")
+            {
+                lastDocIndex = i;
+                break;
+            }
+        }
+
+        Assert.That(lastDocIndex, Is.GreaterThanOrEqualTo(0), "Should contain at least one document block");
+        Assert.That(content[lastDocIndex].TryGetProperty("cache_control", out _), Is.True,
+            "cache_control should be on the last document block, not the question text");
+
+        var lastElement = content[content.GetArrayLength() - 1];
+        Assert.That(lastElement.TryGetProperty("cache_control", out _), Is.False,
+            "The question text (last element) should NOT have cache_control");
     }
 
     [Test]

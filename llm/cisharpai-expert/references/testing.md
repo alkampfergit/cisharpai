@@ -35,6 +35,10 @@ FakeResponses.ToolCalls(("get_weather", """{"location":"Paris"}"""), ("get_time"
 FakeResponses.GroundedChat("Answer with citations")
 FakeResponses.GroundedChat("Answer", citations)
 
+// Cached Chat
+FakeResponses.CachedChat("answer", cachedInputTokens: 500, cacheCreationInputTokens: 200)
+FakeResponses.CachedChat("first call", cacheCreationInputTokens: 1000) // cache-creation-only
+
 // Streaming
 FakeResponses.StreamingChunks("Hello", " ", "world", "!")
 
@@ -76,6 +80,7 @@ fake.EnqueueResponse(FakeResponses.ChatError("Oops"));
 fake.DefaultJsonOutputResponse = FakeResponses.Chat("""{"color":"blue"}""");
 fake.DefaultToolCallingResponse = FakeResponses.ToolCall("get_weather", "{}");
 fake.DefaultGroundedChatResponse = FakeResponses.GroundedChat("Grounded answer");
+fake.DefaultPromptCachingResponse = FakeResponses.CachedChat("Cached answer", cachedInputTokens: 100);
 fake.DefaultStreamingResponse = FakeResponses.StreamingChunks("Hello", " world");
 ```
 
@@ -91,6 +96,7 @@ Assert.Equal("Hello", fake.ReceivedRequests[0].Messages[0].Content);
 fake.ReceivedToolCallingRequests   // tool calling requests
 fake.ReceivedJsonOutputRequests    // JSON output requests
 fake.ReceivedGroundedChatRequests  // grounded chat requests
+fake.ReceivedPromptCachingRequests // prompt caching requests
 fake.ReceivedStreamingRequests     // streaming requests
 ```
 
@@ -133,7 +139,7 @@ var fake = new FakeChatCompletionClient(FakeChatFeatures.All);
 var fake = new FakeChatCompletionClient(FakeChatFeatures.None);
 ```
 
-**FakeChatFeatures:** `Streaming`, `ToolCalling`, `JsonOutput`, `GroundedChat`, `All`, `None`
+**FakeChatFeatures:** `Streaming`, `ToolCalling`, `JsonOutput`, `GroundedChat`, `PromptCaching`, `All`, `None`
 
 **FakeEmbeddingFeatures:** `ImageEmbedding`, `MultimodalEmbedding`, `All`, `None`
 
