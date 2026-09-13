@@ -89,7 +89,7 @@ public class RecursiveChunkerTests
 
         Assert.That(chunks, Has.Count.GreaterThanOrEqualTo(2));
         foreach (var c in chunks)
-            Assert.That(c.Text.Length, Is.LessThanOrEqualTo(20));
+            Assert.That(c.Text, Has.Length.LessThanOrEqualTo(20));
         AssertVerbatimContract(chunks, text);
     }
 
@@ -107,7 +107,7 @@ public class RecursiveChunkerTests
 
         Assert.That(chunks, Has.Count.GreaterThanOrEqualTo(3));
         foreach (var c in chunks)
-            Assert.That(c.Text.Length, Is.LessThanOrEqualTo(10));
+            Assert.That(c.Text, Has.Length.LessThanOrEqualTo(10));
         AssertVerbatimContract(chunks, text);
     }
 
@@ -146,7 +146,7 @@ public class RecursiveChunkerTests
         Assert.That(chunks, Has.Count.GreaterThanOrEqualTo(2));
         Assert.That(chunks[0].Text, Does.StartWith("Paragraph one."));
         foreach (var c in chunks)
-            Assert.That(c.Text.Length, Is.LessThanOrEqualTo(30));
+            Assert.That(c.Text, Has.Length.LessThanOrEqualTo(30));
         AssertVerbatimContract(chunks, text);
     }
 
@@ -572,7 +572,7 @@ public class RecursiveChunkerTests
         var chunks = await Collect(chunker.ChunkAsync(new RagDocument("doc", text)));
 
         foreach (var c in chunks)
-            Assert.That(c.Text.Length, Is.LessThanOrEqualTo(30),
+            Assert.That(c.Text, Has.Length.LessThanOrEqualTo(30),
                 $"Chunk {c.Index} exceeds max size: '{c.Text}'");
     }
 
