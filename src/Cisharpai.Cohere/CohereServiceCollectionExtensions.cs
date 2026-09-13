@@ -152,6 +152,69 @@ public static class CohereServiceCollectionExtensions
         return builder;
     }
 
+    public static IHttpClientBuilder AddCohereTokenCounter(
+        this IServiceCollection services,
+        string model,
+        Action<CohereClientOptions> configure)
+    {
+        var options = new CohereClientOptions();
+        configure(options);
+
+        var builder = services.AddHttpClient<CohereTokenCounter>(client =>
+            {
+                client.BaseAddress = new Uri(options.BaseUrl);
+                client.Timeout = TimeSpan.FromMinutes(2);
+            })
+            .AddHttpMessageHandler(() => new CohereAuthenticationHandler(options));
+
+        builder.AddCisharpaiResilienceHandler();
+
+        services.AddTransient(sp =>
+            new CohereTokenCounter(
+                sp.GetRequiredService<IHttpClientFactory>().CreateClient(typeof(CohereTokenCounter).Name),
+                options,
+                model,
+                sp.GetService<ILoggerFactory>()));
+
+        services.AddSingleton<ITokenCounter>(sp =>
+            sp.GetRequiredService<CohereTokenCounter>());
+
+        return builder;
+    }
+
+    public static IHttpClientBuilder AddCohereTokenCounter(
+        this IServiceCollection services,
+        string key,
+        string model,
+        Action<CohereClientOptions> configure)
+    {
+        var options = new CohereClientOptions();
+        configure(options);
+
+        var clientName = $"{nameof(CohereTokenCounter)}_{key}";
+
+        var builder = services.AddHttpClient(clientName, client =>
+            {
+                client.BaseAddress = new Uri(options.BaseUrl);
+                client.Timeout = TimeSpan.FromMinutes(2);
+            })
+            .AddHttpMessageHandler(() => new CohereAuthenticationHandler(options));
+
+        builder.AddCisharpaiResilienceHandler();
+
+        services.AddKeyedTransient<CohereTokenCounter>(key, (sp, _) =>
+            new CohereTokenCounter(
+                sp.GetRequiredService<IHttpClientFactory>().CreateClient(clientName),
+                options,
+                model,
+                sp.GetService<ILoggerFactory>()));
+
+        services.AddKeyedSingleton<ITokenCounter>(key, (sp, k) =>
+            sp.GetRequiredKeyedService<CohereTokenCounter>(k));
+
+        return builder;
+    }
+
     public static IHttpClientBuilder AddCohereChatClient(
         this IServiceCollection services,
         string key,

@@ -6,9 +6,9 @@ description: >
   LLM providers. Use when writing, debugging, or architecting code that uses
   Cisharpai clients, features, DTOs, DI registration, or provider-specific
   integrations. Activates on mentions of "Cisharpai", "IChatCompletionClient",
-  "IEmbeddingClient", "IRerankerClient", provider setup, tool calling, streaming,
-  JSON output, grounded chat, vision, embeddings, reranking, RAG ingestion, or
-  fake clients for testing.
+  "IEmbeddingClient", "IRerankerClient", "ITokenCounter", provider setup, tool calling,
+  streaming, JSON output, grounded chat, vision, embeddings, reranking, token counting,
+  RAG ingestion, or fake clients for testing.
 ---
 
 # Cisharpai Expert
@@ -23,7 +23,7 @@ change — application code stays the same.
 
 **Key Design Principles:**
 
-- **Unified Abstraction** — Same `IChatCompletionClient` / `IEmbeddingClient` / `IRerankerClient` for all providers that offer the capability
+- **Unified Abstraction** — Same `IChatCompletionClient` / `IEmbeddingClient` / `IRerankerClient` / `ITokenCounter` for all providers that offer the capability
 - **No Exceptions for API Errors** — `IsSuccess` + `ErrorMessage` on responses; exceptions only for network/config
 - **Debuggability** — `RawResponseJson` / `RawRequestJson` on every response
 - **Immutable DTOs** — Request/Response types are immutable records
@@ -227,6 +227,62 @@ foreach (var result in response.Results)
 
 **Gotcha:** if neither `RerankRequest.Model` nor `CohereClientOptions.DefaultModel` is set,
 `RerankAsync` throws `InvalidOperationException` — that is a config error, not an API error.
+
+### ITokenCounter
+
+Counts tokens in a string for a specific model's tokenizer. Each instance is constructed for one
+model — the model is baked in, not passed per call.
+
+```csharp
+public interface ITokenCounter
+{
+    ValueTask<int> CountAsync(string text, CancellationToken ct = default);
+}
+```
+
+**Local counter (`TiktokenCounter` in `Cisharpai.Rag`):** offline, synchronous, thread-safe.
+Supports OpenAI-compatible tokenizers (gpt-4o = o200k_base, gpt-4 = cl100k_base).
+
+```csharp
+using Cisharpai.Rag.Tokenization;
+
+var counter = new TiktokenCounter("gpt-4o");
+int count = counter.CountTokens("Hello, world!");          // sync
+int countAsync = await counter.CountAsync("Hello, world!"); // ValueTask, no allocation
+```
+
+Wire it into `BulkEmbeddingOptions.TokenEstimator`:
+
+```csharp
+var counter = new TiktokenCounter("gpt-4o");
+var options = new BulkEmbeddingOptions
+{
+    MaxBatchTokens = 8000,
+    TokenEstimator = counter.ToTokenEstimator() // replaces s.Length / 4
+};
+```
+
+`ToTokenEstimator()` hangs off `TiktokenCounter` (not `ITokenCounter`) — remote async counters
+cannot be accidentally used in the synchronous batching loop.
+
+**Cohere counter (`CohereTokenCounter` in `Cisharpai.Cohere`):** calls `POST /v1/tokenize`.
+
+```csharp
+using Cisharpai.Cohere;
+
+var counter = CohereTokenCounter.Create(handlerFactory, options, "embed-english-v3.0");
+int tokens = await counter.CountAsync("Hello, world!");
+```
+
+Text over 65,536 characters is split on whitespace boundaries and summed — this is an
+**upper-bound approximation** (BPE merges across the split point are lost).
+
+**Testing (`FakeTokenCounter` in `Cisharpai.Testing`):**
+
+```csharp
+var fake = new FakeTokenCounter { DefaultCount = 10 };
+fake.EnqueueCount(42); // first call returns 42, then falls back to DefaultCount
+```
 
 ### Feature Discovery
 

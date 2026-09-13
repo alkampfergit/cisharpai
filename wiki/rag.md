@@ -75,7 +75,7 @@ A batch closes when **either** constraint is hit:
 
 - **`MaxBatchItems`** (int, default 32) — maximum number of chunks per request.
 - **`MaxBatchTokens`** (int?, default null) — maximum estimated tokens per request. When set, the batch closes when the next chunk would push the running estimate past the budget. The first chunk is always included regardless of budget.
-- **`TokenEstimator`** (`Func<string, int>?`, default `s => s.Length / 4`) — token estimation function. The default uses a conservative character-based heuristic. Swap in a real tokenizer for more accurate batching.
+- **`TokenEstimator`** (`Func<string, int>?`, default `s => s.Length / 4`) — token estimation function. The default uses a conservative character-based heuristic. For accurate batching, swap in a real tokenizer via `TiktokenCounter.ToTokenEstimator()` (see [Token counting](#token-counting)).
 
 ### Per-provider presets
 
@@ -100,6 +100,72 @@ options.ApplyProfile(EmbeddingProviderProfile.AzureOpenAi);
 `ApplyProfile` overwrites **only** `MaxBatchItems` and `MaxBatchTokens` and returns the same instance, so apply it *before* any explicit batch-sizing override — otherwise the profile replaces it. Every other option is left untouched.
 
 These values are conservative starting points chosen to stay inside each provider's documented per-request ceilings; they are not authoritative provider limits. Deployments, models and quotas vary — verify them for yours and override the two properties when they differ.
+
+## Token counting
+
+`ITokenCounter` provides real token counts via `CountAsync(string text)`. Each instance is constructed for one model — the model is baked in, not passed per call.
+
+### Local tokenizer (TiktokenCounter)
+
+`TiktokenCounter` in `Cisharpai.Rag` uses `Microsoft.ML.Tokenizers` for offline, synchronous counting. It supports OpenAI-compatible tokenizers: `gpt-4o` (o200k_base), `gpt-4` / `gpt-3.5-turbo` (cl100k_base).
+
+```csharp
+using Cisharpai.Rag.Tokenization;
+
+var counter = new TiktokenCounter("gpt-4o");
+int tokens = counter.CountTokens("Hello, world!"); // synchronous
+int tokensAsync = await counter.CountAsync("Hello, world!"); // ValueTask — completes synchronously
+```
+
+Wire it into `BulkEmbeddingOptions.TokenEstimator` with the `ToTokenEstimator()` extension:
+
+```csharp
+var counter = new TiktokenCounter("gpt-4o");
+var options = new BulkEmbeddingOptions
+{
+    MaxBatchTokens = 8000,
+    TokenEstimator = counter.ToTokenEstimator() // replaces the s.Length / 4 heuristic
+};
+```
+
+`ToTokenEstimator()` is intentionally defined on `TiktokenCounter` (not `ITokenCounter`) so that remote async counters cannot be accidentally used in the synchronous batching loop.
+
+### Cohere tokenizer (CohereTokenCounter)
+
+`CohereTokenCounter` in `Cisharpai.Cohere` calls Cohere's `POST /v1/tokenize` endpoint. Construct it for one model:
+
+```csharp
+using Cisharpai.Cohere;
+
+var counter = CohereTokenCounter.Create(handlerFactory, options, "embed-english-v3.0");
+int tokens = await counter.CountAsync("Hello, world!");
+```
+
+Or via DI:
+
+```csharp
+services.AddCohereTokenCounter("embed-english-v3.0", options =>
+{
+    options.ApiKey = "...";
+});
+```
+
+The Cohere tokenize API accepts text of 1–65,536 characters per request. Text longer than 65,536 characters is split on whitespace boundaries and the per-chunk token counts are summed. This sum is an **upper-bound approximation**: BPE merges that would span the split point are lost, so the true count may be lower by a small number of tokens.
+
+### FakeTokenCounter
+
+For unit testing, use `FakeTokenCounter` in `Cisharpai.Testing`:
+
+```csharp
+var fake = new FakeTokenCounter { DefaultCount = 10 };
+fake.EnqueueCount(42); // first call returns 42, subsequent calls return 10
+
+// Or via DI:
+services.AddFakeTokenCounter(defaultCount: 10);
+
+// Or via FakeResponses:
+var fake = FakeResponses.TokenCounter(defaultCount: 25);
+```
 
 ## Concurrency
 
@@ -239,7 +305,7 @@ The factory runs in the scope resolving the processor. Choose Azure OpenAI, Azur
 | `Embedding.IncludeRawResponse` | `false` | Request raw payload capture through the provider |
 | `Embedding.ExtraParameters` | `null` | Optional `JsonElement` deep-merged into provider requests |
 
-Lowering `ChunkSize` below the default overlap requires lowering `Overlap` as well. Token budget batching uses the `TokenEstimator` function — the default `s.Length / 4` is a deliberately conservative character-based heuristic. Phase 2 will introduce a real tokenizer; the `TokenEstimator` seam allows a drop-in swap.
+Lowering `ChunkSize` below the default overlap requires lowering `Overlap` as well. Token budget batching uses the `TokenEstimator` function — the default `s.Length / 4` is a deliberately conservative character-based heuristic. For real counts, use `counter.ToTokenEstimator()` on a `TiktokenCounter` instance (see [Token counting](#token-counting)).
 
 For provider-specific parameters, assign JSON in the configuration callback:
 
@@ -318,4 +384,4 @@ Cancellation propagates as `OperationCanceledException`; network/configuration a
 
 ## Offline tests
 
-Reuse `FakeEmbeddingClient` with one vector per submitted chunk. See [Testing](testing.md#rag-ingestion-tests) for a complete example and test commands. No new core feature interface or RAG-specific fake provider is required.
+Reuse `FakeEmbeddingClient` with one vector per submitted chunk, and `FakeTokenCounter` for token counting. See [Testing](testing.md#rag-ingestion-tests) for a complete example and test commands.

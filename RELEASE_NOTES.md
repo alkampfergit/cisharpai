@@ -4,6 +4,7 @@ This file is included in the NuGet packages. Keep a single line for each user-fa
 
 ## Unreleased
 
+- Token counting: new `ITokenCounter` abstraction in core `Cisharpai` with `CountAsync(string text)` — each instance is constructed for one model. Local `TiktokenCounter` in `Cisharpai.Rag` provides offline synchronous counting via `Microsoft.ML.Tokenizers` (o200k_base for gpt-4o, cl100k_base for gpt-4/gpt-3.5-turbo). `CohereTokenCounter` in `Cisharpai.Cohere` calls the `POST /v1/tokenize` API with whitespace-boundary chunk-and-sum for text over 65,536 characters (documented upper-bound approximation). `TiktokenCounter.ToTokenEstimator()` adapter replaces the `s.Length / 4` heuristic in `BulkEmbeddingOptions.TokenEstimator`. `FakeTokenCounter` in `Cisharpai.Testing` with queue/default/capture pattern and `services.AddFakeTokenCounter()` DI helper.
 - **BREAKING** `Cisharpai.Rag`: `ITextChunker.Chunk()` replaced by `ITextChunker.ChunkAsync()` returning `IAsyncEnumerable<TextChunk>` — all chunker implementations and callers of the sync method must migrate to the async-streaming signature.
 - **BREAKING** `Cisharpai.Rag`: `TextChunk` record gains required `EndOffset` parameter (exclusive UTF-16 end offset) and optional `Metadata` (`IReadOnlyDictionary<string, object?>`) — existing code constructing `TextChunk` with positional arguments must add the end offset.
 
