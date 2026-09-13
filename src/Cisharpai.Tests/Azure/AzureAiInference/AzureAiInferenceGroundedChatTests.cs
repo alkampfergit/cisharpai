@@ -366,6 +366,7 @@ public sealed class AzureAiInferenceGroundedChatTests
         {
             Assert.That(response.IsSuccess, Is.True);
             Assert.That(response.Content, Does.Not.Contain("«/cite»"));
+            Assert.That(response.Citations, Is.Empty);
         });
     }
 

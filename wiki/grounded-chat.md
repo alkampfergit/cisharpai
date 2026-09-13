@@ -285,7 +285,7 @@ Azure AI Inference models (Phi-3, Llama-3, Mistral, etc.) do not have a native c
 
 - **`GroundingKind.Synthesized`** — always set on the response
 - **All `CitationMode` values accepted** — there is no server-side distinction; `Accurate`, `Fast`, and `Enabled` all produce the same behavior
-- **Graceful degradation** — if the model emits no markers or malformed markers, the response is returned with zero citations and `IsSuccess=true`
+- **Graceful degradation** — malformed or unmatched markers are stripped from that span and produce no citation for it; well-formed citations elsewhere in the same response are still returned normally. `IsSuccess` is always `true`
 - **Citation type** — synthesized citations have `Type="synthesized_citation"`
 
 ### Example
