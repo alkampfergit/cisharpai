@@ -363,6 +363,7 @@ Use the separate `Cisharpai.Rag` package for ingestion with any `IEmbeddingClien
 - `IngestAsync` and `EmbedAsync` accept collections or async streams, an optional `IProgress<BulkEmbeddingProgress>`, and a cancellation token. With `MaxConcurrency = 1`, processing is sequential. With higher values, batches run in parallel but results are yielded in input order; `MaxPendingBatches` (>= `MaxConcurrency`) bounds how many dispatched batches may wait for in-order delivery, so read-ahead and memory never grow with corpus size.
 - Check `batch.IsSuccess` before reading `batch.Items`; each item has `Chunk` and `Vector`. `batch.Chunks`, zero-based `BatchIndex` and `Response` retain input identity and provider metadata/raw payloads. Failed batches (provider error, malformed response, exhausted retries) have empty items but do NOT stop the run — processing continues. Transient failures are retried with exponential backoff and jitter; `DefaultIsTransient` matches a standalone `429` or any `500`-`599` status in the error message plus the usual throttling/server-error phrases, and `IsTransientError` overrides it. No rollback/checkpoints. Provider HTTP resilience remains independent.
 - Cancellation and network/configuration exceptions propagate. Fake with existing `FakeEmbeddingClient`, queuing one float vector per expected chunk; a default single-vector response fails validation for multi-chunk batches.
+- `.Packing`: `IContextPacker.PackAsync(rankedChunks, options, ct)`, `ContextPacker` (constructor-injects `ITokenCounter`). Input: `IReadOnlyList<ScoredChunk>` where `ScoredChunk(TextChunk, double Score)`. Output: `ContextPackingResult(Selected, Dropped, TotalTokensUsed, BudgetRemaining)`. `DroppedChunk(ScoredChunk, TokenCount, DropReason)` with `DropReason.BudgetExhausted` or `IndividuallyOversized`. Per-call `ContextPackingOptions`: `TokenBudget` (positive), `ReservedTokens` (non-negative, < budget), `Separator` ("\n\n" default, null rejected), `UseLostInMiddleOrdering` (true default — strongest chunks at context edges), `OverflowStrategy` (SkipAndContinue default or StopAtFirstMisfit). Budget accounting: `TokenBudget - ReservedTokens - separators(n-1) - chunkTokens`. Each chunk counted once via the injected `ITokenCounter` and cached for the call. Individually oversized chunks are always skipped (even in StopAtFirstMisfit). Anthropic `count_tokens` is deferred — it is message-shaped and must not be called inside the packing loop.
 
 ## Provider-Specific Guides
 
@@ -440,7 +441,7 @@ var request = new ChatCompletionRequest(
 - `src/Cisharpai.Azure/` — Azure OpenAI + Azure AI Inference
 - `src/Cisharpai.Anthropic/` — Anthropic provider
 - `src/Cisharpai.Cohere/` — Cohere provider
-- `src/Cisharpai.Rag/` — Fixed-size and semantic chunking, bulk embeddings, document ingestion and configuration
+- `src/Cisharpai.Rag/` — Fixed-size and semantic chunking, bulk embeddings, document ingestion, context packing, and configuration
 - `src/Cisharpai.Testing/` — Fake clients for unit testing
 - `src/Cisharpai.Tests/` — Unit tests (all providers)
 - `src/Cisharpai.Integration.Tests/` — Integration tests (.NET 10 only)
