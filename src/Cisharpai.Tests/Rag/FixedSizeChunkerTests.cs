@@ -21,11 +21,11 @@ public class FixedSizeChunkerTests
     [TestCase("abcdef", 3, 0, new[] { "abc", "def" }, new[] { 0, 3 })]
     [TestCase("abcde", 3, 2, new[] { "abc", "bcd", "cde" }, new[] { 0, 1, 2 })]
     [TestCase(" \r\n\t ", 3, 0, new[] { " \r\n", "\t " }, new[] { 0, 3 })]
-    public void Chunk_PreservesExactSlicesAndPositions(
+    public async Task ChunkAsync_PreservesExactSlicesAndPositions(
         string text, int size, int overlap, string[] expected, int[] offsets)
     {
         var chunker = new FixedSizeChunker(new() { ChunkSize = size, Overlap = overlap });
-        var chunks = chunker.Chunk(new RagDocument("doc", text)).ToList();
+        var chunks = await Collect(chunker.ChunkAsync(new RagDocument("doc", text)));
 
         Assert.Multiple(() =>
         {
@@ -38,11 +38,11 @@ public class FixedSizeChunkerTests
     }
 
     [Test]
-    public void Chunk_CountsUnicodeScalarsButReportsUtf16Offsets()
+    public async Task ChunkAsync_CountsUnicodeScalarsButReportsUtf16Offsets()
     {
         const string text = "A😀B🚀C";
-        var chunks = new FixedSizeChunker(new() { ChunkSize = 3, Overlap = 1 })
-            .Chunk(new("unicode", text)).ToList();
+        var chunks = await Collect(new FixedSizeChunker(new() { ChunkSize = 3, Overlap = 1 })
+            .ChunkAsync(new("unicode", text)));
         Assert.Multiple(() =>
         {
             Assert.That(chunks.Select(c => c.Text), Is.EqualTo(UnicodeChunks3Overlap1));
@@ -51,19 +51,19 @@ public class FixedSizeChunkerTests
     }
 
     [Test]
-    public void Chunk_OneScalarDoesNotSplitSurrogatePairs()
+    public async Task ChunkAsync_OneScalarDoesNotSplitSurrogatePairs()
     {
-        var chunks = new FixedSizeChunker(new() { ChunkSize = 1, Overlap = 0 })
-            .Chunk(new("doc", "😀🚀")).ToList();
+        var chunks = await Collect(new FixedSizeChunker(new() { ChunkSize = 1, Overlap = 0 })
+            .ChunkAsync(new("doc", "😀🚀")));
         Assert.That(chunks.Select(c => c.Text), Is.EqualTo(SurrogatePairChunks));
         Assert.That(chunks.Select(c => c.StartOffset), Is.EqualTo(SurrogatePairOffsets));
     }
 
     [Test]
-    public void Chunk_PreservesUnpairedSurrogatesWithoutLooping()
+    public async Task ChunkAsync_PreservesUnpairedSurrogatesWithoutLooping()
     {
-        var chunks = new FixedSizeChunker(new() { ChunkSize = 1, Overlap = 0 })
-            .Chunk(new("doc", "\ud800A\udc00")).ToList();
+        var chunks = await Collect(new FixedSizeChunker(new() { ChunkSize = 1, Overlap = 0 })
+            .ChunkAsync(new("doc", "\ud800A\udc00")));
         Assert.That(string.Concat(chunks.Select(c => c.Text)), Is.EqualTo("\ud800A\udc00"));
         Assert.That(chunks, Has.Count.EqualTo(3));
     }
@@ -80,43 +80,92 @@ public class FixedSizeChunkerTests
     }
 
     [Test]
-    public void Constructor_SnapshotsOptions()
+    public async Task Constructor_SnapshotsOptions()
     {
         var options = new FixedSizeChunkerOptions { ChunkSize = 2, Overlap = 0 };
         var chunker = new FixedSizeChunker(options);
         options.ChunkSize = 0;
-        var result = chunker.Chunk(new("doc", "abcd"));
+        var result = await Collect(chunker.ChunkAsync(new("doc", "abcd")));
         Assert.That(result.Select(c => c.Text), Is.EqualTo(TwoCharChunks));
     }
 
     [Test]
-    public void Chunk_IsRepeatableAndIndependentAcrossEnumerations()
+    public async Task ChunkAsync_IsRepeatableAcrossEnumerations()
     {
         var chunker = new FixedSizeChunker(new() { ChunkSize = 2, Overlap = 1 });
-        var sequence = chunker.Chunk(new("doc", "abcd"));
-        using var first = sequence.GetEnumerator();
-        using var second = sequence.GetEnumerator();
-        Assert.That(first.MoveNext(), Is.True);
-        Assert.That(first.MoveNext(), Is.True);
-        Assert.That(second.MoveNext(), Is.True);
-        Assert.That(first.Current.Index, Is.EqualTo(1));
-        Assert.That(second.Current.Index, Is.Zero);
+        var first = await Collect(chunker.ChunkAsync(new("doc", "abcd")));
+        var second = await Collect(chunker.ChunkAsync(new("doc", "abcd")));
+        Assert.That(first.Select(c => c.Index), Is.EqualTo(second.Select(c => c.Index)));
+        Assert.That(first.Select(c => c.Text), Is.EqualTo(second.Select(c => c.Text)));
     }
 
     [Test]
-    public void DefaultOptions_AreUsable()
+    public async Task DefaultOptions_AreUsable()
     {
-        var chunks = new FixedSizeChunker().Chunk(new("doc", new string('x', 1025))).ToList();
+        var chunks = await Collect(new FixedSizeChunker().ChunkAsync(new("doc", new string('x', 1025))));
         Assert.That(chunks.Select(c => c.StartOffset), Is.EqualTo(DefaultOffsets));
         Assert.That(chunks.Select(c => c.Text.Length), Is.EqualTo(DefaultLengths));
     }
 
     [Test]
-    public void Chunk_ValidatesDocumentAtCallTime()
+    public void ChunkAsync_ValidatesDocumentAtCallTime()
     {
         var chunker = new FixedSizeChunker();
-        Assert.Throws<ArgumentNullException>(() => chunker.Chunk(null!));
-        Assert.Throws<ArgumentNullException>(() => chunker.Chunk(new("doc", null!)));
-        Assert.Throws<ArgumentException>(() => chunker.Chunk(new(" ", "text")));
+        Assert.Throws<ArgumentNullException>(() => chunker.ChunkAsync(null!));
+        Assert.Throws<ArgumentNullException>(() => chunker.ChunkAsync(new("doc", null!)));
+        Assert.Throws<ArgumentException>(() => chunker.ChunkAsync(new(" ", "text")));
+    }
+
+    [Test]
+    public async Task ChunkAsync_EndOffsetEqualsStartPlusTextLength()
+    {
+        var chunker = new FixedSizeChunker(new() { ChunkSize = 3, Overlap = 1 });
+        var chunks = await Collect(chunker.ChunkAsync(new("doc", "abcdefg")));
+        Assert.That(chunks.All(c => c.EndOffset == c.StartOffset + c.Text.Length), Is.True);
+    }
+
+    [Test]
+    public async Task ChunkAsync_EndOffsetCorrectWithSurrogatePairs()
+    {
+        const string text = "A😀B🚀C";
+        var chunks = await Collect(new FixedSizeChunker(new() { ChunkSize = 3, Overlap = 1 })
+            .ChunkAsync(new("doc", text)));
+        Assert.Multiple(() =>
+        {
+            foreach (var chunk in chunks)
+            {
+                Assert.That(chunk.EndOffset, Is.EqualTo(chunk.StartOffset + chunk.Text.Length));
+                Assert.That(text.Substring(chunk.StartOffset, chunk.EndOffset - chunk.StartOffset), Is.EqualTo(chunk.Text));
+            }
+        });
+    }
+
+    [Test]
+    public async Task ChunkAsync_MetadataIsEmptyByDefault()
+    {
+        var chunks = await Collect(new FixedSizeChunker(new() { ChunkSize = 2, Overlap = 0 })
+            .ChunkAsync(new("doc", "abcd")));
+        Assert.Multiple(() =>
+        {
+            Assert.That(chunks.All(c => c.Metadata is not null), Is.True);
+            Assert.That(chunks.All(c => c.Metadata.Count == 0), Is.True);
+        });
+    }
+
+    [Test]
+    public async Task ChunkAsync_RespectsCanellationToken()
+    {
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+        var chunker = new FixedSizeChunker(new() { ChunkSize = 2, Overlap = 0 });
+        Assert.ThrowsAsync<OperationCanceledException>(async () =>
+            await Collect(chunker.ChunkAsync(new("doc", "abcd"), cts.Token)));
+    }
+
+    private static async Task<List<TextChunk>> Collect(IAsyncEnumerable<TextChunk> source)
+    {
+        var results = new List<TextChunk>();
+        await foreach (var chunk in source) results.Add(chunk);
+        return results;
     }
 }

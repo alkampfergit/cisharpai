@@ -369,7 +369,7 @@ public sealed class BulkEmbeddingProcessor : IBulkEmbeddingProcessor
         ArgumentException.ThrowIfNullOrWhiteSpace(chunk.DocumentId);
         ArgumentNullException.ThrowIfNull(chunk.Text);
         ArgumentOutOfRangeException.ThrowIfNegative(chunk.Index);
-        ArgumentOutOfRangeException.ThrowIfNegative(chunk.StartOffset);
+        chunk.Validate();
     }
 
     private static string? Validate(EmbeddingResponse response, int count, int? expectedDimensions)

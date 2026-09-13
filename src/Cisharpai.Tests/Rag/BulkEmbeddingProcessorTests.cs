@@ -11,8 +11,8 @@ public class BulkEmbeddingProcessorTests
 {
     private static readonly float[] SingleOneVector = [1f];
     private static readonly int[] ExpectedDefaultBatchSizes = [32, 1];
-    private static TextChunk Chunk(int index) => new("document", index, index, index.ToString());
-    private static TextChunk ChunkWithText(int index, string text) => new("document", index, index, text);
+    private static TextChunk Chunk(int index) => new("document", index, index, index + index.ToString().Length, index.ToString());
+    private static TextChunk ChunkWithText(int index, string text) => new("document", index, index, index + text.Length, text);
     private static EmbeddingResponse Response(params float[][] vectors) =>
         new(vectors, null, "model", 42, RawResponseJson: "response", RawRequestJson: "request");
 
@@ -273,17 +273,18 @@ public class BulkEmbeddingProcessorTests
     }
 
     [Test]
-    [TestCase(null, "text", 0, 0)]
-    [TestCase(" ", "text", 0, 0)]
-    [TestCase("doc", null, 0, 0)]
-    [TestCase("doc", "text", -1, 0)]
-    [TestCase("doc", "text", 0, -1)]
-    public void InvalidChunkMetadata_ThrowsBeforeProviderTraffic(string? documentId, string? text, int index, int offset)
+    [TestCase(null, "text", 0, 4, 0)]
+    [TestCase(" ", "text", 0, 4, 0)]
+    [TestCase("doc", null, 0, 0, 0)]
+    [TestCase("doc", "text", -1, 3, 0)]
+    [TestCase("doc", "text", 0, 4, -1)]
+    [TestCase("doc", "text", 5, 3, 0)]
+    public void InvalidChunkMetadata_ThrowsBeforeProviderTraffic(string? documentId, string? text, int offset, int endOffset, int index)
     {
         var client = Client(_ => throw new AssertionException("Invalid input must not be sent"));
         var processor = new BulkEmbeddingProcessor(client);
         Assert.CatchAsync<ArgumentException>(() => Collect(processor.EmbedAsync(
-            new[] { new TextChunk(documentId!, index, offset, text!) })));
+            new[] { new TextChunk(documentId!, index, offset, endOffset, text!) })));
         client.DidNotReceive().GetEmbeddingsAsync(Arg.Any<EmbeddingRequest>(), Arg.Any<CancellationToken>());
     }
 

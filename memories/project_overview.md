@@ -84,8 +84,8 @@ Consolidated package for all Azure AI services. Uses HttpClient directly (no SDK
 ## RAG Ingestion — `src/Cisharpai.Rag/`
 
 - Independently consumable library targeting .NET 8 and .NET 10; depends on core abstractions, not a specific provider.
-- `Models/` — `RagDocument`, `TextChunk`, `ChunkEmbedding`, `EmbeddingBatchResult`; chunk identities and UTF-16 source offsets survive embedding.
-- `Chunking/` — `ITextChunker`, `FixedSizeChunker`, `FixedSizeChunkerOptions`; lazy scalar-aware chunks (size 1024, overlap 128).
+- `Models/` — `RagDocument`, `TextChunk(DocumentId, Index, StartOffset, EndOffset, Text, Metadata)`, `ChunkEmbedding`, `EmbeddingBatchResult`; chunk identities, UTF-16 source offsets (start and exclusive end), and chunker-specific metadata survive embedding.
+- `Chunking/` — `ITextChunker` (async-streaming: `ChunkAsync` returns `IAsyncEnumerable<TextChunk>`), `FixedSizeChunker`, `FixedSizeChunkerOptions`; lazy scalar-aware chunks (size 1024, overlap 128).
 - `Embeddings/` — `IBulkEmbeddingProcessor`, `BulkEmbeddingProcessor`, `BulkEmbeddingOptions`, `EmbeddingProviderProfile`; dual-constraint batching (item count + token budget) with per-provider presets via `ForProvider`/`ApplyProfile`, bounded concurrency (1–32 parallel requests with ordered output) and a bounded reordering window (`MaxPendingBatches`, default `MaxConcurrency * 2`) so read-ahead never grows with corpus size, transient failure retry (429 and the full 5xx range) with exponential backoff, `IProgress<BulkEmbeddingProgress>` observability, and continue-on-failure semantics.
 - `Models/BulkEmbeddingProgress` — progress record: `CompletedBatches`, `TotalChunksProcessed`, `FailedBatches`.
 - `IRagIngestionPipeline` / `RagIngestionPipeline` — compose document chunking with bulk embedding; collection and async-stream overloads, cancellation, progress pass-through, and partial batch results.
