@@ -20,6 +20,7 @@ This file is included in the NuGet packages. Keep a single line for each user-fa
 - `Cisharpai.Rag` bulk embedding hardened for real corpora: dual-constraint batch sizing (item count + token budget), bounded concurrency with ordered output, transient failure retry with exponential backoff, `IProgress<BulkEmbeddingProgress>` observability, and failed batches no longer stop the run. **Breaking**: `BatchSize` renamed to `MaxBatchItems`.
 - `Cisharpai.Rag` per-provider batch presets: `BulkEmbeddingOptions.ForProvider(EmbeddingProviderProfile.OpenAi)` (or `ApplyProfile` on existing options) sets the item and token ceilings for OpenAI, Azure OpenAI, Azure AI Inference and Cohere instead of the one global default of 32.
 - `Cisharpai.Rag` concurrent bulk embedding now bounds read-ahead with `BulkEmbeddingOptions.MaxPendingBatches` (default `MaxConcurrency * 2`), so a slow batch or slow consumer can no longer buffer an entire corpus in memory.
+- `Cisharpai.Rag` semantic chunking: new `SemanticChunker` places chunk boundaries where consecutive-sentence cosine similarity drops, using `IBulkEmbeddingProcessor` with `InputType = Document`. Supports percentile-based (self-calibrating, default) and absolute threshold strategies, size-based and sentence-count backstops, and pluggable sentence splitting via `ISentenceSplitter` (default `RegexSentenceSplitter` for English prose).
 
 ## 0.3.0
 
