@@ -11,5 +11,6 @@ public enum FakeChatFeatures
     ToolCalling = 1 << 1,
     JsonOutput = 1 << 2,
     GroundedChat = 1 << 3,
-    All = Streaming | ToolCalling | JsonOutput | GroundedChat
+    PromptCaching = 1 << 4,
+    All = Streaming | ToolCalling | JsonOutput | GroundedChat | PromptCaching
 }

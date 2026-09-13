@@ -89,6 +89,16 @@ var citations = new List<Citation>
 FakeResponses.GroundedChat("The answer is 42.", citations);
 ```
 
+### Cached Chat Responses
+
+```csharp
+// Response with cache hit
+FakeResponses.CachedChat("cached answer", cachedInputTokens: 500);
+
+// Response with both cache read and creation
+FakeResponses.CachedChat("answer", cachedInputTokens: 500, cacheCreationInputTokens: 200);
+```
+
 ### Streaming Responses
 
 ```csharp
@@ -157,6 +167,7 @@ Each feature method has its own queue and default:
 | `GetChatCompletionWithToolsAsync` | `EnqueueToolCallingResponse()` | `DefaultToolCallingResponse` |
 | `GetGroundedChatCompletionAsync` | `EnqueueGroundedChatResponse()` | `DefaultGroundedChatResponse` |
 | `GetChatCompletionStreamAsync` | `EnqueueStreamingResponse()` | `DefaultStreamingResponse` |
+| `GetChatCompletionWithCachingAsync` | `EnqueuePromptCachingResponse()` | `DefaultPromptCachingResponse` |
 
 ### Request Capture
 
@@ -187,6 +198,7 @@ Available capture lists:
 | `ReceivedJsonOutputRequests` | `GetChatCompletionWithJsonOutputAsync` (includes `JsonOutputOptions`) |
 | `ReceivedGroundedChatRequests` | `GetGroundedChatCompletionAsync` (includes `GroundedChatOptions`) |
 | `ReceivedStreamingRequests` | `GetChatCompletionStreamAsync` |
+| `ReceivedPromptCachingRequests` | `GetChatCompletionWithCachingAsync` (includes `PromptCachingOptions`) |
 
 ### Reset
 
@@ -284,7 +296,7 @@ var streaming = bare.Features.Get<IStreamingChatFeature>();
 Assert.That(streaming, Is.Null); // Feature not available
 ```
 
-Available flags: `Streaming`, `ToolCalling`, `JsonOutput`, `GroundedChat`, `All`, `None`.
+Available flags: `Streaming`, `ToolCalling`, `JsonOutput`, `GroundedChat`, `PromptCaching`, `All`, `None`.
 
 ### FakeEmbeddingFeatures
 
@@ -517,12 +529,18 @@ public async Task ConversationAgent_HandlesMultipleTurns()
 | `DefaultToolCallingResponse` | `ToolCallingResponse?` | Fallback for `GetChatCompletionWithToolsAsync` |
 | `DefaultGroundedChatResponse` | `GroundedChatCompletionResponse?` | Fallback for `GetGroundedChatCompletionAsync` |
 | `DefaultStreamingResponse` | `IReadOnlyList<ChatCompletionChunk>?` | Fallback for `GetChatCompletionStreamAsync` |
+| `DefaultPromptCachingResponse` | `ChatCompletionResponse?` | Fallback for `GetChatCompletionWithCachingAsync` (falls back to `DefaultResponse`) |
+| `DefaultGroundedCachingResponse` | `GroundedChatCompletionResponse?` | Fallback for `GetGroundedChatCompletionWithCachingAsync` (falls back to `DefaultGroundedChatResponse`) |
+| `DefaultToolCachingResponse` | `ToolCallingResponse?` | Fallback for `GetChatCompletionWithToolsAndCachingAsync` (falls back to `DefaultToolCallingResponse`) |
 | `CallCount` | `int` | Total calls across all methods |
 | `ReceivedRequests` | `IReadOnlyList<ChatCompletionRequest>` | Captured chat requests |
 | `ReceivedToolCallingRequests` | `IReadOnlyList<(Request, Options)>` | Captured tool calling requests |
 | `ReceivedJsonOutputRequests` | `IReadOnlyList<(Request, Options)>` | Captured JSON output requests |
 | `ReceivedGroundedChatRequests` | `IReadOnlyList<(Request, Options)>` | Captured grounded chat requests |
 | `ReceivedStreamingRequests` | `IReadOnlyList<ChatCompletionRequest>` | Captured streaming requests |
+| `ReceivedPromptCachingRequests` | `IReadOnlyList<(Request, Options)>` | Captured prompt caching requests |
+| `ReceivedGroundedCachingRequests` | `IReadOnlyList<(Request, GroundedOptions, CachingOptions)>` | Captured grounded + caching requests |
+| `ReceivedToolCachingRequests` | `IReadOnlyList<(Request, ToolOptions, CachingOptions)>` | Captured tool + caching requests |
 | `Reset()` | `void` | Clears all queues and captured requests |
 
 ### FakeEmbeddingClient

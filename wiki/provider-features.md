@@ -6,6 +6,8 @@ This page lists every feature supported by each provider integration in Cisharpa
 
 | Feature | Interface | Description |
 |---------|-----------|-------------|
+| Prompt Caching Control | `IPromptCachingFeature` | Explicit cache breakpoints for providers that support them |
+| Prompt Caching Reporting | `ChatCompletionResponse` | Cached vs fresh input token counts on every response |
 | Chat Completions | `IChatCompletionClient` | Send messages and receive model-generated replies |
 | Text Embeddings | `IEmbeddingClient` | Generate vector embeddings from text |
 | Reranking | `IRerankerClient` | Reorder candidate documents by relevance to a query |
@@ -23,6 +25,8 @@ This page lists every feature supported by each provider integration in Cisharpa
 
 | Feature | OpenAI | Azure OpenAI | Azure AI Inference | Anthropic | Cohere |
 |---------|--------|--------------|-------------------|-----------|--------|
+| Prompt Caching Control | -- | -- | -- | Yes | -- |
+| Prompt Caching Reporting | Yes | Yes | -- | Yes | -- |
 | Chat Completions | Yes | Yes | Yes | Yes | Yes |
 | Text Embeddings | Yes | Yes | Yes | -- | Yes |
 | Reranking | -- | -- | -- | -- | Yes |
@@ -63,6 +67,7 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Tool Calling | All models; `ToolChoice` supports Auto, None, Required, Specific (function name) |
 | Vision | Send images via `LlmMessage.WithImage()` or `LlmMessage.WithBase64Image()`; images are sent as data URIs (`data:image/{mime};base64,...`) |
 | Grounded Chat (RAG) | `IGroundedChatFeature`; GPT-5 models only (Responses API); documents sent as `input_file` items with base64 data; annotations mapped to `Citation`/`CitationSource`; returns `IsSuccess=false` for non-GPT-5 models |
+| Prompt Caching | Automatic — `CachedInputTokens` reported from `prompt_tokens_details.cached_tokens` (Chat Completions) and `input_tokens_details.cached_tokens` (Responses API); no control feature |
 | Streaming | `IStreamingChatFeature`; legacy Chat Completions API and Responses API (GPT-5); `[DONE]` terminates the stream |
 
 ### Azure OpenAI
@@ -82,6 +87,7 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Vision | Same data URI format as OpenAI; images sent as content parts in messages |
 | Streaming | `IStreamingChatFeature`; supports legacy, reasoning, and Responses API streams; `[DONE]` terminates Chat Completions streams; gpt-5 uses `response.completed` |
 | Grounded Chat (RAG) | `IGroundedChatFeature`; GPT-5 deployments only (Responses API); documents sent as `input_file` items nested in user message content; uses `ExecuteGroundedWithRouteFallbackAsync` — returns `IsSuccess=false` if deployment falls back to Chat Completions |
+| Prompt Caching | Automatic — `CachedInputTokens` reported from `prompt_tokens_details.cached_tokens` (Chat Completions) and `input_tokens_details.cached_tokens` (Responses API); no control feature |
 | Authentication | API key (`api-key` header) or Azure AD (Bearer token) |
 
 `ReasoningEffort` is omitted for non-reasoning Azure OpenAI deployments to avoid unsupported-parameter errors. `TextVerbosity` is sent only when the model is detected as gpt-5. When Azure rejects `max_tokens` for a reasoning deployment, the client retries once with `max_completion_tokens`; when the initially selected endpoint is wrong, it retries the alternate endpoint once. Learned mismatches are cached in-process per `(Endpoint, DeploymentName, ApiVersion)` for future Azure OpenAI client instances. `ExtraParameters` still deep-merges into the final request and can override either typed option or add newer Azure/OpenAI parameters before the typed options are updated.
@@ -117,6 +123,7 @@ Azure OpenAI truncation is surfaced as a failed unified response when the provid
 | Grounded Chat (RAG) | Document grounding via `document` content blocks with `citations: {enabled: true}`; text documents use `text` source type, key-value documents use `custom_content` source type; `CitationMode.Fast`/`Accurate` treated as `Enabled` (Anthropic citations are binary: on/off) with a logged warning |
 | Tool Calling | All Claude models; `ToolChoice` maps Auto->auto, Required->any, Specific->{type:tool,name}, None is omitted |
 | Vision | Images sent as raw base64 (NOT data URIs) via `source.type: "base64"` in content blocks |
+| Prompt Caching | Explicit breakpoints via `IPromptCachingFeature`; `CachedInputTokens` from `cache_read_input_tokens`, `CacheCreationInputTokens` from `cache_creation_input_tokens`; system, message, and tool breakpoints |
 | Streaming | `IStreamingChatFeature`; event-based SSE (no `[DONE]` sentinel); `message_start`/`content_block_delta`/`message_delta` events |
 
 ### Cohere

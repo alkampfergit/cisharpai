@@ -43,6 +43,26 @@ public sealed class AnthropicContentBlock
     /// <summary>For response text blocks: citation results from grounded chat.</summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<AnthropicCitationResult>? Citations { get; set; }
+
+    [JsonPropertyName("cache_control")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AnthropicCacheControl? CacheControl { get; set; }
+}
+
+public sealed class AnthropicCacheControl
+{
+    public string Type { get; set; } = "ephemeral";
+}
+
+public sealed class AnthropicSystemBlock
+{
+    public string Type { get; set; } = "text";
+
+    public string Text { get; set; } = string.Empty;
+
+    [JsonPropertyName("cache_control")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public AnthropicCacheControl? CacheControl { get; set; }
 }
 
 public sealed class AnthropicUsage
@@ -52,6 +72,12 @@ public sealed class AnthropicUsage
 
     [JsonPropertyName("output_tokens")]
     public int OutputTokens { get; set; }
+
+    [JsonPropertyName("cache_creation_input_tokens")]
+    public int? CacheCreationInputTokens { get; set; }
+
+    [JsonPropertyName("cache_read_input_tokens")]
+    public int? CacheReadInputTokens { get; set; }
 }
 
 public sealed class AnthropicChatResponse
