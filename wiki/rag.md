@@ -552,6 +552,76 @@ Options are validated per call. Invalid values throw:
 
 Deferred. `POST /v1/messages/count_tokens` is message-shaped (takes a full request payload), making it a poor fit for per-chunk counting but a good fit for whole-request verification. It is a network round-trip per call and must not be used inside the packing loop.
 
+## Recursive chunking
+
+`RecursiveChunker` splits text along structural boundaries — paragraphs, lines, sentences, words — before resorting to a hard character-level cut. This is the chunker most RAG applications should use: it respects natural language boundaries whenever possible while guaranteeing that every chunk fits within a configurable budget.
+
+```csharp
+using Cisharpai.Rag.Chunking;
+using Cisharpai.Rag.Models;
+
+var chunker = new RecursiveChunker(new RecursiveChunkerOptions
+{
+    MaxChunkSize = 512,
+    ChunkOverlap = 64
+});
+
+await foreach (var chunk in chunker.ChunkAsync(new RagDocument("handbook", text)))
+{
+    Console.WriteLine($"{chunk.DocumentId}:{chunk.Index} @ {chunk.StartOffset}–{chunk.EndOffset}: " +
+        (chunk.Text.Length <= 50 ? chunk.Text : chunk.Text[..50] + "…"));
+}
+```
+
+The separator ladder tries each separator in order. The default is paragraph (`\n\n`), line (`\n`), sentence (`. `), word (` `), then hard character cut (`""`). When a piece exceeds the budget after splitting by one separator, the chunker falls through to the next. The empty-string terminal entry guarantees that every emitted chunk fits within `MaxChunkSize`.
+
+### Character mode vs token mode
+
+By default, sizes are measured in Unicode scalar values — a supplementary character (e.g. an emoji) counts as one, regardless of how many UTF-16 code units it occupies. This matches `FixedSizeChunker`. Set `TokenCounter` to measure in real tokens instead:
+
+```csharp
+using Cisharpai.Rag.Tokenization;
+
+var counter = new TiktokenCounter("gpt-4o");
+var chunker = new RecursiveChunker(new RecursiveChunkerOptions
+{
+    MaxChunkSize = 256,
+    ChunkOverlap = 32,
+    TokenCounter = counter,
+    TokenSlicerFromStart = counter.ToTokenSlicerFromStart(),
+    TokenSlicerFromEnd = counter.ToTokenSlicerFromEnd()
+});
+```
+
+`TokenSlicerFromStart` and `TokenSlicerFromEnd` use `Microsoft.ML.Tokenizers`' O(n) single-pass `GetIndexByTokenCount` — no counting loop. They are required for the hard-cut terminal case in token mode (the chunker throws rather than silently falling back to a binary search over a potentially network-backed counter). `TokenSlicerFromEnd` is also required when `ChunkOverlap > 0` (the default is 128), since overlap computation in token mode needs it — set `ChunkOverlap = 0` if you want token mode without a from-end slicer. The `Cisharpai.Rag.Tokenizers` package is only needed when token-based sizing is used; character-based consumers never install it.
+
+**Performance note:** token mode issues one `CountAsync` call per candidate split boundary during recursive splitting. With a remote counter (e.g. `CohereTokenCounter`), each call is an HTTP round-trip — impractical for large documents. `TiktokenCounter` (local, synchronous) is strongly recommended.
+
+### Custom separators
+
+Supply your own separator ladder for domain-specific splitting. For example, Markdown:
+
+```csharp
+var chunker = new RecursiveChunker(new RecursiveChunkerOptions
+{
+    MaxChunkSize = 1024,
+    Separators = ["\n## ", "\n### ", "\n\n", "\n", ". ", " ", ""]
+});
+```
+
+Include `""` as the final entry to guarantee max-size compliance.
+
+### Recursive chunker options reference
+
+| Option | Default | Meaning |
+|---|---|---|
+| `MaxChunkSize` | `1024` | Maximum chunk size in characters or tokens; must be positive |
+| `ChunkOverlap` | `128` | Overlap between consecutive chunks in the same unit; `0 ≤ Overlap < MaxChunkSize` |
+| `Separators` | `["\n\n", "\n", ". ", " ", ""]` | Ordered separator ladder; must not be empty |
+| `TokenCounter` | `null` | Token counter for token-based sizing; `null` = character mode |
+| `TokenSlicerFromStart` | `null` | `(text, maxTokens) → charIndex` for hard cuts; required in token mode |
+| `TokenSlicerFromEnd` | `null` | `(text, maxTokens) → charIndex` for overlap; **required** in token mode when `ChunkOverlap > 0` (the default) |
+
 ## Offline tests
 
 Reuse `FakeEmbeddingClient` with one vector per submitted chunk, and `FakeTokenCounter` for token counting (including with `ContextPacker`). See [Testing](testing.md#rag-ingestion-tests) for a complete example and test commands.

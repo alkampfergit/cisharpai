@@ -40,4 +40,31 @@ public sealed class TiktokenCounter : ITokenCounter
         ArgumentNullException.ThrowIfNull(text);
         return _tokenizer.CountTokens(text);
     }
+
+    /// <summary>
+    /// Returns the UTF-16 index immediately following the last character that fits within
+    /// <paramref name="maxTokenCount"/> tokens from the start. O(n) single-pass — no counting
+    /// loop. When no tokens fit the result is 0; when all tokens fit the result is
+    /// <c>text.Length</c>.
+    /// </summary>
+    public int GetIndexByTokenCount(string text, int maxTokenCount)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        ArgumentOutOfRangeException.ThrowIfNegative(maxTokenCount);
+        if (maxTokenCount == 0) return 0;
+        return _tokenizer.GetIndexByTokenCount(text, maxTokenCount, out _, out _);
+    }
+
+    /// <summary>
+    /// Returns the UTF-16 index where the last <paramref name="maxTokenCount"/> tokens begin
+    /// (counting from the end). When the entire text fits, the result is 0; when no tokens fit
+    /// the result is <c>text.Length</c>.
+    /// </summary>
+    public int GetIndexByTokenCountFromEnd(string text, int maxTokenCount)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        ArgumentOutOfRangeException.ThrowIfNegative(maxTokenCount);
+        if (maxTokenCount == 0) return text.Length;
+        return _tokenizer.GetIndexByTokenCountFromEnd(text, maxTokenCount, out _, out _);
+    }
 }
