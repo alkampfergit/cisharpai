@@ -61,21 +61,21 @@ var response = await groundedFeature.GetGroundedChatCompletionAsync(request, opt
 
 ## Provider Support Matrix
 
-| Provider | Grounded Chat | Notes |
-|----------|--------------|-------|
-| OpenAI | Yes (GPT-5) | Via Responses API `input_file` items; returns `IsSuccess=false` for non-GPT-5 models |
-| Azure OpenAI | Yes (GPT-5) | Via Responses API `input_file` items; uses route fallback; returns `IsSuccess=false` if deployment falls back to Chat Completions |
-| Azure AI Inference | -- | Not supported |
-| Anthropic | Yes | Via `document` content blocks with `citations: {enabled: true}` in the Messages API |
-| Cohere | Yes | Via `documents` array and `citation_options` in Chat v2 API |
+| Provider | Grounded Chat | Grounding Kind | Notes |
+|----------|--------------|----------------|-------|
+| OpenAI | Yes (GPT-5) | `Native` | Via Responses API `input_file` items; returns `IsSuccess=false` for non-GPT-5 models |
+| Azure OpenAI | Yes (GPT-5) | `Native` | Via Responses API `input_file` items; uses route fallback; returns `IsSuccess=false` if deployment falls back to Chat Completions |
+| Azure AI Inference | Yes | `Synthesized` | Via prompt-injection fallback; documents serialized into system message; model emits `«cite:N»…«/cite»` markers that are parsed and stripped |
+| Anthropic | Yes | `Native` | Via `document` content blocks with `citations: {enabled: true}` in the Messages API |
+| Cohere | Yes | `Native` | Via `documents` array and `citation_options` in Chat v2 API |
 
 ## Citation Modes
 
 | Mode | Description |
 |------|-------------|
-| `CitationMode.Accurate` | Model generates the full response first, then produces fine-grained citations. Higher latency, more precise. **Cohere**: only supported by the `command-r` family — `command-a` models reject this value (the provider logs a warning and downgrades to `Fast`). **Anthropic**: treated as `Enabled` (warning logged; citations are binary on/off). |
-| `CitationMode.Fast` (default) | Citations generated inline as the response is produced. Lower latency, slightly less precise. **Cohere**: supported by both `command-r` and `command-a` families. **Anthropic**: treated as `Enabled` (warning logged). |
-| `CitationMode.Enabled` | Provider-default citation behavior. Both Cohere and Anthropic honour this directly. |
+| `CitationMode.Accurate` | Model generates the full response first, then produces fine-grained citations. Higher latency, more precise. **Cohere**: only supported by the `command-r` family — `command-a` models reject this value (the provider logs a warning and downgrades to `Fast`). **Anthropic**: treated as `Enabled` (warning logged; citations are binary on/off). **Fallback (Azure AI Inference)**: no distinction — treated identically to `Fast`. |
+| `CitationMode.Fast` (default) | Citations generated inline as the response is produced. Lower latency, slightly less precise. **Cohere**: supported by both `command-r` and `command-a` families. **Anthropic**: treated as `Enabled` (warning logged). **Fallback**: same behavior as all other modes. |
+| `CitationMode.Enabled` | Provider-default citation behavior. Both Cohere and Anthropic honour this directly. **Fallback**: same behavior as all other modes. |
 
 ```csharp
 var options = new GroundedChatOptions(
@@ -165,6 +165,9 @@ response.ChatCompletion.RawResponseJson  // when IncludeRawResponse = true
 
 // Citations
 response.Citations       // IReadOnlyList<Citation>
+
+// Grounding kind (Native or Synthesized)
+response.GroundingKind   // GroundingKind
 ```
 
 ## Feature Discovery
@@ -183,10 +186,11 @@ else
 ```
 
 Currently, `IGroundedChatFeature` is registered on:
-- `OpenAiChatCompletionClient` — GPT-5 models only (uses Responses API)
-- `AzureOpenAiChatCompletionClient` — GPT-5 deployments only (uses Responses API with route fallback)
-- `AnthropicChatCompletionClient` — all Claude models
-- `CohereChatCompletionClient` — all Command models
+- `OpenAiChatCompletionClient` — GPT-5 models only (native, uses Responses API)
+- `AzureOpenAiChatCompletionClient` — GPT-5 deployments only (native, uses Responses API with route fallback)
+- `AzureAiInferenceChatCompletionClient` — all models (synthesized, via prompt-injection fallback)
+- `AnthropicChatCompletionClient` — all Claude models (native)
+- `CohereChatCompletionClient` — all Command models (native)
 
 ## OpenAI / Azure OpenAI Grounded Chat
 
@@ -243,11 +247,80 @@ var groundedFeature = client.Features.Get<IGroundedChatFeature>()!;
 var response = await groundedFeature.GetGroundedChatCompletionAsync(request, options);
 ```
 
+## GroundingKind — Native vs Synthesized
+
+`GroundedChatCompletionResponse.GroundingKind` tells callers how citations were produced:
+
+| Value | Meaning |
+|-------|---------|
+| `GroundingKind.Native` | The provider has a first-class citation mechanism (Cohere `documents`, Anthropic `document` blocks, OpenAI/Azure `input_file`). |
+| `GroundingKind.Synthesized` | Citations were synthesized via prompt injection — the helper serialized documents into the system message, instructed the model to emit inline `«cite:N»…«/cite»` markers, then parsed and stripped the markers to produce `Citation` records. |
+
+Synthesized citations have different reliability characteristics: the model may not always emit markers, may emit them inconsistently, or may hallucinate document indices. Callers can check `GroundingKind` to surface this distinction in their UI.
+
+```csharp
+var response = await groundedFeature.GetGroundedChatCompletionAsync(request, options);
+
+if (response.GroundingKind == GroundingKind.Synthesized)
+{
+    // Citations are prompt-injected, not provider-native
+    Console.WriteLine("Note: citations are AI-generated, not provider-verified.");
+}
+```
+
+The default value is `GroundingKind.Native`, so existing code that doesn't check the property continues to work unchanged.
+
+## Azure AI Inference Grounded Chat (Fallback)
+
+Azure AI Inference models (Phi-3, Llama-3, Mistral, etc.) do not have a native citation API. Cisharpai provides grounded chat for these models via prompt-injection fallback using `GroundedChatFallbackHelper`.
+
+### How it works
+
+1. Documents are serialized into a structured context block in the system message
+2. The model is instructed to wrap cited text in `«cite:N»…«/cite»` markers (guillemet pairs)
+3. After the model responds, markers are regex-matched and stripped to produce clean content
+4. `Citation` records are created with `Start`/`End` offsets computed **after** marker removal
+
+### Key characteristics
+
+- **`GroundingKind.Synthesized`** — always set on the response
+- **All `CitationMode` values accepted** — there is no server-side distinction; `Accurate`, `Fast`, and `Enabled` all produce the same behavior
+- **Graceful degradation** — if the model emits no markers or malformed markers, the response is returned with zero citations and `IsSuccess=true`
+- **Citation type** — synthesized citations have `Type="synthesized_citation"`
+
+### Example
+
+```csharp
+var client = new AzureAiInferenceChatCompletionClient(httpClient, new AzureAiInferenceClientOptions
+{
+    ModelId = "Phi-4",
+    ApiKey = "...",
+    Endpoint = "https://my-endpoint.inference.azure.com"
+});
+
+var groundedFeature = client.Features.Get<IGroundedChatFeature>()!;
+
+var documents = new List<DocumentChunk>
+{
+    new(Id: "doc-1", Text: "Paris is the capital of France."),
+    new(Id: "doc-2", Text: "Berlin is the capital of Germany.")
+};
+
+var response = await groundedFeature.GetGroundedChatCompletionAsync(
+    new ChatCompletionRequest(
+        Messages: [new LlmMessage(LlmRole.User, "What is the capital of France?")]),
+    new GroundedChatOptions(Documents: documents));
+
+// response.GroundingKind == GroundingKind.Synthesized
+// response.Citations may contain synthesized citations
+```
+
 ## Limitations
 
 - **Mutually exclusive with JSON Mode (Cohere)**: The Cohere API does not support `documents` and `response_format` in the same request. Use either grounded chat or JSON output, not both.
 - **Model support (Cohere)**: Use Command-R, Command-R+, or Command-A models.
-- **GPT-5 only (OpenAI/Azure)**: Non-GPT-5 models return `IsSuccess=false`. This is by design — prompt-injection grounding is a separate feature (#40).
+- **GPT-5 only (OpenAI/Azure native)**: Non-GPT-5 models return `IsSuccess=false`. For providers without native support (Azure AI Inference), the prompt-injection fallback is used automatically.
+- **Synthesized citation reliability**: The prompt-injection fallback depends on the model following instructions to emit markers. Results vary by model capability — smaller models may not always produce markers.
 
 ### Anthropic
 - **Citation modes are binary**: Anthropic citations are enabled or disabled — there is no accuracy/speed tradeoff. `CitationMode.Fast` and `CitationMode.Accurate` are treated as `Enabled` with a logged warning.
