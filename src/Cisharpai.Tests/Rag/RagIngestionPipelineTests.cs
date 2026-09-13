@@ -235,6 +235,9 @@ public class RagIngestionPipelineTests
     public void AddCisharpaiRag_PreservesCustomChunker()
     {
         var chunker = Substitute.For<ITextChunker>();
+        chunker.ChunkAsync(Arg.Any<RagDocument>(), Arg.Any<CancellationToken>())
+            .Returns(EmptyChunks());
+        static async IAsyncEnumerable<TextChunk> EmptyChunks() { await Task.CompletedTask; yield break; }
         var services = new ServiceCollection();
         services.AddSingleton(chunker);
         services.AddCisharpaiRag();

@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Cisharpai.Rag.Models;
 
 namespace Cisharpai.Rag.Chunking;
@@ -13,16 +14,19 @@ public sealed class FixedSizeChunker : ITextChunker
     public FixedSizeChunker(FixedSizeChunkerOptions? options = null) =>
         _options = (options ?? new()).Snapshot();
 
-    public IEnumerable<TextChunk> Chunk(RagDocument document)
+    public IAsyncEnumerable<TextChunk> ChunkAsync(
+        RagDocument document, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(document);
         ArgumentException.ThrowIfNullOrWhiteSpace(document.Id);
         ArgumentNullException.ThrowIfNull(document.Text);
-        return ChunkCore(document);
+        return ChunkCore(document, cancellationToken);
     }
 
-    private IEnumerable<TextChunk> ChunkCore(RagDocument document)
+    private async IAsyncEnumerable<TextChunk> ChunkCore(
+        RagDocument document, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
+        await Task.CompletedTask.ConfigureAwait(false);
         var text = document.Text;
         var start = 0;
         var end = Advance(text, 0, _options.ChunkSize);
@@ -30,11 +34,11 @@ public sealed class FixedSizeChunker : ITextChunker
         var index = 0;
         while (start < text.Length)
         {
-            yield return new(document.Id, index++, start, text.Substring(start, end - start));
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return new(document.Id, index++, start, end, text.Substring(start, end - start));
             if (end == text.Length)
                 yield break;
 
-            // Moving both boundaries avoids rescanning the overlapping window.
             start = Advance(text, start, step);
             end = Advance(text, end, step);
         }

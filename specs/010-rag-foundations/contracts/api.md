@@ -2,7 +2,7 @@
 
 Namespace root `Cisharpai.Rag`; models in `.Models`, chunker in `.Chunking`, bulk in `.Embeddings`.
 
-- `ITextChunker.Chunk(RagDocument)` returns lazy `IEnumerable<TextChunk>`.
+- `ITextChunker.ChunkAsync(RagDocument, CancellationToken)` returns `IAsyncEnumerable<TextChunk>`.
 - `FixedSizeChunker(FixedSizeChunkerOptions? options = null)` snapshots validated options.
 - `IBulkEmbeddingProcessor.EmbedAsync(IAsyncEnumerable<TextChunk>, CancellationToken)` returns `IAsyncEnumerable<EmbeddingBatchResult>`; an IEnumerable overload supports ordinary collections.
 - `BulkEmbeddingProcessor(IEmbeddingClient, BulkEmbeddingOptions? options = null)` snapshots options and retains scoped provider.
@@ -15,4 +15,4 @@ DI uses scoped processors/pipelines to avoid capturing scoped providers in singl
 
 Batch outputs preserve input order and source associations; failures return no Items. Validate successful vector count, nonempty consistent lengths, requested dimensions and finite values. Retain raw payloads and provider metadata on validation failure. Do not change a provider's existing error message. Source enumeration is lazy and disposed on completion, failure, cancellation or consumer break.
 
-Caller-provided chunks require a nonblank document ID, nonnull text and nonnegative index/offset. Invalid input throws ArgumentException (or a subclass) before submitting that batch. Empty text is permitted but may be rejected by the chosen provider.
+Caller-provided chunks require a nonblank document ID, nonnull text, nonnegative index/offset and `EndOffset >= StartOffset`. Invalid input throws ArgumentException (or a subclass) before submitting that batch. Empty text is permitted but may be rejected by the chosen provider.

@@ -16,16 +16,18 @@ var chunker = new FixedSizeChunker(new FixedSizeChunkerOptions
     Overlap = 1
 });
 var document = new RagDocument("manual/intro", "abcdefghi");
-foreach (var chunk in chunker.Chunk(document))
+await foreach (var chunk in chunker.ChunkAsync(document))
 {
-    Console.WriteLine($"{chunk.DocumentId}:{chunk.Index} @ {chunk.StartOffset}: {chunk.Text}");
+    Console.WriteLine($"{chunk.DocumentId}:{chunk.Index} @ {chunk.StartOffset}–{chunk.EndOffset}: {chunk.Text}");
 }
-// manual/intro:0 @ 0: abcd
-// manual/intro:1 @ 3: defg
-// manual/intro:2 @ 6: ghi
+// manual/intro:0 @ 0–4: abcd
+// manual/intro:1 @ 3–7: defg
+// manual/intro:2 @ 6–9: ghi
 ```
 
-Size and overlap count **Unicode scalar values**, not UTF-16 code units, grapheme clusters, bytes, or tokens. A supplementary character such as an emoji counts as one scalar; combining sequences can span chunks. `StartOffset` is a UTF-16 offset suitable for `document.Text.Substring(chunk.StartOffset, chunk.Text.Length)`. Valid surrogate pairs are never split. Text and whitespace are preserved; empty documents yield no chunks, and no redundant overlap-only final chunk is produced. IDs must be nonblank, text must be nonnull, and callers own ID uniqueness. Chunk indices start at zero for each document.
+`ITextChunker.ChunkAsync` returns `IAsyncEnumerable<TextChunk>` to support chunkers that need network I/O (e.g. semantic chunking via an embedding client). `FixedSizeChunker` is synchronous internally but exposes the async-streaming shape.
+
+Size and overlap count **Unicode scalar values**, not UTF-16 code units, grapheme clusters, bytes, or tokens. A supplementary character such as an emoji counts as one scalar; combining sequences can span chunks. `StartOffset` and `EndOffset` are zero-based UTF-16 offsets that always delimit the original source span: `document.Text.Substring(chunk.StartOffset, chunk.EndOffset - chunk.StartOffset)` recovers the source slice for any chunker. For **verbatim** chunkers (all built-in chunkers), `Text` equals that source slice and `EndOffset == StartOffset + Text.Length`; callers may use `document.Text.Substring(chunk.StartOffset, chunk.Text.Length)` in that case. For **non-verbatim** chunkers (e.g. contextual retrieval that prefixes generated text), `Text` may differ from the source span and `Text.Length` does not equal the source span length — use `EndOffset - StartOffset` for the source range. `Metadata` is an `IReadOnlyDictionary<string, object?>` carrying chunker-specific data (e.g. boundary type, similarity score); it is defensively copied on construction, defaults to empty, and is never null. Valid surrogate pairs are never split. Built-in (verbatim) chunkers preserve text and whitespace exactly; non-verbatim chunkers may transform chunk text while preserving source offsets. Empty documents yield no chunks, and no redundant overlap-only final chunk is produced. IDs must be nonblank, text must be nonnull, and callers own ID uniqueness. Chunk indices start at zero for each document.
 
 ## Direct pipeline and bulk embedding
 
@@ -65,7 +67,7 @@ await foreach (var batch in pipeline.IngestAsync(new[]
 }
 ```
 
-For pre-chunked input, call `processor.EmbedAsync(chunks, progress, cancellationToken)` with either `IEnumerable<TextChunk>` or `IAsyncEnumerable<TextChunk>`. No document pipeline is required. The processor preserves the input order and pairs each vector with the corresponding submitted chunk. It requests float vectors only.
+For pre-chunked input, call `processor.EmbedAsync(chunks, progress, cancellationToken)` with either `IEnumerable<TextChunk>` or `IAsyncEnumerable<TextChunk>`. No document pipeline is required. The processor preserves the input order and pairs each vector with the corresponding submitted chunk. It requests float vectors only. Pre-chunked `TextChunk` values must include a valid `EndOffset` (≥ `StartOffset`).
 
 ## Batch sizing
 
@@ -306,7 +308,7 @@ catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
 }
 ```
 
-Caller-provided chunks need a nonblank document ID, nonnull text, and nonnegative chunk index/source offset. Invalid chunk metadata raises an argument exception before that batch is submitted. Empty chunk text is allowed locally but may be rejected by the provider.
+Caller-provided chunks need a nonblank document ID, nonnull text, nonnegative chunk index/source offset, and `EndOffset >= StartOffset`. Invalid chunk metadata raises an argument exception before that batch is submitted. Empty chunk text is allowed locally but may be rejected by the provider.
 
 To embed a large existing chunk stream, use the same loop with `processor.EmbedAsync(chunkStream, progress, cancellation.Token)`. With `MaxConcurrency = 1` (default), the next batch is not requested until the consumer advances. With higher concurrency, multiple batches may be in flight. The library buffers one batch plus the current document; retaining batches in your application consumes additional memory. Batches can span documents. Breaking out of enumeration disposes the source; pass cancellation to interrupt pending requests.
 

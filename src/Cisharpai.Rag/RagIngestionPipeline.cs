@@ -66,7 +66,7 @@ public sealed class RagIngestionPipeline : IRagIngestionPipeline
         await foreach (var document in documents.WithCancellation(token).ConfigureAwait(false))
         {
             token.ThrowIfCancellationRequested();
-            foreach (var chunk in _chunker.Chunk(document))
+            await foreach (var chunk in _chunker.ChunkAsync(document, token).ConfigureAwait(false))
             {
                 token.ThrowIfCancellationRequested();
                 yield return chunk;
