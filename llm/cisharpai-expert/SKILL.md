@@ -349,7 +349,7 @@ implemented by Cohere only.
 Use the separate `Cisharpai.Rag` package for ingestion with any `IEmbeddingClient`. This is independent of `IGroundedChatFeature`; it does not provide storage, retrieval or generation.
 
 - Root namespace `Cisharpai.Rag`: `IRagIngestionPipeline`, `RagIngestionPipeline`, `RagOptions`, `AddCisharpaiRag`.
-- `.Chunking`: `ITextChunker.ChunkAsync(RagDocument, CancellationToken)` returns `IAsyncEnumerable<TextChunk>`, `FixedSizeChunker`, `FixedSizeChunkerOptions`.
+- `.Chunking`: `ITextChunker.ChunkAsync(RagDocument, CancellationToken)` returns `IAsyncEnumerable<TextChunk>`, `FixedSizeChunker`, `FixedSizeChunkerOptions`. `SemanticChunker(IBulkEmbeddingProcessor, SemanticChunkerOptions?, ISentenceSplitter?)` — similarity-based chunking; `SemanticThresholdStrategy.Percentile` (default, self-calibrating) or `Absolute`; both modes buffer all sentence embeddings in memory before emitting the first chunk; backstops via `MaxChunkCharacters` (default 8000) and `MaxChunkSentences` (default 50). `ISentenceSplitter` / `RegexSentenceSplitter` — pluggable sentence splitting (default targets English prose, will mis-split on abbreviations). **This chunker embeds the entire document at chunking time — costs money and latency on top of downstream embedding.**
 - `.Embeddings`: `IBulkEmbeddingProcessor.EmbedAsync(chunks, progress?, ct)`, `BulkEmbeddingProcessor`, `BulkEmbeddingOptions`, `EmbeddingProviderProfile`.
 - `.Models`: `RagDocument(Id, Text)`, `TextChunk(DocumentId, Index, StartOffset, EndOffset, Text, Metadata)`, `ChunkEmbedding(Chunk, Vector)`, `EmbeddingBatchResult`, `BulkEmbeddingProgress(CompletedBatches, TotalChunksProcessed, FailedBatches)`.
 - `TextChunk.EndOffset` is the exclusive UTF-16 end offset (for verbatim chunks: `StartOffset + Text.Length`); stored rather than derived to support non-verbatim chunkers that prepend context. `Metadata` is `IReadOnlyDictionary<string, object?>`, always non-null, empty by default. `object?` values support numeric metadata (similarity scores) without stringification.
@@ -440,7 +440,7 @@ var request = new ChatCompletionRequest(
 - `src/Cisharpai.Azure/` — Azure OpenAI + Azure AI Inference
 - `src/Cisharpai.Anthropic/` — Anthropic provider
 - `src/Cisharpai.Cohere/` — Cohere provider
-- `src/Cisharpai.Rag/` — Fixed-size chunking, bulk embeddings, document ingestion and configuration
+- `src/Cisharpai.Rag/` — Fixed-size and semantic chunking, bulk embeddings, document ingestion and configuration
 - `src/Cisharpai.Testing/` — Fake clients for unit testing
 - `src/Cisharpai.Tests/` — Unit tests (all providers)
 - `src/Cisharpai.Integration.Tests/` — Integration tests (.NET 10 only)

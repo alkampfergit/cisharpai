@@ -419,6 +419,69 @@ foreach (var (index, similarity) in topResults)
 
 **`Normalize` vs `NormalizeInPlace`**: `Normalize` takes `ReadOnlySpan<float>` and returns a new `float[]`, leaving the input untouched. `NormalizeInPlace` takes `Span<float>` and mutates it in place — use it at ingestion time to avoid per-vector allocations when normalizing a large corpus.
 
+## Semantic chunking
+
+> **Cost warning:** `SemanticChunker` embeds the entire document at chunking time — it costs money and latency on top of any downstream embedding. A user swapping `FixedSizeChunker` for this one should expect an additional embedding call covering every sentence in the document.
+
+`SemanticChunker` places boundaries where the meaning shifts rather than where a counter runs out. It splits the document into sentences, embeds them via `IBulkEmbeddingProcessor`, and cuts where the cosine similarity between consecutive sentences drops.
+
+```csharp
+using Cisharpai.Rag.Chunking;
+using Cisharpai.Rag.Embeddings;
+using Cisharpai.Rag.Models;
+
+var processor = new BulkEmbeddingProcessor(embeddingClient, new BulkEmbeddingOptions
+{
+    InputType = EmbeddingInputType.Document,
+    MaxBatchItems = 96
+});
+var chunker = new SemanticChunker(processor, new SemanticChunkerOptions
+{
+    Strategy = SemanticThresholdStrategy.Percentile,
+    BreakPercentile = 10f,
+    MaxChunkCharacters = 8000,
+    MaxChunkSentences = 50
+});
+
+await foreach (var chunk in chunker.ChunkAsync(new RagDocument("handbook", text)))
+{
+    var preview = chunk.Text.Length <= 50 ? chunk.Text : chunk.Text[..50] + "…";
+    Console.WriteLine($"{chunk.DocumentId}:{chunk.Index} @ {chunk.StartOffset}–{chunk.EndOffset}: {preview}");
+}
+```
+
+### Threshold strategies
+
+| Strategy | Default | Behaviour |
+|---|---|---|
+| `Percentile` (default) | `BreakPercentile = 10` | Bottom N-th percentile of similarity drops in *this* document become boundaries. Self-calibrating across models and domains. **Buffers all sentence embeddings in memory** before emitting the first chunk — memory is proportional to `sentences × embedding dimensions × 4 bytes`. |
+| `Absolute` | `AbsoluteThreshold = 0.5` | Boundary when cosine similarity drops below a fixed threshold. The right number varies by embedding model and domain — tune per model. Buffers all sentence embeddings like Percentile mode. |
+
+### Backstops
+
+Two backstops prevent any chunk from growing unbounded. Whichever limit trips first forces the cut:
+
+- **`MaxChunkCharacters`** (default 8000) — hard size-based backstop preventing a chunk from exceeding the embedding model's input limit. A sentence count alone does not bound this — 50 sentences of legal prose can be tens of thousands of characters.
+- **`MaxChunkSentences`** (default 50) — secondary guard limiting the number of sentences per chunk.
+
+### Sentence splitting
+
+The default `RegexSentenceSplitter` splits on `.` `!` `?` followed by whitespace or end-of-string. It targets English prose and will mis-split on abbreviations like "Dr." and "e.g." — inject a custom `ISentenceSplitter` for domain-specific or multilingual segmentation:
+
+```csharp
+var chunker = new SemanticChunker(processor, options, sentenceSplitter: myCustomSplitter);
+```
+
+### Semantic chunker options reference
+
+| Option | Default | Meaning |
+|---|---|---|
+| `Strategy` | `Percentile` | Threshold strategy: `Percentile` or `Absolute` |
+| `BreakPercentile` | `10` | Bottom N-th percentile of drops → boundary (Percentile mode only); `(0, 100]` |
+| `AbsoluteThreshold` | `0.5` | Cosine below this → boundary (Absolute mode only); `[-1, 1]` |
+| `MaxChunkCharacters` | `8000` | Size-based backstop in characters; must be positive |
+| `MaxChunkSentences` | `50` | Secondary backstop in sentences; must be positive |
+
 ## Offline tests
 
 Reuse `FakeEmbeddingClient` with one vector per submitted chunk, and `FakeTokenCounter` for token counting. See [Testing](testing.md#rag-ingestion-tests) for a complete example and test commands.
