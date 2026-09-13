@@ -52,6 +52,14 @@ public class VectorMathTests
         Assert.That(VectorMath.DotProduct(a, b), Is.EqualTo(23f));
     }
 
+    [Test]
+    public void DotProduct_IReadOnlyList_NonArrayList_ComputesCorrectly()
+    {
+        IReadOnlyList<float> a = new List<float> { 2f, 3f };
+        IReadOnlyList<float> b = new List<float> { 4f, 5f };
+        Assert.That(VectorMath.DotProduct(a, b), Is.EqualTo(23f));
+    }
+
     #endregion
 
     #region CosineSimilarity
@@ -120,6 +128,14 @@ public class VectorMathTests
     {
         IReadOnlyList<float> a = new float[] { 1f, 0f };
         IReadOnlyList<float> b = new float[] { 1f, 0f };
+        Assert.That(VectorMath.CosineSimilarity(a, b), Is.EqualTo(1f).Within(1e-6f));
+    }
+
+    [Test]
+    public void CosineSimilarity_IReadOnlyList_NonArrayList_ComputesCorrectly()
+    {
+        IReadOnlyList<float> a = new List<float> { 3f, 4f };
+        IReadOnlyList<float> b = new List<float> { 3f, 4f };
         Assert.That(VectorMath.CosineSimilarity(a, b), Is.EqualTo(1f).Within(1e-6f));
     }
 
@@ -194,6 +210,18 @@ public class VectorMathTests
         IReadOnlyList<float> v = new float[] { 0f, 5f };
         var result = VectorMath.Normalize(v);
         Assert.That(result[1], Is.EqualTo(1f).Within(1e-6f));
+    }
+
+    [Test]
+    public void Normalize_IReadOnlyList_NonArrayList_ReturnsUnitVector()
+    {
+        IReadOnlyList<float> v = new List<float> { 3f, 4f };
+        var result = VectorMath.Normalize(v);
+        Assert.Multiple(() =>
+        {
+            Assert.That(result[0], Is.EqualTo(0.6f).Within(1e-6f));
+            Assert.That(result[1], Is.EqualTo(0.8f).Within(1e-6f));
+        });
     }
 
     #endregion
@@ -325,6 +353,20 @@ public class VectorMathTests
     {
         IReadOnlyList<float> query = new float[] { 1f, 0f };
         IReadOnlyList<float[]> candidates = new float[][] { [0f, 1f], [1f, 0f] };
+
+        var results = VectorMath.TopK(query, candidates, 1);
+        Assert.That(results[0].Index, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void TopK_IReadOnlyList_NonArrayList_ComputesCorrectly()
+    {
+        IReadOnlyList<float> query = new List<float> { 1f, 0f };
+        IReadOnlyList<float[]> candidates = new List<float[]>
+        {
+            new[] { 0f, 1f },
+            new[] { 1f, 0f },
+        };
 
         var results = VectorMath.TopK(query, candidates, 1);
         Assert.That(results[0].Index, Is.EqualTo(1));
