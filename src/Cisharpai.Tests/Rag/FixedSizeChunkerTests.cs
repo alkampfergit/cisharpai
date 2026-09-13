@@ -93,8 +93,9 @@ public class FixedSizeChunkerTests
     public async Task ChunkAsync_IsRepeatableAcrossEnumerations()
     {
         var chunker = new FixedSizeChunker(new() { ChunkSize = 2, Overlap = 1 });
-        var first = await Collect(chunker.ChunkAsync(new("doc", "abcd")));
-        var second = await Collect(chunker.ChunkAsync(new("doc", "abcd")));
+        var sequence = chunker.ChunkAsync(new("doc", "abcd"));
+        var first = await Collect(sequence);
+        var second = await Collect(sequence);
         Assert.That(first.Select(c => c.Index), Is.EqualTo(second.Select(c => c.Index)));
         Assert.That(first.Select(c => c.Text), Is.EqualTo(second.Select(c => c.Text)));
     }
@@ -153,7 +154,25 @@ public class FixedSizeChunkerTests
     }
 
     [Test]
-    public async Task ChunkAsync_RespectsCanellationToken()
+    public void Metadata_NullViaWithExpression_CoalescesToEmpty()
+    {
+        var chunk = new TextChunk("doc", 0, 0, 3, "abc");
+        var modified = chunk with { Metadata = null! };
+        Assert.That(modified.Metadata, Is.Not.Null);
+        Assert.That(modified.Metadata, Is.Empty);
+    }
+
+    [Test]
+    public void Metadata_IsDefensivelyCopied()
+    {
+        var source = new Dictionary<string, object?> { ["key"] = "value" };
+        var chunk = new TextChunk("doc", 0, 0, 3, "abc", source);
+        source["key"] = "mutated";
+        Assert.That(chunk.Metadata["key"], Is.EqualTo("value"));
+    }
+
+    [Test]
+    public async Task ChunkAsync_RespectsCancellationToken()
     {
         using var cts = new CancellationTokenSource();
         cts.Cancel();
