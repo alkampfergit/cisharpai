@@ -2,7 +2,7 @@
 
 ## Overview
 
-Grounded chat enables document-grounded Q&A with source citations. Available via `IGroundedChatFeature` on four providers: **OpenAI** (GPT-5), **Azure OpenAI** (GPT-5 deployments), **Anthropic** (all Claude models), and **Cohere** (all Command models).
+Grounded chat enables document-grounded Q&A with source citations. Available via `IGroundedChatFeature` on all five providers: **OpenAI** (GPT-5, native), **Azure OpenAI** (GPT-5 deployments, native), **Azure AI Inference** (all models, synthesized fallback), **Anthropic** (all Claude models, native), and **Cohere** (all Command models, native).
 
 ## Quick Start
 
@@ -71,11 +71,11 @@ new DocumentChunk("doc-1", "Plain text content of the document...")
 
 ## Citation Modes
 
-| Mode | Cohere | Anthropic |
-|------|--------|-----------|
-| `CitationMode.Accurate` | Full response first, then citations. Only `command-r` family. | Treated as `Enabled` (warning logged). |
-| `CitationMode.Fast` (default) | Inline citations during generation. All models. | Treated as `Enabled` (warning logged). |
-| `CitationMode.Enabled` | Provider default. | Citations enabled. |
+| Mode | Cohere | Anthropic | Azure AI Inference (fallback) |
+|------|--------|-----------|-------------------------------|
+| `CitationMode.Accurate` | Full response first, then citations. Only `command-r` family. | Treated as `Enabled` (warning logged). | No distinction — same as Fast. |
+| `CitationMode.Fast` (default) | Inline citations during generation. All models. | Treated as `Enabled` (warning logged). | Same behavior for all modes. |
+| `CitationMode.Enabled` | Provider default. | Citations enabled. | Same behavior for all modes. |
 
 > **Cohere model compatibility.** `Accurate` is supported only by the `command-r`
 > family. `command-a` models reject it; the provider logs a warning and downgrades
@@ -110,6 +110,17 @@ Both providers report offsets within the concatenated response content.
 
 Wraps `ChatCompletionResponse` and adds:
 - `Citations` — List of `Citation` objects
+- `GroundingKind` — `GroundingKind.Native` (default) or `GroundingKind.Synthesized`
+
+### GroundingKind
+
+`GroundingKind.Native` — provider has first-class citation support (Cohere, Anthropic, OpenAI/Azure OpenAI).
+`GroundingKind.Synthesized` — citations produced via prompt injection and marker parsing (Azure AI Inference).
+
+```csharp
+if (response.GroundingKind == GroundingKind.Synthesized)
+    Console.WriteLine("Citations are AI-generated, not provider-verified.");
+```
 
 ## Best Practices
 
@@ -133,10 +144,29 @@ var feature = client.Features.Get<IGroundedChatFeature>()!;
 var response = await feature.GetGroundedChatCompletionAsync(request, options);
 ```
 
+## Azure AI Inference Grounded Chat (Fallback)
+
+Azure AI Inference models (Phi-3, Llama-3, Mistral, etc.) use the prompt-injection fallback via `GroundedChatFallbackHelper`:
+
+1. Documents serialized into a context block in the system message
+2. Model instructed to emit `«cite:N»…«/cite»` guillemet markers
+3. Markers regex-matched and stripped to produce clean content with citation offsets
+
+```csharp
+var client = new AzureAiInferenceChatCompletionClient(httpClient, options);
+var feature = client.Features.Get<IGroundedChatFeature>()!;
+var response = await feature.GetGroundedChatCompletionAsync(request, groundedOptions);
+// response.GroundingKind == GroundingKind.Synthesized
+```
+
+- Graceful degradation: no markers → zero citations, `IsSuccess=true`
+- Citation type: `"synthesized_citation"`
+- All `CitationMode` values accepted (no server-side distinction)
+
 ## Limitations
 
-- **Azure AI Inference** — returns `null` for `Features.Get<IGroundedChatFeature>()`
 - **Cohere**: mutually exclusive with JSON Mode — cannot combine grounded chat and JSON output
 - **Cohere**: supported models — Command-R, Command-R+, Command-A only
 - **OpenAI/Azure: GPT-5 only** — Non-GPT-5 models return `IsSuccess=false` with a descriptive error
+- **Azure AI Inference (fallback)** — citation quality depends on model's instruction-following ability; smaller models may not always emit markers
 - **Anthropic**: `CitationMode.Fast`/`Accurate` are treated as `Enabled`; PDF/base64 sources not yet first-class (reachable via `ExtraParameters`)
