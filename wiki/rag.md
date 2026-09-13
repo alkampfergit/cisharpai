@@ -482,6 +482,76 @@ var chunker = new SemanticChunker(processor, options, sentenceSplitter: myCustom
 | `MaxChunkCharacters` | `8000` | Size-based backstop in characters; must be positive |
 | `MaxChunkSentences` | `50` | Secondary backstop in sentences; must be positive |
 
+## Context packing
+
+`IContextPacker` selects and orders ranked chunks to fit within a token budget. The built-in `ContextPacker` constructor-injects an `ITokenCounter` (the counter is tied to a model, so it belongs on the instance). Each chunk is counted exactly once per `PackAsync` call and the count is cached for the duration of the operation.
+
+```csharp
+using Cisharpai.Rag.Packing;
+using Cisharpai.Rag.Tokenization;
+
+var counter = new TiktokenCounter("gpt-4o");
+var packer = new ContextPacker(counter);
+
+var result = await packer.PackAsync(rankedChunks, new ContextPackingOptions
+{
+    TokenBudget = 4096,
+    ReservedTokens = 500,      // system prompt + expected completion
+    Separator = "\n\n",
+    UseLostInMiddleOrdering = true,
+    OverflowStrategy = OverflowStrategy.SkipAndContinue
+});
+
+foreach (var chunk in result.Selected)
+    Console.WriteLine($"Selected: {chunk.Chunk.DocumentId}:{chunk.Chunk.Index} (score {chunk.Score:F3})");
+
+foreach (var drop in result.Dropped)
+    Console.WriteLine($"Dropped: {drop.Chunk.Chunk.DocumentId}:{drop.Chunk.Chunk.Index} — {drop.Reason} ({drop.TokenCount} tokens)");
+
+Console.WriteLine($"Tokens used: {result.TotalTokensUsed}, remaining: {result.BudgetRemaining}");
+```
+
+### Input
+
+`IReadOnlyList<ScoredChunk>` — ranked chunks with relevance scores. `ScoredChunk(TextChunk Chunk, double Score)` wraps a `TextChunk` with a `double` score that accepts both `float` similarity scores from `VectorMath.TopK` and `double` reranker scores from `RerankResult.RelevanceScore` without precision loss.
+
+### Selection
+
+Greedy over the ranked list. Budget accounting: `TokenBudget - ReservedTokens - separator_tokens - chunk_tokens`. Separators are counted once (n-1 for n chunks). The first chunk has no separator cost.
+
+**`OverflowStrategy.SkipAndContinue`** (default): skip a chunk that does not fit and continue packing lower-ranked chunks. Fills the budget more fully; the dropped-chunk report explains exactly what was skipped and why.
+
+**`OverflowStrategy.StopAtFirstMisfit`**: stop at the first chunk that does not fit the remaining budget. Guarantees "everything above rank N is present". Individually oversized chunks (those that exceed the entire available budget) are still skipped rather than stopping, since they can never fit regardless of packing order.
+
+### Ordering
+
+**Lost-in-the-middle** (default, `UseLostInMiddleOrdering = true`): the highest-ranked chunks are placed at the start and end of the context, with the weakest in the middle. Models attend most reliably to context edges, so this improves answer quality. Set `UseLostInMiddleOrdering = false` to preserve rank order.
+
+### Dropped chunk reporting
+
+`ContextPackingResult.Dropped` reports every excluded chunk with its token count and reason:
+
+- `DropReason.BudgetExhausted` — the remaining budget could not accommodate the chunk.
+- `DropReason.IndividuallyOversized` — the chunk alone exceeds the entire available budget. The fix is to chunk smaller at the chunking stage.
+
+`TotalTokensUsed` and `BudgetRemaining` are reported for debuggability.
+
+### Options validation
+
+Options are validated per call. Invalid values throw:
+
+| Condition | Exception |
+|---|---|
+| `TokenBudget <= 0` | `ArgumentOutOfRangeException` |
+| `ReservedTokens < 0` | `ArgumentOutOfRangeException` |
+| `ReservedTokens >= TokenBudget` | `ArgumentOutOfRangeException` |
+| `Separator` is null | `ArgumentNullException` |
+| `OverflowStrategy` undefined enum value | `ArgumentOutOfRangeException` |
+
+### Anthropic `count_tokens`
+
+Deferred. `POST /v1/messages/count_tokens` is message-shaped (takes a full request payload), making it a poor fit for per-chunk counting but a good fit for whole-request verification. It is a network round-trip per call and must not be used inside the packing loop.
+
 ## Offline tests
 
-Reuse `FakeEmbeddingClient` with one vector per submitted chunk, and `FakeTokenCounter` for token counting. See [Testing](testing.md#rag-ingestion-tests) for a complete example and test commands.
+Reuse `FakeEmbeddingClient` with one vector per submitted chunk, and `FakeTokenCounter` for token counting (including with `ContextPacker`). See [Testing](testing.md#rag-ingestion-tests) for a complete example and test commands.
