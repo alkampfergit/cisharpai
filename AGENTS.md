@@ -54,7 +54,7 @@ Detailed structure: [project_overview.md](memories/project_overview.md)
 | `IJsonOutputFeature` | All 5 chat clients |
 | `IToolCallingFeature` | All 5 chat clients |
 | `IStreamingChatFeature` | All 5 chat clients |
-| `IGroundedChatFeature` | Anthropic, Cohere |
+| `IGroundedChatFeature` | All 5 chat clients (Anthropic, Cohere, OpenAI, Azure OpenAI native; Azure AI Inference fallback) |
 | `IPromptCachingFeature` | Anthropic only (control); OpenAI/Azure report cache usage on the unified response without this interface |
 | `IImageEmbeddingFeature` | Azure AI Inference, Cohere |
 | `IMultimodalEmbeddingFeature` | Cohere only |

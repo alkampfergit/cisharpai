@@ -38,7 +38,7 @@ services.AddCohereChatClient(options =>
 - `IJsonOutputFeature` — JSON Mode + Structured Outputs
 - `IToolCallingFeature` — With uppercase ToolChoice values
 - `IStreamingChatFeature` — Event-based SSE
-- `IGroundedChatFeature` — RAG with document citations (Anthropic, Cohere)
+- `IGroundedChatFeature` — RAG with document citations (all providers; native on Anthropic/Cohere/OpenAI/Azure OpenAI, fallback on Azure AI Inference)
 - `IImageEmbeddingFeature` — Single image embedding
 - `IMultimodalEmbeddingFeature` — Mixed text + image (Embed v4)
 - Vision — Partial (image parts silently skipped, only text extracted)
