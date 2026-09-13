@@ -41,7 +41,7 @@ public class SemanticChunkerTests
                 $"Chunk {chunk.Index} text must match source span (verbatim contract)");
     }
 
-    private static void AssertContiguousCoverage(IReadOnlyList<TextChunk> chunks, string sourceText)
+    private static void AssertContiguousCoverage(List<TextChunk> chunks, string sourceText)
     {
         if (chunks.Count == 0) return;
         for (var i = 1; i < chunks.Count; i++)
