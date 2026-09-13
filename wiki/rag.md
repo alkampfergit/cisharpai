@@ -323,7 +323,7 @@ Cancellation propagates as `OperationCanceledException`; network/configuration a
 ```csharp
 using Cisharpai.Rag;
 
-float[] query = embeddingResponse.Values;
+float[] query = embeddingResponse.Embeddings[0];
 float[][] corpus = loadedVectors; // from your store
 
 // Cosine similarity (−1 to 1)

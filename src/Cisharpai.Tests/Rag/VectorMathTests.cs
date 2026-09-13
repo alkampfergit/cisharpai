@@ -140,11 +140,31 @@ public class VectorMathTests
     }
 
     [Test]
-    public void CosineSimilarity_ScaledVectors_ReturnOne()
+    public void CosineSimilarity_ScaledVectors_ReturnsOne()
     {
         float[] a = [1f, 2f, 3f];
         float[] b = [2f, 4f, 6f];
         Assert.That(VectorMath.CosineSimilarity(a, b), Is.EqualTo(1f).Within(1e-6f));
+    }
+
+    [Test]
+    public void CosineSimilarity_LargeMagnitudeVectors_DoesNotOverflowToNaN()
+    {
+        float[] a = [1e20f];
+        float[] b = [1e20f];
+        var result = VectorMath.CosineSimilarity(a, b);
+        Assert.That(float.IsNaN(result), Is.False);
+        Assert.That(result, Is.EqualTo(1f).Within(1e-6f));
+    }
+
+    [Test]
+    public void CosineSimilarity_TinyMagnitudeVectors_DoesNotReturnNaN()
+    {
+        float[] a = [float.Epsilon];
+        float[] b = [float.Epsilon];
+        var result = VectorMath.CosineSimilarity(a, b);
+        Assert.That(float.IsNaN(result), Is.False);
+        Assert.That(result, Is.EqualTo(1f).Within(1e-6f));
     }
 
     #endregion
@@ -271,12 +291,39 @@ public class VectorMathTests
         Assert.DoesNotThrow(() => VectorMath.NormalizeInPlace(Span<float>.Empty));
     }
 
+    [Test]
+    public void NormalizeInPlace_LargeMagnitudeVector_ProducesUnitLength()
+    {
+        float[] v = [1e20f, 1e20f];
+        VectorMath.NormalizeInPlace(v);
+        Assert.Multiple(() =>
+        {
+            Assert.That(v.Any(float.IsInfinity), Is.False);
+            Assert.That(v.Any(float.IsNaN), Is.False);
+            var magnitude = MathF.Sqrt(v.Sum(x => x * x));
+            Assert.That(magnitude, Is.EqualTo(1f).Within(1e-6f));
+        });
+    }
+
+    [Test]
+    public void NormalizeInPlace_FloatEpsilonVector_ProducesUnitLength()
+    {
+        float[] v = [float.Epsilon];
+        VectorMath.NormalizeInPlace(v);
+        Assert.Multiple(() =>
+        {
+            Assert.That(float.IsInfinity(v[0]), Is.False);
+            Assert.That(float.IsNaN(v[0]), Is.False);
+            Assert.That(v[0], Is.EqualTo(1f).Within(1e-6f));
+        });
+    }
+
     #endregion
 
     #region TopK
 
     [Test]
-    public void TopK_ReturnsCandatesInDescendingScoreOrder()
+    public void TopK_ReturnsCandidatesInDescendingScoreOrder()
     {
         float[] query = [1f, 0f];
         float[][] candidates =
@@ -370,6 +417,33 @@ public class VectorMathTests
 
         var results = VectorMath.TopK(query, candidates, 1);
         Assert.That(results[0].Index, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void TopK_NullCandidate_ThrowsWithIndex()
+    {
+        float[] query = [1f, 0f];
+        float[][] candidates = [new float[] { 1f, 0f }, null!, new float[] { 0f, 1f }];
+
+        var ex = Assert.Throws<ArgumentNullException>(
+            () => VectorMath.TopK(query, candidates, 1));
+        Assert.That(ex!.Message, Does.Contain("index 1"));
+    }
+
+    [Test]
+    public void TopK_NullCandidate_IReadOnlyList_ThrowsWithIndex()
+    {
+        IReadOnlyList<float> query = new float[] { 1f, 0f };
+        IReadOnlyList<float[]> candidates = new List<float[]>
+        {
+            new[] { 1f, 0f },
+            null!,
+            new[] { 0f, 1f },
+        };
+
+        var ex = Assert.Throws<ArgumentNullException>(
+            () => VectorMath.TopK(query, candidates, 1));
+        Assert.That(ex!.Message, Does.Contain("index 1"));
     }
 
     [Test]

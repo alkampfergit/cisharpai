@@ -44,18 +44,18 @@ public static class VectorMath
     {
         ThrowIfDimensionMismatch(a.Length, b.Length);
 
-        var dot = 0f;
-        var normA = 0f;
-        var normB = 0f;
+        var dot = 0.0;
+        var normA = 0.0;
+        var normB = 0.0;
         for (var i = 0; i < a.Length; i++)
         {
-            dot += a[i] * b[i];
-            normA += a[i] * a[i];
-            normB += b[i] * b[i];
+            dot += (double)a[i] * b[i];
+            normA += (double)a[i] * a[i];
+            normB += (double)b[i] * b[i];
         }
 
-        var denominator = MathF.Sqrt(normA) * MathF.Sqrt(normB);
-        return denominator == 0f ? 0f : dot / denominator;
+        var denominator = Math.Sqrt(normA) * Math.Sqrt(normB);
+        return denominator == 0.0 ? 0f : (float)(dot / denominator);
     }
 
     /// <inheritdoc cref="CosineSimilarity(ReadOnlySpan{float}, ReadOnlySpan{float})"/>
@@ -99,16 +99,16 @@ public static class VectorMath
     /// </summary>
     public static void NormalizeInPlace(Span<float> vector)
     {
-        var sumSq = 0f;
+        var sumSq = 0.0;
         for (var i = 0; i < vector.Length; i++)
-            sumSq += vector[i] * vector[i];
+            sumSq += (double)vector[i] * vector[i];
 
-        if (sumSq == 0f)
+        if (sumSq == 0.0)
             return;
 
-        var invNorm = 1f / MathF.Sqrt(sumSq);
+        var invNorm = 1.0 / Math.Sqrt(sumSq);
         for (var i = 0; i < vector.Length; i++)
-            vector[i] *= invNorm;
+            vector[i] = (float)(vector[i] * invNorm);
     }
 
     /// <summary>
@@ -126,7 +126,11 @@ public static class VectorMath
 
         var scored = new (int Index, float Score)[candidates.Length];
         for (var i = 0; i < candidates.Length; i++)
+        {
+            if (candidates[i] is null)
+                throw new ArgumentNullException(nameof(candidates), $"Candidate at index {i} is null.");
             scored[i] = (i, CosineSimilarity(query, candidates[i]));
+        }
 
         Array.Sort(scored, (x, y) => y.Score.CompareTo(x.Score));
 
@@ -149,7 +153,8 @@ public static class VectorMath
             return TopK((ReadOnlySpan<float>)queryArr, (ReadOnlySpan<float[]>)jagged, k);
         var candidateArr = new float[candidates.Count][];
         for (var i = 0; i < candidates.Count; i++)
-            candidateArr[i] = candidates[i];
+            candidateArr[i] = candidates[i]
+                ?? throw new ArgumentNullException(nameof(candidates), $"Candidate at index {i} is null.");
         return TopK((ReadOnlySpan<float>)queryArr, (ReadOnlySpan<float[]>)candidateArr, k);
     }
 
