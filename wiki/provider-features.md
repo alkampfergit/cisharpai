@@ -31,7 +31,7 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Chat Completions | Yes | Yes | Yes | Yes | Yes |
 | Text Embeddings | Yes | Yes | Yes | -- | Yes |
 | Reranking | -- | -- | -- | -- | Yes |
-| Token Counting | Local* | Local* | Local* | Local* | Yes (local + API) |
+| Token Counting | Local* | Local* | -- | -- | Yes (local + API) |
 | RAG Ingestion | Yes | Yes | Yes | -- | Yes |
 | JSON Mode | Yes | Yes | Yes | Yes | Yes |
 | Structured Outputs | Yes | Yes | Yes | Yes | Yes |
@@ -48,7 +48,7 @@ This page lists every feature supported by each provider integration in Cisharpa
 
 \* Cohere Vision: image content parts are silently skipped (only text extracted). Cohere chat API does not support visual inputs.
 
-\* Local Token Counting: `TiktokenCounter` in `Cisharpai.Rag` provides offline counting via `Microsoft.ML.Tokenizers` for OpenAI-compatible tokenizers (o200k_base, cl100k_base). Cohere also has `CohereTokenCounter` which calls the `POST /v1/tokenize` API. See [RAG — Token counting](rag.md#token-counting).
+\* Local Token Counting: `TiktokenCounter` in `Cisharpai.Rag.Tokenizers` provides offline counting via `Microsoft.ML.Tokenizers` for OpenAI-compatible tokenizers only (o200k_base, cl100k_base). It works with OpenAI and Azure OpenAI models; it does **not** produce correct counts for Anthropic, Azure AI Inference (non-OpenAI deployments), or other providers whose tokenizers differ. Cohere also has `CohereTokenCounter` which calls the `POST /v1/tokenize` API. See [RAG — Token counting](rag.md#token-counting).
 
 **Logging & Tracing:** every provider client routes through `LlmHttpClient`, which emits structured `ILogger` entries (EventIds 1000–1005) and `System.Diagnostics.Activity` spans from the `Cisharpai` source (constant: `Cisharpai.CisharpaiTelemetry.ActivitySourceName`). See [Logging](logging.md) for the property/tag set and subscription options.
 

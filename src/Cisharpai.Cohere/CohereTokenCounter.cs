@@ -60,9 +60,10 @@ public sealed class CohereTokenCounter : ITokenCounter
 
     /// <inheritdoc />
     /// <remarks>
-    /// Text longer than 65,536 characters is split on whitespace boundaries and the per-chunk
+    /// Text longer than 65,536 characters is split preferring whitespace boundaries and the per-chunk
     /// token counts are summed. The result is an upper-bound approximation because BPE merges
-    /// across the split point are lost.
+    /// across the split point are lost. If a chunk contains no whitespace within the limit,
+    /// a hard cut at the character limit is used to honour the provider's per-request ceiling.
     /// </remarks>
     public ValueTask<int> CountAsync(string text, CancellationToken cancellationToken = default)
     {
@@ -135,7 +136,15 @@ public sealed class CohereTokenCounter : ITokenCounter
         {
             var newPath = path.Replace("/v2/", "/v1/", StringComparison.OrdinalIgnoreCase)
                               .Replace("/v2", "/v1", StringComparison.OrdinalIgnoreCase);
+            if (!newPath.EndsWith('/'))
+                newPath += '/';
             var builder = new UriBuilder(uri) { Path = newPath };
+            return builder.Uri;
+        }
+
+        if (!path.EndsWith('/'))
+        {
+            var builder = new UriBuilder(uri) { Path = path + '/' };
             return builder.Uri;
         }
 

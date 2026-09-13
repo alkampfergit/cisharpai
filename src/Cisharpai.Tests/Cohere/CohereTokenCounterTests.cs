@@ -324,6 +324,58 @@ public sealed class CohereTokenCounterTests
     }
 
     [Test]
+    public async Task CountAsync_BaseUrlWithV2NoTrailingSlash_ResolvesToV1Tokenize()
+    {
+        var handler = OkHandler();
+        var counter = CreateCounter(handler, out var httpClient,
+            baseUrl: "https://api.cohere.com/v2");
+        using var _ = httpClient;
+
+        await counter.CountAsync("test");
+
+        Assert.That(handler.LastRequest!.RequestUri!.AbsolutePath, Is.EqualTo("/v1/tokenize"));
+    }
+
+    [Test]
+    public async Task CountAsync_BaseUrlWithV2TrailingSlash_ResolvesToV1Tokenize()
+    {
+        var handler = OkHandler();
+        var counter = CreateCounter(handler, out var httpClient,
+            baseUrl: "https://api.cohere.com/v2/");
+        using var _ = httpClient;
+
+        await counter.CountAsync("test");
+
+        Assert.That(handler.LastRequest!.RequestUri!.AbsolutePath, Is.EqualTo("/v1/tokenize"));
+    }
+
+    [Test]
+    public async Task CountAsync_BaseUrlWithoutVersionNoTrailingSlash_ResolvesToTokenize()
+    {
+        var handler = OkHandler();
+        var counter = CreateCounter(handler, out var httpClient,
+            baseUrl: "https://custom-endpoint.example.com/api");
+        using var _ = httpClient;
+
+        await counter.CountAsync("test");
+
+        Assert.That(handler.LastRequest!.RequestUri!.AbsolutePath, Is.EqualTo("/api/tokenize"));
+    }
+
+    [Test]
+    public async Task CountAsync_BaseUrlWithoutVersionTrailingSlash_ResolvesToTokenize()
+    {
+        var handler = OkHandler();
+        var counter = CreateCounter(handler, out var httpClient,
+            baseUrl: "https://custom-endpoint.example.com/api/");
+        using var _ = httpClient;
+
+        await counter.CountAsync("test");
+
+        Assert.That(handler.LastRequest!.RequestUri!.AbsolutePath, Is.EqualTo("/api/tokenize"));
+    }
+
+    [Test]
     public void Constructor_ThrowsOnNullHttpClient()
     {
         Assert.That(() => new CohereTokenCounter(null!, new CohereClientOptions(), "model"),

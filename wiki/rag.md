@@ -107,7 +107,7 @@ These values are conservative starting points chosen to stay inside each provide
 
 ### Local tokenizer (TiktokenCounter)
 
-`TiktokenCounter` in `Cisharpai.Rag` uses `Microsoft.ML.Tokenizers` for offline, synchronous counting. It supports OpenAI-compatible tokenizers: `gpt-4o` (o200k_base), `gpt-4` / `gpt-3.5-turbo` (cl100k_base).
+`TiktokenCounter` in the separate `Cisharpai.Rag.Tokenizers` package uses `Microsoft.ML.Tokenizers` for offline, synchronous counting. It supports OpenAI-compatible tokenizers only: `gpt-4o` (o200k_base), `gpt-4` / `gpt-3.5-turbo` (cl100k_base). Install `Cisharpai.Rag.Tokenizers` to use it — it is a separate package so that consumers of `Cisharpai.Rag` who only need bulk embeddings do not pull in the multi-megabyte tokenizer data files.
 
 ```csharp
 using Cisharpai.Rag.Tokenization;

@@ -11,7 +11,7 @@ public sealed class TiktokenCounterTests
 
         var count = await counter.CountAsync("Hello, world!");
 
-        Assert.That(count, Is.GreaterThan(0));
+        Assert.That(count, Is.EqualTo(4));
     }
 
     [Test]
@@ -48,19 +48,23 @@ public sealed class TiktokenCounterTests
     }
 
     [Test]
-    public void CountAsync_IsThreadSafe()
+    public async Task CountAsync_IsThreadSafe()
     {
         var counter = new TiktokenCounter("gpt-4o");
         var text = "Thread safety test with some tokens.";
+        var barrier = new Barrier(100);
 
         var tasks = Enumerable.Range(0, 100)
-            .Select(_ => counter.CountAsync(text).AsTask())
+            .Select(_ => Task.Run(async () =>
+            {
+                barrier.SignalAndWait();
+                return await counter.CountAsync(text);
+            }))
             .ToArray();
 
-        Task.WaitAll(tasks);
+        var results = await Task.WhenAll(tasks);
 
-        var expected = tasks[0].Result;
-        Assert.That(tasks.All(t => t.Result == expected), Is.True);
+        Assert.That(results, Is.All.EqualTo(results[0]));
     }
 
     [Test]

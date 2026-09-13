@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Description>Local token counting for Cisharpai RAG pipelines via Microsoft.ML.Tokenizers (o200k_base, cl100k_base). Install this package to replace the default s.Length / 4 heuristic in BulkEmbeddingOptions.TokenEstimator with real counts.</Description>
+    <PackageTags>rag;tokenizer;tiktoken;llm;ai</PackageTags>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.ML.Tokenizers" />
+    <PackageReference Include="Microsoft.ML.Tokenizers.Data.O200kBase" />
+    <PackageReference Include="Microsoft.ML.Tokenizers.Data.Cl100kBase" />
+    <ProjectReference Include="..\Cisharpai\Cisharpai.csproj" />
+  </ItemGroup>
+</Project>

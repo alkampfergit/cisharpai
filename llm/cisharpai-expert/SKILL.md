@@ -240,8 +240,9 @@ public interface ITokenCounter
 }
 ```
 
-**Local counter (`TiktokenCounter` in `Cisharpai.Rag`):** offline, synchronous, thread-safe.
-Supports OpenAI-compatible tokenizers (gpt-4o = o200k_base, gpt-4 = cl100k_base).
+**Local counter (`TiktokenCounter` in `Cisharpai.Rag.Tokenizers`):** offline, synchronous, thread-safe.
+Supports OpenAI-compatible tokenizers only (gpt-4o = o200k_base, gpt-4 = cl100k_base).
+Install the separate `Cisharpai.Rag.Tokenizers` package to use it.
 
 ```csharp
 using Cisharpai.Rag.Tokenization;

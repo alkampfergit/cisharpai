@@ -32,6 +32,7 @@
     <ProjectReference Include="..\Cisharpai.Tests.Common\Cisharpai.Tests.Common.csproj" />
     <ProjectReference Include="..\Cisharpai.Testing\Cisharpai.Testing.csproj" />
     <ProjectReference Include="..\Cisharpai.Rag\Cisharpai.Rag.csproj" />
+    <ProjectReference Include="..\Cisharpai.Rag.Tokenizers\Cisharpai.Rag.Tokenizers.csproj" />
   </ItemGroup>
 
 </Project>
