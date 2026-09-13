@@ -55,7 +55,7 @@ var result = await embeddingClient.GetEmbeddingAsync(
 
 ## Grounded Chat (RAG)
 
-Cohere is the only provider supporting `IGroundedChatFeature` — pass documents and get back citations with character offsets:
+Cohere supports `IGroundedChatFeature` — pass documents and get back citations with character offsets:
 
 ```csharp
 var feature = ((IHasFeatures)client).Features.Get<IGroundedChatFeature>();

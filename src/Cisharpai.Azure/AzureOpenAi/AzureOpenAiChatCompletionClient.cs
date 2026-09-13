@@ -18,8 +18,11 @@ namespace Cisharpai.Azure.AzureOpenAi;
 /// Azure OpenAI chat completion client using HttpClient.
 /// Supports legacy models (GPT-4), reasoning models (o1/o3/o4), and GPT-5 via the Responses API.
 /// </summary>
-public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature, IStreamingChatFeature
+public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature, IStreamingChatFeature, IGroundedChatFeature
 {
+    private const string IncompleteStatus = "incomplete";
+    private const string FailedStatus = "failed";
+
     private static readonly JsonSerializerOptions StreamJsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
@@ -61,6 +64,7 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         features.Set<IJsonOutputFeature>(this);
         features.Set<IToolCallingFeature>(this);
         features.Set<IStreamingChatFeature>(this);
+        features.Set<IGroundedChatFeature>(this);
         Features = features;
     }
 
@@ -249,6 +253,94 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         }
     }
 
+    public async Task<GroundedChatCompletionResponse> GetGroundedChatCompletionAsync(
+        ChatCompletionRequest request,
+        GroundedChatOptions groundedChatOptions,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            groundedChatOptions.Validate();
+
+            var modelType = DetectModelTypeFromHints(request);
+            if (modelType != AzureOpenAiModelType.Gpt5)
+            {
+                return GroundedChatCompletionResponse.Error(
+                    "Grounded chat requires the Responses API (GPT-5 models). The current deployment does not support native document grounding with citations. Use a GPT-5 deployment or consider the prompt-injection grounding approach.");
+            }
+
+            if (_routingMode == AzureOpenAiRoutingMode.ChatCompletions)
+            {
+                return GroundedChatCompletionResponse.Error(
+                    "Grounded chat requires the Responses API but the deployment uses Chat Completions which does not support native document grounding with citations.");
+            }
+
+            return await ExecuteGroundedWithRouteFallbackAsync(request, groundedChatOptions, cancellationToken);
+        }
+        catch (LlmHttpRequestException ex)
+        {
+            return GroundedChatCompletionResponse.Error(ex.Message, ex.ResponseBody);
+        }
+        catch (Exception ex)
+        {
+            return GroundedChatCompletionResponse.Error(ex.Message);
+        }
+    }
+
+    private async Task<GroundedChatCompletionResponse> ExecuteGroundedWithRouteFallbackAsync(
+        ChatCompletionRequest request,
+        GroundedChatOptions groundedChatOptions,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var response = await SendGroundedResponsesApiAsync(request, groundedChatOptions, cancellationToken);
+            if (response.IsSuccess)
+            {
+                SetRoutingMode(AzureOpenAiRoutingMode.ResponsesApi);
+            }
+            return response;
+        }
+        catch (LlmHttpRequestException ex) when (CanRetryWithAlternateRoute(ex))
+        {
+            SetRoutingMode(AzureOpenAiRoutingMode.ChatCompletions, persistToSharedCache: true);
+            return GroundedChatCompletionResponse.Error(
+                "Grounded chat requires the Responses API but the deployment fell back to Chat Completions which does not support native document grounding with citations.",
+                ex.ResponseBody);
+        }
+    }
+
+    private async Task<GroundedChatCompletionResponse> SendGroundedResponsesApiAsync(
+        ChatCompletionRequest request,
+        GroundedChatOptions groundedChatOptions,
+        CancellationToken cancellationToken)
+    {
+        var messages = new List<object>(await MapMessagesAsync(request.Messages, cancellationToken));
+        var inputFiles = MapDocumentChunksToInputFiles(groundedChatOptions.Documents);
+        if (!EmbedInputFilesInUserMessage(messages, inputFiles))
+        {
+            return GroundedChatCompletionResponse.Error(
+                "Grounded chat requires at least one user message to attach documents to.");
+        }
+
+        var providerRequest = new AzureOpenAiResponsesApiRequest
+        {
+            MaxOutputTokens = request.MaxTokens,
+            Input = messages,
+            Reasoning = (request.ReasoningEffort ?? _options.ReasoningEffort) is { } effort
+                ? new AzureOpenAiResponsesReasoningOption { Effort = effort }
+                : null,
+            Text = _options.TextVerbosity is not null
+                ? new AzureOpenAiTextOption { Verbosity = _options.TextVerbosity }
+                : null
+        };
+
+        var (raw, rawResponseJson, rawRequestJson) = await PostWithOptionalRawAsync<AzureOpenAiResponsesApiRequest, AzureOpenAiResponsesApiResponse>(
+            ResponsesApiUri, providerRequest, request, cancellationToken);
+
+        return MapGroundedChatResponse(raw, groundedChatOptions.Documents, rawResponseJson, rawRequestJson);
+    }
+
     private async Task<ChatCompletionResponse> SendChatCompletionsAsync(
         ChatCompletionRequest request,
         AzureOpenAiModelType modelType,
@@ -422,7 +514,7 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         var providerRequest = new AzureOpenAiResponsesApiRequest
         {
             MaxOutputTokens = request.MaxTokens,
-            Input = await MapMessagesAsync(request.Messages, cancellationToken),
+            Input = new List<object>(await MapMessagesAsync(request.Messages, cancellationToken)),
             Reasoning = (request.ReasoningEffort ?? _options.ReasoningEffort) is { } effort
                 ? new AzureOpenAiResponsesReasoningOption { Effort = effort }
                 : null,
@@ -449,7 +541,7 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         var providerRequest = new AzureOpenAiResponsesApiRequest
         {
             MaxOutputTokens = request.MaxTokens,
-            Input = await MapMessagesAsync(messages, cancellationToken),
+            Input = new List<object>(await MapMessagesAsync(messages, cancellationToken)),
             Reasoning = (request.ReasoningEffort ?? _options.ReasoningEffort) is { } effort
                 ? new AzureOpenAiResponsesReasoningOption { Effort = effort }
                 : null,
@@ -467,37 +559,20 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         var (raw, rawResponseJson, rawRequestJson) = await PostWithOptionalRawAsync<AzureOpenAiResponsesApiRequest, AzureOpenAiResponsesApiResponse>(
             ResponsesApiUri, providerRequest, request, cancellationToken);
 
-        var content = raw.Output
-            .Where(o => o.Type == "message")
-            .SelectMany(o => o.Content)
-            .Where(c => c.Type == "output_text")
-            .Select(c => c.Text)
-            .FirstOrDefault() ?? string.Empty;
-
-        var refusal = raw.Output
-            .Where(o => o.Type == "message")
-            .SelectMany(o => o.Content)
-            .Where(c => c.Type == "refusal")
-            .Select(c => c.Refusal)
-            .FirstOrDefault();
-
-        var isIncomplete = raw.Status == "incomplete";
-        var incompleteReason = raw.IncompleteDetails?.Reason;
-        var isError = raw.Status is "incomplete" or "failed";
-        var errorMessage = BuildResponsesErrorMessage(isError, raw.Status, incompleteReason);
+        var parsed = ParseResponsesApiOutput(raw);
 
         return new ChatCompletionResponse(
-            Content: content,
+            Content: parsed.Content,
             Model: raw.Model,
             PromptTokens: raw.Usage.InputTokens,
             CompletionTokens: raw.Usage.OutputTokens,
             RawResponseJson: rawResponseJson,
             RawRequestJson: rawRequestJson,
             Status: raw.Status,
-            IncompleteReason: isIncomplete ? incompleteReason : null,
-            IsSuccess: !isError,
-            ErrorMessage: errorMessage,
-            Refusal: refusal);
+            IncompleteReason: parsed.IsIncomplete ? parsed.IncompleteReason : null,
+            IsSuccess: !parsed.IsError,
+            ErrorMessage: parsed.ErrorMessage,
+            Refusal: parsed.Refusal);
     }
 
     private async IAsyncEnumerable<ChatCompletionChunk> StreamResponsesApiAsync(
@@ -507,7 +582,7 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         var providerRequest = new AzureOpenAiResponsesApiRequest
         {
             MaxOutputTokens = request.MaxTokens,
-            Input = await MapMessagesAsync(request.Messages, cancellationToken),
+            Input = new List<object>(await MapMessagesAsync(request.Messages, cancellationToken)),
             Stream = true,
             Reasoning = (request.ReasoningEffort ?? _options.ReasoningEffort) is { } effort
                 ? new AzureOpenAiResponsesReasoningOption { Effort = effort }
@@ -784,6 +859,37 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         return new ToolCallingResponse(chatCompletion, toolCalls);
     }
 
+    private readonly record struct ParsedResponsesApiOutput(
+        string Content,
+        string? Refusal,
+        bool IsIncomplete,
+        bool IsError,
+        string? IncompleteReason,
+        string? ErrorMessage);
+
+    private static ParsedResponsesApiOutput ParseResponsesApiOutput(AzureOpenAiResponsesApiResponse raw)
+    {
+        var messages = raw.Output.Where(o => o.Type == "message");
+
+        var content = string.Join("", messages
+            .SelectMany(o => o.Content)
+            .Where(c => c.Type == "output_text")
+            .Select(c => c.Text));
+
+        var refusal = messages
+            .SelectMany(o => o.Content)
+            .Where(c => c.Type == "refusal")
+            .Select(c => c.Refusal)
+            .FirstOrDefault();
+
+        var isIncomplete = raw.Status == IncompleteStatus;
+        var incompleteReason = raw.IncompleteDetails?.Reason;
+        var isError = raw.Status is IncompleteStatus or FailedStatus;
+        var errorMessage = BuildResponsesErrorMessage(isError, raw.Status, incompleteReason);
+
+        return new ParsedResponsesApiOutput(content, refusal, isIncomplete, isError, incompleteReason, errorMessage);
+    }
+
     private static bool IsIncompleteFinishReason(string? finishReason) =>
         string.Equals(finishReason, "length", StringComparison.Ordinal);
 
@@ -915,6 +1021,14 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
         };
     }
 
+    private AzureOpenAiModelType DetectModelTypeFromHints(ChatCompletionRequest request)
+    {
+        return GetRoutingHints(request)
+            .Select(TryDetectModelType)
+            .FirstOrDefault(modelType => modelType.HasValue)
+            ?? AzureOpenAiModelType.Legacy;
+    }
+
     private AzureOpenAiModelType DetectChatCompletionsModelTypeForRequest(ChatCompletionRequest request)
     {
         if (_chatCompletionsModelOverride is { } overrideModel)
@@ -955,5 +1069,81 @@ public sealed class AzureOpenAiChatCompletionClient : IChatCompletionClient, IJs
     internal static AzureOpenAiModelType DetectModelType(string? model)
     {
         return TryDetectModelType(model) ?? AzureOpenAiModelType.Legacy;
+    }
+
+    private static List<AzureOpenAiInputFile> MapDocumentChunksToInputFiles(IReadOnlyList<DocumentChunk> documents)
+    {
+        return documents.Select((doc, index) =>
+        {
+            var (filename, fileData) = GroundedChatHelper.EncodeDocumentChunk(doc, index);
+            return new AzureOpenAiInputFile { Filename = filename, FileData = fileData };
+        }).ToList();
+    }
+
+    private static bool EmbedInputFilesInUserMessage(List<object> messages, List<AzureOpenAiInputFile> inputFiles)
+    {
+        var lastUserMsg = messages.OfType<AzureOpenAiChatMessage>().LastOrDefault(m => m.Role == "user");
+        if (lastUserMsg == null) return false;
+
+        var contentItems = new List<object>();
+        contentItems.AddRange(inputFiles);
+
+        switch (lastUserMsg.Content)
+        {
+            case string text:
+                contentItems.Add(new AzureOpenAiContentPart { Type = "input_text", Text = text });
+                break;
+            case IEnumerable<object> parts:
+                foreach (var part in parts)
+                {
+                    contentItems.Add(part switch
+                    {
+                        AzureOpenAiContentPart { Type: "text" } textPart =>
+                            new AzureOpenAiContentPart { Type = "input_text", Text = textPart.Text },
+                        AzureOpenAiContentPart { Type: "image_url", ImageUrl: { } img } =>
+                            (object)new Dictionary<string, string> { ["type"] = "input_image", ["image_url"] = img.Url },
+                        _ => part
+                    });
+                }
+                break;
+        }
+
+        lastUserMsg.Content = contentItems;
+        return true;
+    }
+
+    private static GroundedChatCompletionResponse MapGroundedChatResponse(
+        AzureOpenAiResponsesApiResponse raw,
+        IReadOnlyList<DocumentChunk> documents,
+        string? rawResponseJson,
+        string? rawRequestJson)
+    {
+        var parsed = ParseResponsesApiOutput(raw);
+
+        var chatCompletion = new ChatCompletionResponse(
+            Content: parsed.Content,
+            Model: raw.Model,
+            PromptTokens: raw.Usage.InputTokens,
+            CompletionTokens: raw.Usage.OutputTokens,
+            RawResponseJson: rawResponseJson,
+            RawRequestJson: rawRequestJson,
+            Status: raw.Status,
+            IncompleteReason: parsed.IsIncomplete ? parsed.IncompleteReason : null,
+            IsSuccess: !parsed.IsError,
+            ErrorMessage: parsed.ErrorMessage,
+            Refusal: parsed.Refusal);
+
+        var annotations = raw.Output
+            .Where(o => o.Type == "message")
+            .SelectMany(o => o.Content)
+            .Where(c => c.Type == "output_text" && c.Annotations is not null)
+            .SelectMany(c => c.Annotations!)
+            .ToList();
+
+        var citations = GroundedChatHelper.MapAnnotationsToCitations(
+            annotations, parsed.Content, documents,
+            a => (a.Type, a.FileId, a.Filename, a.Index, a.StartIndex, a.EndIndex));
+
+        return new GroundedChatCompletionResponse(chatCompletion, citations);
     }
 }

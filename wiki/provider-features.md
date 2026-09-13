@@ -33,7 +33,7 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Multimodal Embeddings | -- | -- | -- | -- | Yes |
 | Reasoning Models | Yes | Yes | Yes | -- | -- |
 | Responses API (GPT-5) | Yes | Yes | -- | -- | -- |
-| Grounded Chat (RAG) | -- | -- | -- | Yes | Yes |
+| Grounded Chat (RAG) | Yes | Yes | -- | Yes | Yes |
 | Tool Calling | Yes | Yes | Yes | Yes | Yes |
 | Vision (Image Input) | Yes | Yes | Yes | Yes | Partial* |
 | Streaming | Yes | Yes | Yes | Yes | Yes |
@@ -62,6 +62,7 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Responses API | GPT-5 models — status and incomplete-reason tracking |
 | Tool Calling | All models; `ToolChoice` supports Auto, None, Required, Specific (function name) |
 | Vision | Send images via `LlmMessage.WithImage()` or `LlmMessage.WithBase64Image()`; images are sent as data URIs (`data:image/{mime};base64,...`) |
+| Grounded Chat (RAG) | `IGroundedChatFeature`; GPT-5 models only (Responses API); documents sent as `input_file` items with base64 data; annotations mapped to `Citation`/`CitationSource`; returns `IsSuccess=false` for non-GPT-5 models |
 | Streaming | `IStreamingChatFeature`; legacy Chat Completions API and Responses API (GPT-5); `[DONE]` terminates the stream |
 
 ### Azure OpenAI
@@ -80,6 +81,7 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Tool Calling | All deployments; identical JSON shape to OpenAI (`tools` array, `tool_choice` parameter); all `ToolChoice` variants supported. GPT-5 tool calling uses Chat Completions (matches OpenAI client). |
 | Vision | Same data URI format as OpenAI; images sent as content parts in messages |
 | Streaming | `IStreamingChatFeature`; supports legacy, reasoning, and Responses API streams; `[DONE]` terminates Chat Completions streams; gpt-5 uses `response.completed` |
+| Grounded Chat (RAG) | `IGroundedChatFeature`; GPT-5 deployments only (Responses API); documents sent as `input_file` items nested in user message content; uses `ExecuteGroundedWithRouteFallbackAsync` — returns `IsSuccess=false` if deployment falls back to Chat Completions |
 | Authentication | API key (`api-key` header) or Azure AD (Bearer token) |
 
 `ReasoningEffort` is omitted for non-reasoning Azure OpenAI deployments to avoid unsupported-parameter errors. `TextVerbosity` is sent only when the model is detected as gpt-5. When Azure rejects `max_tokens` for a reasoning deployment, the client retries once with `max_completion_tokens`; when the initially selected endpoint is wrong, it retries the alternate endpoint once. Learned mismatches are cached in-process per `(Endpoint, DeploymentName, ApiVersion)` for future Azure OpenAI client instances. `ExtraParameters` still deep-merges into the final request and can override either typed option or add newer Azure/OpenAI parameters before the typed options are updated.

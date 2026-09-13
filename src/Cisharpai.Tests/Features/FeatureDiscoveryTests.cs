@@ -337,12 +337,17 @@ public sealed class FeatureDiscoveryTests
     }
 
     [Test]
-    public void OpenAiChatCompletionClient_DoesNotExposeGroundedChatFeature()
+    public void OpenAiChatCompletionClient_ExposesGroundedChatFeature()
     {
         using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.openai.com/v1/") };
         var client = new OpenAiChatCompletionClient(httpClient, new OpenAiClientOptions());
 
-        Assert.That(client.Features.Get<IGroundedChatFeature>(), Is.Null);
+        var feature = client.Features.Get<IGroundedChatFeature>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
     }
 
     [Test]
@@ -360,13 +365,18 @@ public sealed class FeatureDiscoveryTests
     }
 
     [Test]
-    public void AzureOpenAiChatCompletionClient_DoesNotExposeGroundedChatFeature()
+    public void AzureOpenAiChatCompletionClient_ExposesGroundedChatFeature()
     {
         using var httpClient = new HttpClient { BaseAddress = new Uri("https://test.openai.azure.com/") };
         var options = new AzureOpenAiClientOptions { DeploymentName = "test", ApiKey = "key" };
         var client = new AzureOpenAiChatCompletionClient(httpClient, options);
 
-        Assert.That(client.Features.Get<IGroundedChatFeature>(), Is.Null);
+        var feature = client.Features.Get<IGroundedChatFeature>();
+        Assert.Multiple(() =>
+        {
+            Assert.That(feature, Is.Not.Null);
+            Assert.That(feature, Is.SameAs(client));
+        });
     }
 
     [Test]

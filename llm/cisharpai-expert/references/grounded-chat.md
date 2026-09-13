@@ -1,8 +1,8 @@
-# Grounded Chat (RAG) — Anthropic & Cohere
+# Grounded Chat (RAG)
 
 ## Overview
 
-Grounded chat enables document-grounded Q&A with source citations. Available via `IGroundedChatFeature` on the Anthropic and Cohere providers.
+Grounded chat enables document-grounded Q&A with source citations. Available via `IGroundedChatFeature` on four providers: **OpenAI** (GPT-5), **Azure OpenAI** (GPT-5 deployments), **Anthropic** (all Claude models), and **Cohere** (all Command models).
 
 ## Quick Start
 
@@ -118,8 +118,25 @@ Wraps `ChatCompletionResponse` and adds:
 - Unique IDs for each document chunk
 - Use `CitationMode.Enabled` for cross-provider compatibility
 
+## OpenAI / Azure OpenAI Grounded Chat
+
+GPT-5 models support grounded chat via the Responses API `input_file` transport. Documents are base64-encoded and sent as `input_file` items. Response annotations (`file_citation`) are mapped to `Citation`/`CitationSource`.
+
+- **GPT-5 only**: Non-GPT-5 models return `IsSuccess=false` (no silent fallback).
+- **`CitationMode` ignored**: OpenAI always returns annotations when sources are provided.
+- **Azure route fallback**: If the deployment falls back from Responses API to Chat Completions, grounded chat returns `IsSuccess=false`.
+
+```csharp
+// OpenAI GPT-5
+var client = new OpenAiChatCompletionClient(httpClient, new OpenAiClientOptions { DefaultModel = "gpt-5-0513" });
+var feature = client.Features.Get<IGroundedChatFeature>()!;
+var response = await feature.GetGroundedChatCompletionAsync(request, options);
+```
+
 ## Limitations
 
-- **OpenAI, Azure OpenAI, Azure AI Inference** — return `null` for `Features.Get<IGroundedChatFeature>()`
+- **Azure AI Inference** — returns `null` for `Features.Get<IGroundedChatFeature>()`
 - **Cohere**: mutually exclusive with JSON Mode — cannot combine grounded chat and JSON output
+- **Cohere**: supported models — Command-R, Command-R+, Command-A only
+- **OpenAI/Azure: GPT-5 only** — Non-GPT-5 models return `IsSuccess=false` with a descriptive error
 - **Anthropic**: `CitationMode.Fast`/`Accurate` are treated as `Enabled`; PDF/base64 sources not yet first-class (reachable via `ExtraParameters`)

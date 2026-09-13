@@ -39,6 +39,7 @@ Use the typed constants from `OpenAiModels` to avoid typos:
 | Chat completions | `IChatCompletionClient` |
 | Text embeddings | `IEmbeddingClient` |
 | JSON Mode & Structured Outputs | `IJsonOutputFeature` |
+| Grounded Chat (RAG) | `IGroundedChatFeature` |
 | Tool / function calling | `IToolCallingFeature` |
 | Streaming | `IStreamingChatFeature` |
 | Vision (image input) | `LlmMessage.WithImage()` |
@@ -84,6 +85,28 @@ services.AddOpenAiClient(o =>
 ```
 
 Streaming for GPT-5 uses `response.completed` as the termination event instead of `[DONE]`. This is handled internally — your streaming code is identical across models.
+
+## Grounded Chat (RAG with Citations)
+
+GPT-5 models support grounded chat via the Responses API's `input_file` transport. Documents are base64-encoded and included as `input_file` items in the `input` array. The model returns `file_citation` annotations that map to `Citation`/`CitationSource` records.
+
+```csharp
+var groundedFeature = client.Features.Get<IGroundedChatFeature>()!;
+
+var documents = new List<DocumentChunk>
+{
+    new(Id: "doc-1", Text: "Paris is the capital of France."),
+    new(Id: "doc-2", Text: "Berlin is the capital of Germany.")
+};
+
+var response = await groundedFeature.GetGroundedChatCompletionAsync(
+    new ChatCompletionRequest(
+        Messages: [new LlmMessage(LlmRole.User, "What is the capital of France?")],
+        Model: "gpt-5-0513"),
+    new GroundedChatOptions(Documents: documents));
+```
+
+Non-GPT-5 models (GPT-4, o-series) return `IsSuccess=false` with a descriptive error — there is no silent fallback. `CitationMode` is accepted but ignored (OpenAI always returns annotations when sources are provided). See [Grounded Chat](grounded-chat.md) for full details.
 
 ## Text Embeddings
 

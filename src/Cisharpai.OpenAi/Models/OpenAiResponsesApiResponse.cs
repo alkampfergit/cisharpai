@@ -51,6 +51,36 @@ public sealed class OpenAiResponseContent
 
     [JsonPropertyName("refusal")]
     public string? Refusal { get; set; }
+
+    [JsonPropertyName("annotations")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<OpenAiAnnotation>? Annotations { get; set; }
+}
+
+public sealed class OpenAiAnnotation
+{
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = string.Empty;
+
+    [JsonPropertyName("file_id")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? FileId { get; set; }
+
+    [JsonPropertyName("filename")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Filename { get; set; }
+
+    [JsonPropertyName("index")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? Index { get; set; }
+
+    [JsonPropertyName("start_index")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? StartIndex { get; set; }
+
+    [JsonPropertyName("end_index")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? EndIndex { get; set; }
 }
 
 public sealed class OpenAiResponsesUsage

@@ -5,7 +5,7 @@ namespace Cisharpai.Azure.AzureOpenAi.Models;
 
 public sealed class AzureOpenAiResponsesApiRequest
 {
-    public List<AzureOpenAiChatMessage> Input { get; set; } = [];
+    public List<object> Input { get; set; } = [];
 
     [JsonPropertyName("max_output_tokens")]
     public int? MaxOutputTokens { get; set; }
