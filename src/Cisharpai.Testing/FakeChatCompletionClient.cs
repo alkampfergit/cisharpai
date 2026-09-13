@@ -15,19 +15,22 @@ public sealed class FakeChatCompletionClient :
     IStreamingChatFeature,
     IToolCallingFeature,
     IJsonOutputFeature,
-    IGroundedChatFeature
+    IGroundedChatFeature,
+    IPromptCachingFeature
 {
     private readonly Queue<ChatCompletionResponse> _responses = new();
     private readonly Queue<ToolCallingResponse> _toolCallingResponses = new();
     private readonly Queue<ChatCompletionResponse> _jsonOutputResponses = new();
     private readonly Queue<GroundedChatCompletionResponse> _groundedChatResponses = new();
     private readonly Queue<IReadOnlyList<ChatCompletionChunk>> _streamingResponses = new();
+    private readonly Queue<ChatCompletionResponse> _promptCachingResponses = new();
 
     private readonly List<ChatCompletionRequest> _receivedRequests = new();
     private readonly List<(ChatCompletionRequest Request, ToolCallingOptions Options)> _receivedToolCallingRequests = new();
     private readonly List<(ChatCompletionRequest Request, JsonOutputOptions Options)> _receivedJsonOutputRequests = new();
     private readonly List<(ChatCompletionRequest Request, GroundedChatOptions Options)> _receivedGroundedChatRequests = new();
     private readonly List<ChatCompletionRequest> _receivedStreamingRequests = new();
+    private readonly List<(ChatCompletionRequest Request, PromptCachingOptions Options)> _receivedPromptCachingRequests = new();
 
     public FakeChatCompletionClient(FakeChatFeatures enabledFeatures = FakeChatFeatures.All)
     {
@@ -41,6 +44,8 @@ public sealed class FakeChatCompletionClient :
             Features.Set<IJsonOutputFeature>(this);
         if (enabledFeatures.HasFlag(FakeChatFeatures.GroundedChat))
             Features.Set<IGroundedChatFeature>(this);
+        if (enabledFeatures.HasFlag(FakeChatFeatures.PromptCaching))
+            Features.Set<IPromptCachingFeature>(this);
     }
 
     public IFeatureCollection Features { get; }
@@ -56,6 +61,7 @@ public sealed class FakeChatCompletionClient :
     public ToolCallingResponse? DefaultToolCallingResponse { get; set; }
     public GroundedChatCompletionResponse? DefaultGroundedChatResponse { get; set; }
     public IReadOnlyList<ChatCompletionChunk>? DefaultStreamingResponse { get; set; }
+    public ChatCompletionResponse? DefaultPromptCachingResponse { get; set; }
 
     /// <summary>Enqueues a response to be returned by the next call.</summary>
     public void EnqueueResponse(ChatCompletionResponse response) => _responses.Enqueue(response);
@@ -72,6 +78,9 @@ public sealed class FakeChatCompletionClient :
     /// <summary>Enqueues streaming chunks for the next streaming call.</summary>
     public void EnqueueStreamingResponse(IReadOnlyList<ChatCompletionChunk> chunks) => _streamingResponses.Enqueue(chunks);
 
+    /// <summary>Enqueues a prompt caching response.</summary>
+    public void EnqueuePromptCachingResponse(ChatCompletionResponse response) => _promptCachingResponses.Enqueue(response);
+
     // --- Request capture ---
 
     public IReadOnlyList<ChatCompletionRequest> ReceivedRequests => _receivedRequests;
@@ -79,11 +88,12 @@ public sealed class FakeChatCompletionClient :
     public IReadOnlyList<(ChatCompletionRequest Request, JsonOutputOptions Options)> ReceivedJsonOutputRequests => _receivedJsonOutputRequests;
     public IReadOnlyList<(ChatCompletionRequest Request, GroundedChatOptions Options)> ReceivedGroundedChatRequests => _receivedGroundedChatRequests;
     public IReadOnlyList<ChatCompletionRequest> ReceivedStreamingRequests => _receivedStreamingRequests;
+    public IReadOnlyList<(ChatCompletionRequest Request, PromptCachingOptions Options)> ReceivedPromptCachingRequests => _receivedPromptCachingRequests;
 
     /// <summary>Total number of calls across all methods.</summary>
     public int CallCount => _receivedRequests.Count + _receivedToolCallingRequests.Count +
                             _receivedJsonOutputRequests.Count + _receivedGroundedChatRequests.Count +
-                            _receivedStreamingRequests.Count;
+                            _receivedStreamingRequests.Count + _receivedPromptCachingRequests.Count;
 
     /// <summary>Clears all queued responses and captured requests.</summary>
     public void Reset()
@@ -98,6 +108,8 @@ public sealed class FakeChatCompletionClient :
         _receivedJsonOutputRequests.Clear();
         _receivedGroundedChatRequests.Clear();
         _receivedStreamingRequests.Clear();
+        _promptCachingResponses.Clear();
+        _receivedPromptCachingRequests.Clear();
     }
 
     // --- Interface implementations ---
@@ -135,6 +147,15 @@ public sealed class FakeChatCompletionClient :
     {
         _receivedGroundedChatRequests.Add((request, groundedChatOptions));
         return Task.FromResult(Dequeue(_groundedChatResponses, DefaultGroundedChatResponse));
+    }
+
+    public Task<ChatCompletionResponse> GetChatCompletionWithCachingAsync(
+        ChatCompletionRequest request,
+        PromptCachingOptions cachingOptions,
+        CancellationToken cancellationToken = default)
+    {
+        _receivedPromptCachingRequests.Add((request, cachingOptions));
+        return Task.FromResult(Dequeue(_promptCachingResponses, DefaultPromptCachingResponse ?? DefaultResponse));
     }
 
     public async IAsyncEnumerable<ChatCompletionChunk> GetChatCompletionStreamAsync(

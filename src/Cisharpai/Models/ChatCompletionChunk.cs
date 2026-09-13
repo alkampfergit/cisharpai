@@ -20,7 +20,13 @@ public sealed record ChatCompletionChunk(
     int? CompletionTokens = null,
 
     /// <summary>For tool-calling streams: partial tool call deltas.</summary>
-    ToolCallDelta? ToolCallDelta = null);
+    ToolCallDelta? ToolCallDelta = null,
+
+    /// <summary>Cached input tokens (final chunk only, when provider reports).</summary>
+    int? CachedInputTokens = null,
+
+    /// <summary>Cache creation input tokens (Anthropic final chunk only).</summary>
+    int? CacheCreationInputTokens = null);
 
 /// <summary>
 /// Incremental tool call information emitted during streaming.

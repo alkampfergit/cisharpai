@@ -263,21 +263,24 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
                 var toolDelta = ToolCallingHelper.MapStreamToolCallDelta(
                     choice.Delta?.ToolCalls,
                     tc => (tc.Index, tc.Id, tc.Function?.Name, tc.Function?.Arguments));
+                var streamCached = chunk.Usage?.PromptTokensDetails?.CachedTokens;
                 yield return new ChatCompletionChunk(
                     Content: choice.Delta?.Content ?? string.Empty,
                     FinishReason: choice.FinishReason,
                     Model: chunk.Model,
                     PromptTokens: chunk.Usage?.PromptTokens,
                     CompletionTokens: chunk.Usage?.CompletionTokens,
-                    ToolCallDelta: toolDelta);
+                    ToolCallDelta: toolDelta,
+                    CachedInputTokens: streamCached > 0 ? streamCached : null);
             }
             else if (chunk.Usage is not null)
             {
-                // Usage-only final chunk (when stream_options.include_usage is true)
+                var streamCached = chunk.Usage.PromptTokensDetails?.CachedTokens;
                 yield return new ChatCompletionChunk(
                     Content: string.Empty,
                     PromptTokens: chunk.Usage.PromptTokens,
-                    CompletionTokens: chunk.Usage.CompletionTokens);
+                    CompletionTokens: chunk.Usage.CompletionTokens,
+                    CachedInputTokens: streamCached > 0 ? streamCached : null);
             }
         }
     }
@@ -332,13 +335,15 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
                         model = evt.Response.Model;
                         promptTokens = evt.Response.Usage?.InputTokens;
                         completionTokens = evt.Response.Usage?.OutputTokens;
+                        var respCached = evt.Response.Usage?.InputTokensDetails?.CachedTokens;
 
                         yield return new ChatCompletionChunk(
                             Content: string.Empty,
                             FinishReason: evt.Response.Status,
                             Model: model,
                             PromptTokens: promptTokens,
-                            CompletionTokens: completionTokens);
+                            CompletionTokens: completionTokens,
+                            CachedInputTokens: respCached > 0 ? respCached : null);
                     }
                     break;
             }
@@ -588,6 +593,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         }
 
         var parsed = ParseResponsesApiOutput(raw);
+        var cachedTokens = raw.Usage.InputTokensDetails?.CachedTokens;
 
         return new ChatCompletionResponse(
             Content: parsed.Content,
@@ -600,7 +606,8 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
             IncompleteReason: parsed.IncompleteReason,
             IsSuccess: !parsed.IsError,
             ErrorMessage: parsed.ErrorMessage,
-            Refusal: parsed.Refusal);
+            Refusal: parsed.Refusal,
+            CachedInputTokens: cachedTokens > 0 ? cachedTokens : null);
     }
 
     private static ChatCompletionResponse MapChatResponse(
@@ -610,6 +617,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
     {
         var choice = raw.Choices.FirstOrDefault();
         var refusal = choice?.Message.Refusal;
+        var cachedTokens = raw.Usage.PromptTokensDetails?.CachedTokens;
 
         return new ChatCompletionResponse(
             Content: ContentPartHelper.ExtractStringContent(choice?.Message.Content),
@@ -618,7 +626,8 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
             CompletionTokens: raw.Usage.CompletionTokens,
             RawResponseJson: rawResponseJson,
             RawRequestJson: rawRequestJson,
-            Refusal: refusal);
+            Refusal: refusal,
+            CachedInputTokens: cachedTokens > 0 ? cachedTokens : null);
     }
 
     private static ToolCallingResponse MapToolCallingResponse(
@@ -628,6 +637,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
     {
         var choice = raw.Choices.FirstOrDefault();
         var content = ContentPartHelper.ExtractStringContent(choice?.Message.Content);
+        var cachedTokens = raw.Usage.PromptTokensDetails?.CachedTokens;
 
         var chatCompletion = new ChatCompletionResponse(
             Content: content,
@@ -635,7 +645,8 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
             PromptTokens: raw.Usage.PromptTokens,
             CompletionTokens: raw.Usage.CompletionTokens,
             RawResponseJson: rawResponseJson,
-            RawRequestJson: rawRequestJson);
+            RawRequestJson: rawRequestJson,
+            CachedInputTokens: cachedTokens > 0 ? cachedTokens : null);
 
         var toolCalls = ToolCallingHelper.MapResponseToolCalls(
             choice?.Message.ToolCalls,
@@ -824,6 +835,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         string? rawRequestJson)
     {
         var parsed = ParseResponsesApiOutput(raw);
+        var cachedTokens = raw.Usage.InputTokensDetails?.CachedTokens;
 
         var chatCompletion = new ChatCompletionResponse(
             Content: parsed.Content,
@@ -836,7 +848,8 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
             IncompleteReason: parsed.IncompleteReason,
             IsSuccess: !parsed.IsError,
             ErrorMessage: parsed.ErrorMessage,
-            Refusal: parsed.Refusal);
+            Refusal: parsed.Refusal,
+            CachedInputTokens: cachedTokens > 0 ? cachedTokens : null);
 
         var annotations = raw.Output
             .Where(o => o.Type == "message")
