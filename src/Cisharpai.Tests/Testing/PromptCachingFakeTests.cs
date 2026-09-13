@@ -7,6 +7,8 @@ namespace Cisharpai.Tests.Testing;
 public sealed class PromptCachingFakeTests
 {
     private static readonly int[] ExpectedBreakpoints = [0, 2];
+    private static readonly int[] SingleMessageBreakpoint = [1];
+    private static readonly int[] SingleToolBreakpoint = [0];
 
     [Test]
     public void FakeChatCompletionClient_RegistersPromptCachingFeature_ByDefault()
@@ -224,7 +226,7 @@ public sealed class PromptCachingFakeTests
             Assert.That(client.ReceivedGroundedCachingRequests[0].GroundedOptions.Documents, Has.Count.EqualTo(1));
             Assert.That(client.ReceivedGroundedCachingRequests[0].GroundedOptions.Documents[0].Id, Is.EqualTo("doc1"));
             Assert.That(client.ReceivedGroundedCachingRequests[0].CachingOptions.CacheSystemMessage, Is.True);
-            Assert.That(client.ReceivedGroundedCachingRequests[0].CachingOptions.MessageBreakpoints, Is.EqualTo(new[] { 1 }));
+            Assert.That(client.ReceivedGroundedCachingRequests[0].CachingOptions.MessageBreakpoints, Is.EqualTo(SingleMessageBreakpoint));
             Assert.That(client.ReceivedGroundedCachingRequests[0].Request.Messages[0].Content, Is.EqualTo("q"));
         });
     }
@@ -355,7 +357,7 @@ public sealed class PromptCachingFakeTests
             Assert.That(client.ReceivedToolCachingRequests, Has.Count.EqualTo(1));
             Assert.That(client.ReceivedToolCachingRequests[0].ToolOptions.Tools, Has.Count.EqualTo(1));
             Assert.That(client.ReceivedToolCachingRequests[0].ToolOptions.Tools[0].Name, Is.EqualTo("calc"));
-            Assert.That(client.ReceivedToolCachingRequests[0].CachingOptions.ToolBreakpoints, Is.EqualTo(new[] { 0 }));
+            Assert.That(client.ReceivedToolCachingRequests[0].CachingOptions.ToolBreakpoints, Is.EqualTo(SingleToolBreakpoint));
             Assert.That(client.ReceivedToolCachingRequests[0].CachingOptions.CacheSystemMessage, Is.True);
             Assert.That(client.ReceivedToolCachingRequests[0].Request.Messages[0].Content, Is.EqualTo("compute"));
         });
