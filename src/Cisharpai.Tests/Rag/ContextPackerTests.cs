@@ -594,6 +594,122 @@ public class ContextPackerTests
     }
 
     [Test]
+    public async Task PackAsync_StopAtFirstMisfit_LabelsOversizedChunksCorrectly()
+    {
+        var counter = new FakeTokenCounter();
+        counter.EnqueueCount(1);   // separator
+        counter.EnqueueCount(10);  // chunk A
+        counter.EnqueueCount(15);  // chunk B — fits budget individually but not remaining space
+        counter.EnqueueCount(500); // chunk C — individually oversized (exceeds effective budget of 20)
+        counter.EnqueueCount(5);   // chunk D — fits budget individually
+        var packer = new ContextPacker(counter);
+        var chunks = new[]
+        {
+            Scored("A", 0.9, 0),
+            Scored("B", 0.8, 1),
+            Scored("C-huge", 0.7, 2),
+            Scored("D", 0.6, 3)
+        };
+        var options = new ContextPackingOptions
+        {
+            TokenBudget = 20,
+            ReservedTokens = 0,
+            Separator = "|",
+            OverflowStrategy = OverflowStrategy.StopAtFirstMisfit,
+            UseLostInMiddleOrdering = false
+        };
+
+        var result = await packer.PackAsync(chunks, options);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Selected, Has.Count.EqualTo(1));
+            Assert.That(result.Dropped, Has.Count.EqualTo(3));
+            Assert.That(result.Dropped[0].Chunk.Chunk.Text, Is.EqualTo("B"));
+            Assert.That(result.Dropped[0].Reason, Is.EqualTo(DropReason.BudgetExhausted));
+            Assert.That(result.Dropped[1].Chunk.Chunk.Text, Is.EqualTo("C-huge"));
+            Assert.That(result.Dropped[1].Reason, Is.EqualTo(DropReason.IndividuallyOversized));
+            Assert.That(result.Dropped[2].Chunk.Chunk.Text, Is.EqualTo("D"));
+            Assert.That(result.Dropped[2].Reason, Is.EqualTo(DropReason.BudgetExhausted));
+        });
+    }
+
+    [Test]
+    public void PackAsync_CancellationRespected_EmptyInput()
+    {
+        var counter = new FakeTokenCounter { DefaultCount = 10 };
+        var packer = new ContextPacker(counter);
+        var options = new ContextPackingOptions
+        {
+            TokenBudget = 100,
+            ReservedTokens = 0,
+            Separator = ""
+        };
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        Assert.ThrowsAsync<OperationCanceledException>(
+            () => packer.PackAsync([], options, cts.Token));
+    }
+
+    [Test]
+    public async Task PackAsync_SingleChunk_DoesNotCountSeparator()
+    {
+        var counter = new FakeTokenCounter { DefaultCount = 10 };
+        var packer = new ContextPacker(counter);
+        var chunks = new[] { Scored("only", 1.0) };
+        var options = new ContextPackingOptions
+        {
+            TokenBudget = 100,
+            ReservedTokens = 0,
+            Separator = "\n\n",
+            UseLostInMiddleOrdering = false
+        };
+
+        var result = await packer.PackAsync(chunks, options);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Selected, Has.Count.EqualTo(1));
+            Assert.That(counter.CallCount, Is.EqualTo(1));
+            Assert.That(counter.ReceivedTexts, Does.Not.Contain("\n\n"));
+        });
+    }
+
+    [Test]
+    public async Task PackAsync_ResultCollectionsAreGenuinelyImmutable()
+    {
+        var counter = new FakeTokenCounter();
+        counter.EnqueueCount(1);  // separator
+        counter.EnqueueCount(10); // chunk A
+        counter.EnqueueCount(10); // chunk B
+        counter.EnqueueCount(10); // chunk C — won't fit
+        var packer = new ContextPacker(counter);
+        var chunks = new[]
+        {
+            Scored("A", 0.9, 0),
+            Scored("B", 0.8, 1),
+            Scored("C", 0.7, 2)
+        };
+        var options = new ContextPackingOptions
+        {
+            TokenBudget = 25,
+            ReservedTokens = 0,
+            Separator = "|",
+            UseLostInMiddleOrdering = false
+        };
+
+        var result = await packer.PackAsync(chunks, options);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Selected, Is.Not.InstanceOf<List<ScoredChunk>>());
+            Assert.That(result.Selected, Is.Not.InstanceOf<ScoredChunk[]>());
+            Assert.That(result.Dropped, Is.Not.InstanceOf<List<DroppedChunk>>());
+        });
+    }
+
+    [Test]
     public async Task PackAsync_LostInMiddle_SingleChunk_ReturnsAsIs()
     {
         var counter = new FakeTokenCounter { DefaultCount = 5 };

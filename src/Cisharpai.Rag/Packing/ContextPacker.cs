@@ -29,8 +29,10 @@ public sealed class ContextPacker : IContextPacker
         ContextPackingOptions opts,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         var effectiveBudget = opts.TokenBudget - opts.ReservedTokens;
-        var separatorTokens = opts.Separator.Length > 0
+        var separatorTokens = opts.Separator.Length > 0 && rankedChunks.Count > 1
             ? await _counter.CountAsync(opts.Separator, cancellationToken).ConfigureAwait(false)
             : 0;
 
@@ -44,7 +46,11 @@ public sealed class ContextPacker : IContextPacker
             ? ApplyLostInMiddleOrdering(selected.Select(s => s.Chunk).ToList())
             : selected.Select(s => s.Chunk).ToList();
 
-        return new ContextPackingResult(ordered, dropped, tokensUsed, effectiveBudget - tokensUsed);
+        return new ContextPackingResult(
+            Array.AsReadOnly(ordered.ToArray()),
+            dropped.AsReadOnly(),
+            tokensUsed,
+            effectiveBudget - tokensUsed);
     }
 
     private async Task<int[]> CountChunkTokensAsync(
@@ -91,7 +97,12 @@ public sealed class ContextPacker : IContextPacker
                 {
                     dropped.Add(new DroppedChunk(rankedChunks[i], chunkTokens, DropReason.BudgetExhausted));
                     for (var j = i + 1; j < rankedChunks.Count; j++)
-                        dropped.Add(new DroppedChunk(rankedChunks[j], chunkTokenCounts[j], DropReason.BudgetExhausted));
+                    {
+                        var reason = chunkTokenCounts[j] > effectiveBudget
+                            ? DropReason.IndividuallyOversized
+                            : DropReason.BudgetExhausted;
+                        dropped.Add(new DroppedChunk(rankedChunks[j], chunkTokenCounts[j], reason));
+                    }
                     break;
                 }
 
