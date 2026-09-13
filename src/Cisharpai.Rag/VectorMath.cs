@@ -138,17 +138,6 @@ public static class VectorMath
 
     /// <inheritdoc cref="TopK(ReadOnlySpan{float}, ReadOnlySpan{float[]}, int)"/>
     public static (int Index, float Score)[] TopK(
-        float[] query,
-        float[][] candidates,
-        int k)
-    {
-        ArgumentNullException.ThrowIfNull(query);
-        ArgumentNullException.ThrowIfNull(candidates);
-        return TopK((ReadOnlySpan<float>)query, (ReadOnlySpan<float[]>)candidates, k);
-    }
-
-    /// <inheritdoc cref="TopK(ReadOnlySpan{float}, ReadOnlySpan{float[]}, int)"/>
-    public static (int Index, float Score)[] TopK(
         IReadOnlyList<float> query,
         IReadOnlyList<float[]> candidates,
         int k)
@@ -156,6 +145,8 @@ public static class VectorMath
         ArgumentNullException.ThrowIfNull(query);
         ArgumentNullException.ThrowIfNull(candidates);
         var queryArr = ToArray(query);
+        if (candidates is float[][] jagged)
+            return TopK((ReadOnlySpan<float>)queryArr, (ReadOnlySpan<float[]>)jagged, k);
         var candidateArr = new float[candidates.Count][];
         for (var i = 0; i < candidates.Count; i++)
             candidateArr[i] = candidates[i];

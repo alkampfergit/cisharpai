@@ -313,10 +313,10 @@ public class VectorMathTests
     public void TopK_NullArray_Throws()
     {
         Assert.That(
-            () => VectorMath.TopK((float[])null!, new float[][] { [1f] }, 1),
+            () => VectorMath.TopK((IReadOnlyList<float>)null!, new float[][] { [1f] }, 1),
             Throws.ArgumentNullException);
         Assert.That(
-            () => VectorMath.TopK(new float[] { 1f }, (float[][])null!, 1),
+            () => VectorMath.TopK(new float[] { 1f }, (IReadOnlyList<float[]>)null!, 1),
             Throws.ArgumentNullException);
     }
 
