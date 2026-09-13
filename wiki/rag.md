@@ -316,6 +316,40 @@ To embed a large existing chunk stream, use the same loop with `processor.EmbedA
 
 Cancellation propagates as `OperationCanceledException`; network/configuration and source-enumeration exceptions propagate to the caller. Transient failures (429, 5xx) are retried with exponential backoff up to `MaxRetries` times. Provider HTTP resilience may still retry requests according to its own configuration. Permanent validation failures are not retried.
 
+## Vector math helpers
+
+`VectorMath` is a static class with brute-force scoring operations for in-memory retrieval. It avoids external dependencies and operates on `ReadOnlySpan<float>` for the hot path, with `float[]` and `IReadOnlyList<float>` convenience overloads.
+
+```csharp
+using Cisharpai.Rag;
+
+float[] query = embeddingResponse.Values;
+float[][] corpus = loadedVectors; // from your store
+
+// Cosine similarity (−1 to 1)
+float score = VectorMath.CosineSimilarity(query, corpus[0]);
+
+// Dot product
+float dot = VectorMath.DotProduct(query, corpus[0]);
+
+// Normalize to unit length (returns new array; input unchanged)
+float[] unit = VectorMath.Normalize(query);
+
+// Normalize in place (mutates the span/array)
+VectorMath.NormalizeInPlace(corpus[0]);
+
+// Top-k retrieval — returns (Index, Score) pairs in descending order
+var topResults = VectorMath.TopK(query, corpus, k: 5);
+foreach (var (index, similarity) in topResults)
+    Console.WriteLine($"Candidate {index}: {similarity:F4}");
+```
+
+**Dimension mismatch** between two vectors throws `ArgumentException` — this is always a programming error (wrong model, mixed embedding runs).
+
+**Zero-vector normalization** returns the zero vector unchanged. A zero-magnitude vector cannot be meaningfully normalized; returning it as-is prevents `NaN` from propagating into similarity scores.
+
+**`Normalize` vs `NormalizeInPlace`**: `Normalize` takes `ReadOnlySpan<float>` and returns a new `float[]`, leaving the input untouched. `NormalizeInPlace` takes `Span<float>` and mutates it in place — use it at ingestion time to avoid per-vector allocations when normalizing a large corpus.
+
 ## Offline tests
 
 Reuse `FakeEmbeddingClient` with one vector per submitted chunk. See [Testing](testing.md#rag-ingestion-tests) for a complete example and test commands. No new core feature interface or RAG-specific fake provider is required.
