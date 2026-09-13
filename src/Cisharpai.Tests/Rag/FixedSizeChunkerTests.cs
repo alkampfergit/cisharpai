@@ -90,14 +90,17 @@ public class FixedSizeChunkerTests
     }
 
     [Test]
-    public async Task ChunkAsync_IsRepeatableAcrossEnumerations()
+    public async Task ChunkAsync_IsRepeatableAndIndependentAcrossEnumerations()
     {
-        var chunker = new FixedSizeChunker(new() { ChunkSize = 2, Overlap = 1 });
+        var chunker = new FixedSizeChunker(new() { ChunkSize = 2, Overlap = 0 });
         var sequence = chunker.ChunkAsync(new("doc", "abcd"));
-        var first = await Collect(sequence);
-        var second = await Collect(sequence);
-        Assert.That(first.Select(c => c.Index), Is.EqualTo(second.Select(c => c.Index)));
-        Assert.That(first.Select(c => c.Text), Is.EqualTo(second.Select(c => c.Text)));
+        await using var first = sequence.GetAsyncEnumerator();
+        await using var second = sequence.GetAsyncEnumerator();
+        Assert.That(await first.MoveNextAsync(), Is.True);
+        Assert.That(await first.MoveNextAsync(), Is.True);
+        Assert.That(await second.MoveNextAsync(), Is.True);
+        Assert.That(first.Current.Index, Is.EqualTo(1));
+        Assert.That(second.Current.Index, Is.Zero);
     }
 
     [Test]
