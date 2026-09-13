@@ -6,11 +6,10 @@ using Cisharpai.Models;
 
 namespace Cisharpai.Helpers;
 
-public static class GroundedChatFallbackHelper
+public static partial class GroundedChatFallbackHelper
 {
-    private static readonly Regex MarkerPattern = new(
-        @"«cite:(\d+)»(.*?)«/cite»",
-        RegexOptions.Singleline | RegexOptions.Compiled);
+    [GeneratedRegex(@"«cite:(\d+)»(.*?)«/cite»", RegexOptions.Singleline, 1000)]
+    private static partial Regex MarkerPattern();
 
     public static IReadOnlyList<LlmMessage> BuildGroundingMessages(
         IReadOnlyList<LlmMessage> messages,
@@ -50,7 +49,7 @@ public static class GroundedChatFallbackHelper
         if (string.IsNullOrEmpty(rawContent))
             return (rawContent ?? string.Empty, Array.Empty<Citation>());
 
-        var matches = MarkerPattern.Matches(rawContent);
+        var matches = MarkerPattern().Matches(rawContent);
         if (matches.Count == 0)
             return (rawContent, Array.Empty<Citation>());
 
