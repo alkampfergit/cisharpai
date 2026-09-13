@@ -95,14 +95,7 @@ public sealed class ContextPacker : IContextPacker
             {
                 if (strategy == OverflowStrategy.StopAtFirstMisfit)
                 {
-                    dropped.Add(new DroppedChunk(rankedChunks[i], chunkTokens, DropReason.BudgetExhausted));
-                    for (var j = i + 1; j < rankedChunks.Count; j++)
-                    {
-                        var reason = chunkTokenCounts[j] > effectiveBudget
-                            ? DropReason.IndividuallyOversized
-                            : DropReason.BudgetExhausted;
-                        dropped.Add(new DroppedChunk(rankedChunks[j], chunkTokenCounts[j], reason));
-                    }
+                    DrainRemainingAsDropped(rankedChunks, chunkTokenCounts, effectiveBudget, i, dropped);
                     break;
                 }
 
@@ -115,6 +108,22 @@ public sealed class ContextPacker : IContextPacker
         }
 
         return (selected, dropped, tokensUsed);
+    }
+
+    private static void DrainRemainingAsDropped(
+        IReadOnlyList<ScoredChunk> rankedChunks,
+        int[] chunkTokenCounts,
+        int effectiveBudget,
+        int fromInclusive,
+        List<DroppedChunk> dropped)
+    {
+        for (var j = fromInclusive; j < rankedChunks.Count; j++)
+        {
+            var reason = chunkTokenCounts[j] > effectiveBudget
+                ? DropReason.IndividuallyOversized
+                : DropReason.BudgetExhausted;
+            dropped.Add(new DroppedChunk(rankedChunks[j], chunkTokenCounts[j], reason));
+        }
     }
 
     internal static IReadOnlyList<ScoredChunk> ApplyLostInMiddleOrdering(
