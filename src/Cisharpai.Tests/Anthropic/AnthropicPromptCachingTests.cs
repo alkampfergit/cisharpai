@@ -286,6 +286,224 @@ public sealed class AnthropicPromptCachingTests
         });
     }
 
+    [Test]
+    public async Task GetChatCompletionWithCachingAsync_MessageBreakpoint_OnContentBlocks_AppliesCacheControl()
+    {
+        string? capturedBody = null;
+        var handler = new MockHttpMessageHandler(async (request, _) =>
+        {
+            capturedBody = await request.Content!.ReadAsStringAsync(CancellationToken.None);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(CachedResponseJson, System.Text.Encoding.UTF8, "application/json")
+            };
+        });
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
+
+        var cachingFeature = client.Features.Get<IPromptCachingFeature>()!;
+        var request = new ChatCompletionRequest(
+            Messages:
+            [
+                new LlmMessage(LlmRole.User, string.Empty, ContentParts: new MessageContentPart[]
+                {
+                    new TextContentPart("Part one"),
+                    new TextContentPart("Part two")
+                }),
+                new LlmMessage(LlmRole.Assistant, "Response")
+            ],
+            Model: "claude-sonnet-4-20250514");
+
+        await cachingFeature.GetChatCompletionWithCachingAsync(
+            request,
+            new PromptCachingOptions { MessageBreakpoints = [0] });
+
+        var doc = JsonDocument.Parse(capturedBody!);
+        var firstMsg = doc.RootElement.GetProperty("messages")[0];
+        var content = firstMsg.GetProperty("content");
+        Assert.That(content.ValueKind, Is.EqualTo(JsonValueKind.Array));
+        var lastBlock = content[content.GetArrayLength() - 1];
+        Assert.That(lastBlock.GetProperty("cache_control").GetProperty("type").GetString(), Is.EqualTo("ephemeral"));
+    }
+
+    [Test]
+    public async Task GetChatCompletionWithCachingAsync_ToolBreakpoints_WithTools_AppliesCacheControl()
+    {
+        string? capturedBody = null;
+        var handler = new MockHttpMessageHandler(async (request, _) =>
+        {
+            capturedBody = await request.Content!.ReadAsStringAsync(CancellationToken.None);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(ToolUseWithCacheResponseJson, System.Text.Encoding.UTF8, "application/json")
+            };
+        });
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
+
+        var toolParams = JsonDocument.Parse("""{"type":"object","properties":{"city":{"type":"string"}},"required":["city"]}""").RootElement.Clone();
+        var tools = new List<ToolDefinition>
+        {
+            new("get_weather", "Get weather for a city", toolParams),
+            new("get_time", "Get time for a city", toolParams)
+        };
+
+        var cachingFeature = client.Features.Get<IPromptCachingFeature>()!;
+        var request = new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "Hello")],
+            Model: "claude-sonnet-4-20250514");
+
+        var providerResponse = await cachingFeature.GetChatCompletionWithCachingAsync(
+            request,
+            new PromptCachingOptions { ToolBreakpoints = [0] });
+
+        Assert.That(providerResponse.IsSuccess, Is.True);
+    }
+
+    [Test]
+    public async Task GetChatCompletionWithToolsAsync_MapsCacheUsageFields()
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(ToolUseWithCacheResponseJson, System.Text.Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
+
+        var toolParams = JsonDocument.Parse("""{"type":"object","properties":{"city":{"type":"string"}},"required":["city"]}""").RootElement.Clone();
+        var feature = client.Features.Get<IToolCallingFeature>()!;
+        var response = await feature.GetChatCompletionWithToolsAsync(
+            new ChatCompletionRequest(
+                Messages: [new LlmMessage(LlmRole.User, "Weather in Paris?")],
+                Model: "claude-sonnet-4-20250514"),
+            new ToolCallingOptions([new ToolDefinition("get_weather", "Get weather", toolParams)]));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.ChatCompletion.CachedInputTokens, Is.EqualTo(300));
+            Assert.That(response.ChatCompletion.CacheCreationInputTokens, Is.EqualTo(100));
+        });
+    }
+
+    [Test]
+    public async Task GetGroundedChatCompletionAsync_MapsCacheUsageFields()
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(GroundedWithCacheResponseJson, System.Text.Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
+
+        var feature = client.Features.Get<IGroundedChatFeature>()!;
+        var response = await feature.GetGroundedChatCompletionAsync(
+            new ChatCompletionRequest(
+                Messages: [new LlmMessage(LlmRole.User, "What does the doc say?")],
+                Model: "claude-sonnet-4-20250514"),
+            new GroundedChatOptions([new DocumentChunk(Id: "doc-1", Text: "The sky is blue.")]));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.ChatCompletion.CachedInputTokens, Is.EqualTo(500));
+            Assert.That(response.ChatCompletion.CacheCreationInputTokens, Is.EqualTo(250));
+        });
+    }
+
+    [Test]
+    public async Task Streaming_NoCacheFields_ReturnsNullCacheTokens()
+    {
+        var sseContent = """
+            event: message_start
+            data: {"type":"message_start","message":{"id":"msg-abc","type":"message","role":"assistant","model":"claude-sonnet-4-20250514","content":[],"stop_reason":null,"usage":{"input_tokens":10,"output_tokens":1}}}
+
+            event: content_block_delta
+            data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hi"}}
+
+            event: message_delta
+            data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":2}}
+
+            event: message_stop
+            data: {"type":"message_stop"}
+
+            """;
+
+        var bytes = System.Text.Encoding.UTF8.GetBytes(sseContent);
+        var handler = new MockHttpMessageHandler((_, _) =>
+        {
+            var stream = new System.IO.MemoryStream(bytes);
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StreamContent(stream)
+            });
+        });
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
+
+        var feature = client.Features.Get<IStreamingChatFeature>()!;
+        var chunks = new List<ChatCompletionChunk>();
+        await foreach (var chunk in feature.GetChatCompletionStreamAsync(
+            new ChatCompletionRequest(
+                Messages: [new LlmMessage(LlmRole.User, "Hello")],
+                Model: "claude-sonnet-4-20250514")))
+        {
+            chunks.Add(chunk);
+        }
+
+        var finalChunk = chunks.Last(c => c.FinishReason is not null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(finalChunk.CachedInputTokens, Is.Null);
+            Assert.That(finalChunk.CacheCreationInputTokens, Is.Null);
+        });
+    }
+
+    private const string ToolUseWithCacheResponseJson = """
+        {
+            "model": "claude-sonnet-4-20250514",
+            "content": [
+                {
+                    "type": "tool_use",
+                    "id": "toolu_abc123",
+                    "name": "get_weather",
+                    "input": {"city": "Paris"}
+                }
+            ],
+            "usage": {
+                "input_tokens": 50,
+                "output_tokens": 20,
+                "cache_creation_input_tokens": 100,
+                "cache_read_input_tokens": 300
+            },
+            "stop_reason": "tool_use"
+        }
+        """;
+
+    private const string GroundedWithCacheResponseJson = """
+        {
+            "model": "claude-sonnet-4-20250514",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "The document says the sky is blue."
+                }
+            ],
+            "usage": {
+                "input_tokens": 100,
+                "output_tokens": 15,
+                "cache_creation_input_tokens": 250,
+                "cache_read_input_tokens": 500
+            },
+            "stop_reason": "end_turn"
+        }
+        """;
+
     private const string CachedResponseJson = """
         {
             "model": "claude-sonnet-4-20250514",
