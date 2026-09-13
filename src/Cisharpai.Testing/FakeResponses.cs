@@ -99,7 +99,7 @@ public static class FakeResponses
     /// </summary>
     public static ChatCompletionResponse CachedChat(
         string content,
-        int cachedInputTokens,
+        int? cachedInputTokens = null,
         int? cacheCreationInputTokens = null,
         string model = DefaultModel,
         int promptTokens = 10,

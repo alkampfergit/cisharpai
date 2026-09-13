@@ -14,4 +14,16 @@ public interface IPromptCachingFeature
         ChatCompletionRequest request,
         PromptCachingOptions cachingOptions,
         CancellationToken cancellationToken = default);
+
+    Task<GroundedChatCompletionResponse> GetGroundedChatCompletionWithCachingAsync(
+        ChatCompletionRequest request,
+        GroundedChatOptions groundedChatOptions,
+        PromptCachingOptions cachingOptions,
+        CancellationToken cancellationToken = default);
+
+    Task<ToolCallingResponse> GetChatCompletionWithToolsAndCachingAsync(
+        ChatCompletionRequest request,
+        ToolCallingOptions toolOptions,
+        PromptCachingOptions cachingOptions,
+        CancellationToken cancellationToken = default);
 }

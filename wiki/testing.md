@@ -529,12 +529,18 @@ public async Task ConversationAgent_HandlesMultipleTurns()
 | `DefaultToolCallingResponse` | `ToolCallingResponse?` | Fallback for `GetChatCompletionWithToolsAsync` |
 | `DefaultGroundedChatResponse` | `GroundedChatCompletionResponse?` | Fallback for `GetGroundedChatCompletionAsync` |
 | `DefaultStreamingResponse` | `IReadOnlyList<ChatCompletionChunk>?` | Fallback for `GetChatCompletionStreamAsync` |
+| `DefaultPromptCachingResponse` | `ChatCompletionResponse?` | Fallback for `GetChatCompletionWithCachingAsync` (falls back to `DefaultResponse`) |
+| `DefaultGroundedCachingResponse` | `GroundedChatCompletionResponse?` | Fallback for `GetGroundedChatCompletionWithCachingAsync` (falls back to `DefaultGroundedChatResponse`) |
+| `DefaultToolCachingResponse` | `ToolCallingResponse?` | Fallback for `GetChatCompletionWithToolsAndCachingAsync` (falls back to `DefaultToolCallingResponse`) |
 | `CallCount` | `int` | Total calls across all methods |
 | `ReceivedRequests` | `IReadOnlyList<ChatCompletionRequest>` | Captured chat requests |
 | `ReceivedToolCallingRequests` | `IReadOnlyList<(Request, Options)>` | Captured tool calling requests |
 | `ReceivedJsonOutputRequests` | `IReadOnlyList<(Request, Options)>` | Captured JSON output requests |
 | `ReceivedGroundedChatRequests` | `IReadOnlyList<(Request, Options)>` | Captured grounded chat requests |
 | `ReceivedStreamingRequests` | `IReadOnlyList<ChatCompletionRequest>` | Captured streaming requests |
+| `ReceivedPromptCachingRequests` | `IReadOnlyList<(Request, Options)>` | Captured prompt caching requests |
+| `ReceivedGroundedCachingRequests` | `IReadOnlyList<(Request, GroundedOptions, CachingOptions)>` | Captured grounded + caching requests |
+| `ReceivedToolCachingRequests` | `IReadOnlyList<(Request, ToolOptions, CachingOptions)>` | Captured tool + caching requests |
 | `Reset()` | `void` | Clears all queues and captured requests |
 
 ### FakeEmbeddingClient

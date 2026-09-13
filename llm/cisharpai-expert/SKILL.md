@@ -281,7 +281,7 @@ All feature interfaces live in the `Cisharpai.Features.Chat` namespace (not `Cis
 | Tool Calling | `IToolCallingFeature` | All 5 |
 | Streaming | `IStreamingChatFeature` | All 5 |
 | Grounded Chat | `IGroundedChatFeature` | OpenAI (GPT-5), Azure OpenAI (GPT-5), Anthropic, Cohere |
-| Prompt Caching | `IPromptCachingFeature` | Anthropic (control); OpenAI, Azure OpenAI (report-only) |
+| Prompt Caching | `IPromptCachingFeature` | Anthropic only (control); OpenAI/Azure report cache usage on the unified response without this interface |
 | Image Embedding | `IImageEmbeddingFeature` | Azure AI Inference, Cohere |
 | Multimodal Embedding | `IMultimodalEmbeddingFeature` | Cohere only |
 

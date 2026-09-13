@@ -18,10 +18,13 @@ Every `ChatCompletionResponse` and `ChatCompletionChunk` carries two nullable fi
 
 | Field | Meaning |
 |-------|---------|
+| `PromptTokens` | Total input tokens (including cached and cache-creation tokens) |
 | `CachedInputTokens` | Tokens served from cache (reduced cost) |
 | `CacheCreationInputTokens` | Tokens written into cache this request (Anthropic-only) |
 
-These fields are populated automatically — no feature discovery required. When a provider doesn't report caching, both are `null`.
+These fields are populated automatically — no feature discovery required. When a provider doesn't report caching, both cache fields are `null`.
+
+`PromptTokens` is always the **true total** across all providers — it includes cached tokens, cache-creation tokens, and fresh tokens. This enables a universal formula:
 
 ```csharp
 var response = await client.GetChatCompletionAsync(request);
@@ -32,6 +35,8 @@ if (response.CachedInputTokens is { } cached)
     Console.WriteLine($"Cache hit: {cached} cached, {freshTokens} fresh");
 }
 ```
+
+For Anthropic, `PromptTokens = input_tokens + cache_read_input_tokens + cache_creation_input_tokens`. For OpenAI/Azure, `PromptTokens = prompt_tokens` (which already includes cached tokens as a subset).
 
 ### Streaming
 
@@ -104,16 +109,43 @@ The `MessageBreakpoints` indices refer to positions in the **provider message li
 
 Out-of-range indices are silently ignored — this prevents errors if the message list changes between calls.
 
-### RAG Use Case
+### RAG Use Case: Grounded Chat with Caching
 
-The primary use case for prompt caching is RAG: cache the document corpus across conversation turns while the user question changes:
+The primary use case for prompt caching is RAG: cache the document corpus across conversation turns while the user question changes. Use `GetGroundedChatCompletionWithCachingAsync` to compose document grounding with cache breakpoints in a single call:
 
 ```csharp
+var cachingFeature = client.Features.Get<IPromptCachingFeature>()!;
+
+var groundedOptions = new GroundedChatOptions(documents);
 var cachingOptions = new PromptCachingOptions
 {
     CacheSystemMessage = true,
-    MessageBreakpoints = [documentMessages.Count - 1]  // Cache all documents
+    MessageBreakpoints = [0]  // Cache the message containing injected documents
 };
+
+var response = await cachingFeature.GetGroundedChatCompletionWithCachingAsync(
+    request, groundedOptions, cachingOptions);
+
+// response.Citations contains source references
+// response.ChatCompletion.CachedInputTokens shows cache hits
+```
+
+### Tool Calling with Caching
+
+Use `GetChatCompletionWithToolsAndCachingAsync` to cache tool definitions alongside messages:
+
+```csharp
+var cachingFeature = client.Features.Get<IPromptCachingFeature>()!;
+
+var toolOptions = new ToolCallingOptions(tools);
+var cachingOptions = new PromptCachingOptions
+{
+    CacheSystemMessage = true,
+    ToolBreakpoints = [tools.Count - 1]  // Cache all tool definitions
+};
+
+var response = await cachingFeature.GetChatCompletionWithToolsAndCachingAsync(
+    request, toolOptions, cachingOptions);
 ```
 
 ## OpenAI / Azure OpenAI: Automatic Caching
@@ -131,14 +163,20 @@ if (response.CachedInputTokens.HasValue)
 
 ## Testing
 
-Use `FakeResponses.CachedChat` to create responses with cache fields:
+Use `FakeResponses.CachedChat` to create responses with cache fields. Both `cachedInputTokens` and `cacheCreationInputTokens` are optional — omit `cachedInputTokens` to simulate a first-call (cache-creation-only) response:
 
 ```csharp
 var fake = new FakeChatCompletionClient();
+
+// Cache hit response (second+ call)
 fake.DefaultPromptCachingResponse = FakeResponses.CachedChat(
     "cached response",
     cachedInputTokens: 500,
     cacheCreationInputTokens: 200);
+
+// Cache creation response (first call)
+fake.EnqueuePromptCachingResponse(FakeResponses.CachedChat(
+    "first call", cacheCreationInputTokens: 1000));
 
 var feature = fake.Features.Get<IPromptCachingFeature>()!;
 var response = await feature.GetChatCompletionWithCachingAsync(request, options);

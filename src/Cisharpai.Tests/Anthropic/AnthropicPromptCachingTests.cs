@@ -29,7 +29,7 @@ public sealed class AnthropicPromptCachingTests
             Assert.That(response.IsSuccess, Is.True);
             Assert.That(response.CachedInputTokens, Is.EqualTo(1024));
             Assert.That(response.CacheCreationInputTokens, Is.EqualTo(512));
-            Assert.That(response.PromptTokens, Is.EqualTo(15));
+            Assert.That(response.PromptTokens, Is.EqualTo(15 + 1024 + 512), "PromptTokens should be the true total: input_tokens + cache_read + cache_creation");
         });
     }
 
@@ -328,7 +328,7 @@ public sealed class AnthropicPromptCachingTests
     }
 
     [Test]
-    public async Task GetChatCompletionWithCachingAsync_ToolBreakpoints_WithTools_AppliesCacheControl()
+    public async Task GetChatCompletionWithToolsAndCachingAsync_ToolBreakpoints_AppliesCacheControl()
     {
         string? capturedBody = null;
         var handler = new MockHttpMessageHandler(async (request, _) =>
@@ -355,11 +355,18 @@ public sealed class AnthropicPromptCachingTests
             Messages: [new LlmMessage(LlmRole.User, "Hello")],
             Model: "claude-sonnet-4-20250514");
 
-        var providerResponse = await cachingFeature.GetChatCompletionWithCachingAsync(
+        var response = await cachingFeature.GetChatCompletionWithToolsAndCachingAsync(
             request,
+            new ToolCallingOptions(tools),
             new PromptCachingOptions { ToolBreakpoints = [0] });
 
-        Assert.That(providerResponse.IsSuccess, Is.True);
+        Assert.That(response.ChatCompletion.IsSuccess, Is.True);
+
+        var doc = JsonDocument.Parse(capturedBody!);
+        var serializedTools = doc.RootElement.GetProperty("tools");
+        Assert.That(serializedTools.GetArrayLength(), Is.EqualTo(2));
+        Assert.That(serializedTools[0].GetProperty("cache_control").GetProperty("type").GetString(), Is.EqualTo("ephemeral"));
+        Assert.That(serializedTools[1].TryGetProperty("cache_control", out _), Is.False, "Only breakpointed tool should have cache_control");
     }
 
     [Test]
@@ -412,6 +419,79 @@ public sealed class AnthropicPromptCachingTests
         {
             Assert.That(response.ChatCompletion.CachedInputTokens, Is.EqualTo(500));
             Assert.That(response.ChatCompletion.CacheCreationInputTokens, Is.EqualTo(250));
+        });
+    }
+
+    [Test]
+    public async Task GetGroundedChatCompletionWithCachingAsync_InjectsDocsAndAppliesCacheBreakpoints()
+    {
+        string? capturedBody = null;
+        var handler = new MockHttpMessageHandler(async (request, _) =>
+        {
+            capturedBody = await request.Content!.ReadAsStringAsync(CancellationToken.None);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(GroundedWithCacheResponseJson, System.Text.Encoding.UTF8, "application/json")
+            };
+        });
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
+
+        var cachingFeature = client.Features.Get<IPromptCachingFeature>()!;
+        var request = new ChatCompletionRequest(
+            Messages:
+            [
+                new LlmMessage(LlmRole.System, "You are a helpful assistant"),
+                new LlmMessage(LlmRole.User, "What does the doc say?")
+            ],
+            Model: "claude-sonnet-4-20250514");
+
+        var groundedOptions = new GroundedChatOptions([new DocumentChunk(Id: "doc-1", Text: "The sky is blue.")]);
+        var cachingOptions = new PromptCachingOptions
+        {
+            CacheSystemMessage = true,
+            MessageBreakpoints = [0]
+        };
+
+        var response = await cachingFeature.GetGroundedChatCompletionWithCachingAsync(
+            request, groundedOptions, cachingOptions);
+
+        Assert.That(response.ChatCompletion.IsSuccess, Is.True);
+        Assert.That(response.ChatCompletion.CachedInputTokens, Is.EqualTo(500));
+
+        var doc = JsonDocument.Parse(capturedBody!);
+        var system = doc.RootElement.GetProperty("system");
+        Assert.That(system.ValueKind, Is.EqualTo(JsonValueKind.Array));
+        Assert.That(system[0].GetProperty("cache_control").GetProperty("type").GetString(), Is.EqualTo("ephemeral"));
+
+        var firstMsg = doc.RootElement.GetProperty("messages")[0];
+        var content = firstMsg.GetProperty("content");
+        Assert.That(content.GetArrayLength(), Is.GreaterThan(1), "Should contain document blocks + user text");
+    }
+
+    [Test]
+    public async Task PromptTokens_IsUniversalTotal_IncludesCacheTokens()
+    {
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(CachedResponseJson, System.Text.Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
+
+        var response = await client.GetChatCompletionAsync(new ChatCompletionRequest(
+            Messages: [new LlmMessage(LlmRole.User, "Hello")],
+            Model: "claude-sonnet-4-20250514"));
+
+        var freshTokens = response.PromptTokens - (response.CachedInputTokens ?? 0);
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.PromptTokens, Is.EqualTo(15 + 1024 + 512), "Total = input_tokens + cache_read + cache_creation");
+            Assert.That(freshTokens, Is.EqualTo(15 + 512), "Fresh = total - cached_read = input_tokens + cache_creation");
+            Assert.That(freshTokens, Is.GreaterThan(0), "Universal formula must never produce negative values");
         });
     }
 
