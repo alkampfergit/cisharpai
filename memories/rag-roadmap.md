@@ -48,7 +48,7 @@ Here is the rest of the inventory (all on `develop`).
 | Image embeddings | `IImageEmbeddingFeature` | Azure AI Inference, Cohere | |
 | Multimodal embeddings | `IMultimodalEmbeddingFeature` | Cohere (Embed v4) | Matryoshka dimension control |
 | Reranking | `IRerankerClient` / `RerankRequest` | Cohere only | `TopN`, `MaxTokensPerDocument`, retargetable `BaseUrl` |
-| Grounded chat + citations | `IGroundedChatFeature`, `GroundedChatOptions`, `DocumentChunk`, `Citation`, `CitationSource`, `CitationMode` | **Cohere only** | Character-offset citations |
+| Grounded chat + citations | `IGroundedChatFeature`, `GroundedChatOptions`, `DocumentChunk`, `Citation`, `CitationSource`, `CitationMode` | All 5 (Anthropic, Cohere, OpenAI, Azure OpenAI native; Azure AI Inference fallback) | Character-offset citations |
 | Structured outputs | `IJsonOutputFeature` | All 5 | Needed for extraction + LLM-as-judge |
 | Tool calling | `IToolCallingFeature` | All 5 | Needed for agentic retrieval |
 | Streaming | `IStreamingChatFeature` | All 5 | |
@@ -62,8 +62,7 @@ Here is the rest of the inventory (all on `develop`).
 - Bulk embedding batching is a hardcoded 32 items with no token budget, no per-provider ceiling,
   no concurrency and no retry (#42).
 - No vector math (cosine / normalize / top-k) — you cannot even do an in-memory demo end to end.
-- `IGroundedChatFeature` is a 1-of-5 feature; Anthropic and OpenAI both have native citation
-  surfaces today and neither is wired up.
+- ~~`IGroundedChatFeature` is a 1-of-5 feature~~ — now wired on all 5 providers (Anthropic, Cohere, OpenAI, Azure OpenAI native; Azure AI Inference prompt-injection fallback).
 - No prompt caching support — the single biggest cost lever in RAG, and it is pure model interaction.
 - No wrapper for provider-hosted retrieval (OpenAI `file_search` / vector stores, Azure OpenAI
   "On Your Data" `data_sources`, Cohere connectors). This is the *right* answer to "do we need a

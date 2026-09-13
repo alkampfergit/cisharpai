@@ -17,9 +17,6 @@ public static partial class GroundedChatFallbackHelper
     [GeneratedRegex(@"«cite:\d+»|«/cite»", RegexOptions.None, 1000)]
     private static partial Regex AnyMarkerPattern();
 
-    [GeneratedRegex(@"«/cite»", RegexOptions.None, 1000)]
-    private static partial Regex CloseMarkerPattern();
-
     public static IReadOnlyList<LlmMessage> BuildGroundingMessages(
         IReadOnlyList<LlmMessage> messages,
         IReadOnlyList<DocumentChunk> documents)
@@ -36,7 +33,7 @@ public static partial class GroundedChatFallbackHelper
         {
             if (m.Role == LlmRole.System && !appendedToFirst)
             {
-                result.Add(new LlmMessage(LlmRole.System, m.Content + "\n\n" + groundingContent));
+                result.Add(m with { Content = m.Content + "\n\n" + groundingContent });
                 appendedToFirst = true;
             }
             else
@@ -75,7 +72,6 @@ public static partial class GroundedChatFallbackHelper
         var citations = new List<Citation>();
         var cleanBuilder = new StringBuilder(rawContent.Length);
         var lastEnd = 0;
-        var hadNesting = false;
 
         foreach (Match match in matches)
         {
@@ -84,12 +80,12 @@ public static partial class GroundedChatFallbackHelper
 
             var citedText = match.Groups[2].Value;
 
-            cleanBuilder.Append(rawContent, lastEnd, match.Index - lastEnd);
+            if (match.Index > lastEnd)
+                cleanBuilder.Append(StripAllMarkers(rawContent.Substring(lastEnd, match.Index - lastEnd)));
             lastEnd = match.Index + match.Length;
 
             if (HasNestedMarker(citedText))
             {
-                hadNesting = true;
                 cleanBuilder.Append(StripAllMarkers(citedText));
                 continue;
             }
@@ -114,13 +110,10 @@ public static partial class GroundedChatFallbackHelper
                 Type: "synthesized_citation"));
         }
 
-        cleanBuilder.Append(rawContent, lastEnd, rawContent.Length - lastEnd);
+        if (lastEnd < rawContent.Length)
+            cleanBuilder.Append(StripAllMarkers(rawContent.Substring(lastEnd)));
 
-        var result = cleanBuilder.ToString();
-        if (hadNesting)
-            result = StripOrphanedCloseMarkers(result);
-
-        return (result, citations);
+        return (cleanBuilder.ToString(), citations);
     }
 
     private static bool HasNestedMarker(string citedText)
@@ -140,18 +133,6 @@ public static partial class GroundedChatFallbackHelper
         try
         {
             return AnyMarkerPattern().Replace(text, string.Empty);
-        }
-        catch (RegexMatchTimeoutException)
-        {
-            return text;
-        }
-    }
-
-    private static string StripOrphanedCloseMarkers(string text)
-    {
-        try
-        {
-            return CloseMarkerPattern().Replace(text, string.Empty);
         }
         catch (RegexMatchTimeoutException)
         {

@@ -466,9 +466,34 @@ public sealed class GroundedChatFallbackHelperTests
 
         Assert.Multiple(() =>
         {
+            Assert.That(clean, Does.Not.Contain("«"));
             Assert.That(citations, Has.Count.EqualTo(1));
             Assert.That(citations[0].Text, Is.EqualTo("Berlin"));
             Assert.That(citations[0].Sources[0].Id, Is.EqualTo("doc-2"));
+            Assert.That(clean[citations[0].Start..citations[0].End], Is.EqualTo("Berlin"));
+        });
+    }
+
+    [Test]
+    public void ParseAndStripMarkers_NestedBeforeValid_OffsetsCorrectInFinalContent()
+    {
+        var docs = new List<DocumentChunk>
+        {
+            new(Id: "doc-0", Text: "Zero"),
+            new(Id: "doc-1", Text: "One"),
+            new(Id: "doc-2", Text: "Two")
+        };
+        var raw = "«cite:0»a «cite:1»b«/cite» c«/cite» then «cite:2»valid«/cite»";
+
+        var (clean, citations) = GroundedChatFallbackHelper.ParseAndStripMarkers(raw, docs);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(clean, Is.EqualTo("a b c then valid"));
+            Assert.That(clean, Does.Not.Contain("«"));
+            Assert.That(citations, Has.Count.EqualTo(1));
+            Assert.That(citations[0].Text, Is.EqualTo("valid"));
+            Assert.That(clean[citations[0].Start..citations[0].End], Is.EqualTo("valid"));
         });
     }
 
@@ -514,6 +539,33 @@ public sealed class GroundedChatFallbackHelperTests
             Assert.That(result, Has.Count.EqualTo(3));
             Assert.That(result[0].Content, Does.Contain("REFERENCE DOCUMENTS"));
             Assert.That(result[2].Content, Is.EqualTo("Second system."));
+        });
+    }
+
+    #endregion
+
+    #region BuildGroundingMessages — ContentParts preservation
+
+    [Test]
+    public void BuildGroundingMessages_PreservesContentParts_WhenSystemMessageHasThem()
+    {
+        var contentParts = new MessageContentPart[]
+        {
+            new TextContentPart("System instruction with image context")
+        };
+        var messages = new List<LlmMessage>
+        {
+            new(LlmRole.System, "You are helpful.", ContentParts: contentParts),
+            new(LlmRole.User, "Question")
+        };
+
+        var result = GroundedChatFallbackHelper.BuildGroundingMessages(messages, CreateTextDocs());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result[0].ContentParts, Is.Not.Null);
+            Assert.That(result[0].ContentParts, Is.SameAs(contentParts));
+            Assert.That(result[0].Content, Does.Contain("REFERENCE DOCUMENTS"));
         });
     }
 
