@@ -191,48 +191,11 @@ public sealed class RecursiveChunker : ITextChunker
         {
             ct.ThrowIfCancellationRequested();
 
-            int cutEnd;
-            if (_options.TokenCounter != null)
+            var (cutEnd, isRemainder) = ComputeHardCutEnd(sourceText, pos, regionEnd, strideSize);
+            if (isRemainder)
             {
-                if (_options.TokenSlicerFromStart == null)
-                    throw new InvalidOperationException(
-                        "Token-based sizing requires RecursiveChunkerOptions.TokenSlicerFromStart " +
-                        "to handle oversized text that cannot be split by any separator. " +
-                        "Use TiktokenCounter.ToTokenSlicerFromStart() or provide a custom delegate.");
-
-                var remainingLen = regionEnd - pos;
-                var boundedLen = Math.Min(remainingLen, strideSize * 8);
-                var slice = sourceText.Substring(pos, boundedLen);
-                var sliceEnd = _options.TokenSlicerFromStart(slice, strideSize);
-
-                if (sliceEnd >= slice.Length)
-                {
-                    if (boundedLen >= remainingLen)
-                    {
-                        result.Add((pos, regionEnd, false));
-                        break;
-                    }
-                    slice = sourceText.Substring(pos, remainingLen);
-                    sliceEnd = _options.TokenSlicerFromStart(slice, strideSize);
-                    if (sliceEnd >= slice.Length)
-                    {
-                        result.Add((pos, regionEnd, false));
-                        break;
-                    }
-                }
-
-                cutEnd = pos + sliceEnd;
-            }
-            else
-            {
-                var advanceFull = pos + AdvanceScalars(sourceText, pos, _options.MaxChunkSize);
-                if (advanceFull >= regionEnd)
-                {
-                    result.Add((pos, regionEnd, false));
-                    break;
-                }
-
-                cutEnd = pos + AdvanceScalars(sourceText, pos, strideSize);
+                result.Add((pos, regionEnd, false));
+                break;
             }
 
             cutEnd = Math.Min(cutEnd, regionEnd);
@@ -248,6 +211,43 @@ public sealed class RecursiveChunker : ITextChunker
         return Task.CompletedTask;
     }
 
+    private (int CutEnd, bool IsRemainder) ComputeHardCutEnd(
+        string sourceText, int pos, int regionEnd, int strideSize)
+    {
+        if (_options.TokenCounter != null)
+        {
+            if (_options.TokenSlicerFromStart == null)
+                throw new InvalidOperationException(
+                    "Token-based sizing requires RecursiveChunkerOptions.TokenSlicerFromStart " +
+                    "to handle oversized text that cannot be split by any separator. " +
+                    "Use TiktokenCounter.ToTokenSlicerFromStart() or provide a custom delegate.");
+
+            var remainingLen = regionEnd - pos;
+            var boundedLen = Math.Min(remainingLen, strideSize * 8);
+            var slice = sourceText.Substring(pos, boundedLen);
+            var sliceEnd = _options.TokenSlicerFromStart(slice, strideSize);
+
+            if (sliceEnd >= slice.Length)
+            {
+                if (boundedLen >= remainingLen)
+                    return (regionEnd, true);
+
+                slice = sourceText.Substring(pos, remainingLen);
+                sliceEnd = _options.TokenSlicerFromStart(slice, strideSize);
+                if (sliceEnd >= slice.Length)
+                    return (regionEnd, true);
+            }
+
+            return (pos + sliceEnd, false);
+        }
+
+        var advanceFull = pos + AdvanceScalars(sourceText, pos, _options.MaxChunkSize);
+        if (advanceFull >= regionEnd)
+            return (regionEnd, true);
+
+        return (pos + AdvanceScalars(sourceText, pos, strideSize), false);
+    }
+
     private List<(int Start, int End)> ApplyOverlap(
         string sourceText,
         List<(int Start, int End, bool Oversized)> rawChunks)
@@ -260,55 +260,69 @@ public sealed class RecursiveChunker : ITextChunker
 
         for (var i = 1; i < rawChunks.Count; i++)
         {
-            var prev = rawChunks[i - 1];
-            var chunk = rawChunks[i];
-
-            int overlapStart;
-            if (_options.TokenCounter != null)
-            {
-                var prevText = sourceText[prev.Start..prev.End];
-                overlapStart = prev.Start + _options.TokenSlicerFromEnd!(prevText, _options.ChunkOverlap);
-            }
-            else
-            {
-                overlapStart = RetreatScalars(sourceText, prev.Start, prev.End, _options.ChunkOverlap);
-            }
-
-            overlapStart = Math.Max(overlapStart, prev.Start);
-            overlapStart = Math.Min(overlapStart, chunk.Start);
-            overlapStart = AdjustSurrogateStart(sourceText, overlapStart, prev.Start);
-
-            if (!chunk.Oversized)
-            {
-                if (_options.TokenCounter != null)
-                {
-                    var overlappedText = sourceText[overlapStart..chunk.End];
-                    var capIndex = _options.TokenSlicerFromEnd!(overlappedText, _options.MaxChunkSize);
-                    var cappedStart = overlapStart + capIndex;
-                    if (cappedStart > overlapStart)
-                    {
-                        overlapStart = cappedStart;
-                        overlapStart = AdjustSurrogateStart(sourceText, overlapStart, prev.Start);
-                    }
-                }
-                else
-                {
-                    var maxStart = RetreatScalars(sourceText, 0, chunk.End, _options.MaxChunkSize);
-                    if (overlapStart < maxStart)
-                    {
-                        overlapStart = maxStart;
-                        overlapStart = AdjustSurrogateStart(sourceText, overlapStart, prev.Start);
-                    }
-                }
-
-                overlapStart = Math.Min(overlapStart, chunk.Start);
-                overlapStart = AdjustSurrogateStart(sourceText, overlapStart, prev.Start);
-            }
-
-            result.Add((overlapStart, chunk.End));
+            var overlapStart = ComputeOverlapStart(
+                sourceText, rawChunks[i - 1], rawChunks[i]);
+            result.Add((overlapStart, rawChunks[i].End));
         }
 
         return result;
+    }
+
+    private int ComputeOverlapStart(
+        string sourceText,
+        (int Start, int End, bool Oversized) prev,
+        (int Start, int End, bool Oversized) chunk)
+    {
+        int overlapStart;
+        if (_options.TokenCounter != null)
+        {
+            var prevText = sourceText[prev.Start..prev.End];
+            overlapStart = prev.Start + _options.TokenSlicerFromEnd!(prevText, _options.ChunkOverlap);
+        }
+        else
+        {
+            overlapStart = RetreatScalars(sourceText, prev.Start, prev.End, _options.ChunkOverlap);
+        }
+
+        overlapStart = Math.Max(overlapStart, prev.Start);
+        overlapStart = Math.Min(overlapStart, chunk.Start);
+        overlapStart = AdjustSurrogateStart(sourceText, overlapStart, prev.Start);
+
+        if (!chunk.Oversized)
+        {
+            overlapStart = CapOverlapToBudget(sourceText, overlapStart, prev.Start, chunk.End);
+            overlapStart = Math.Min(overlapStart, chunk.Start);
+            overlapStart = AdjustSurrogateStart(sourceText, overlapStart, prev.Start);
+        }
+
+        return overlapStart;
+    }
+
+    private int CapOverlapToBudget(
+        string sourceText, int overlapStart, int lowerBound, int chunkEnd)
+    {
+        if (_options.TokenCounter != null)
+        {
+            var overlappedText = sourceText[overlapStart..chunkEnd];
+            var capIndex = _options.TokenSlicerFromEnd!(overlappedText, _options.MaxChunkSize);
+            var cappedStart = overlapStart + capIndex;
+            if (cappedStart > overlapStart)
+            {
+                overlapStart = cappedStart;
+                overlapStart = AdjustSurrogateStart(sourceText, overlapStart, lowerBound);
+            }
+        }
+        else
+        {
+            var maxStart = RetreatScalars(sourceText, 0, chunkEnd, _options.MaxChunkSize);
+            if (overlapStart < maxStart)
+            {
+                overlapStart = maxStart;
+                overlapStart = AdjustSurrogateStart(sourceText, overlapStart, lowerBound);
+            }
+        }
+
+        return overlapStart;
     }
 
     private ValueTask<int> MeasureSizeAsync(string sourceText, int start, int end, CancellationToken ct)
