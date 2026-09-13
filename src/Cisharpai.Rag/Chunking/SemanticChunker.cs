@@ -67,10 +67,12 @@ public sealed class SemanticChunker : ITextChunker
         var sentences = SplitWithOffsets(document.Text);
         if (sentences.Count == 0)
             yield break;
+
+        ValidateAllSentenceSizes(sentences);
+
         if (sentences.Count == 1)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            ThrowIfSentenceExceedsBackstop(sentences, 0);
             yield return MakeChunk(document.Id, 0, document.Text, sentences, 0, 1);
             yield break;
         }
@@ -86,9 +88,11 @@ public sealed class SemanticChunker : ITextChunker
         var start = 0;
         foreach (var boundary in boundaries)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             yield return MakeChunk(document.Id, chunkIndex++, document.Text, sentences, start, boundary);
             start = boundary;
         }
+        cancellationToken.ThrowIfCancellationRequested();
         if (start < sentences.Count)
             yield return MakeChunk(document.Id, chunkIndex, document.Text, sentences, start, sentences.Count);
     }
@@ -100,10 +104,12 @@ public sealed class SemanticChunker : ITextChunker
         var sentences = SplitWithOffsets(document.Text);
         if (sentences.Count == 0)
             yield break;
+
+        ValidateAllSentenceSizes(sentences);
+
         if (sentences.Count == 1)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            ThrowIfSentenceExceedsBackstop(sentences, 0);
             yield return MakeChunk(document.Id, 0, document.Text, sentences, 0, 1);
             yield break;
         }
@@ -114,22 +120,21 @@ public sealed class SemanticChunker : ITextChunker
         var chunkIndex = 0;
         var chunkStart = 0;
         var chunkSentenceCount = 1;
-        ThrowIfSentenceExceedsBackstop(sentences, 0);
 
         for (var i = 1; i < sentences.Count; i++)
         {
             var sim = VectorMath.CosineSimilarity(embeddings[i - 1], embeddings[i]);
-            var candidateSpan = sentences[i].EndOffset - sentences[chunkStart].StartOffset;
+            var candidateSpan = EmittedSpan(sentences, chunkStart, i + 1);
             var wouldExceedChars = candidateSpan > _options.MaxChunkCharacters;
             var wouldExceedSentences = chunkSentenceCount + 1 > _options.MaxChunkSentences;
             var belowThreshold = sim < _options.AbsoluteThreshold;
 
             if (belowThreshold || wouldExceedChars || wouldExceedSentences)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 yield return MakeChunk(document.Id, chunkIndex++, document.Text, sentences, chunkStart, i);
                 chunkStart = i;
                 chunkSentenceCount = 1;
-                ThrowIfSentenceExceedsBackstop(sentences, i);
             }
             else
             {
@@ -137,6 +142,7 @@ public sealed class SemanticChunker : ITextChunker
             }
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         if (chunkStart < sentences.Count)
             yield return MakeChunk(document.Id, chunkIndex, document.Text, sentences, chunkStart, sentences.Count);
     }
@@ -222,11 +228,10 @@ public sealed class SemanticChunker : ITextChunker
         var boundaries = new List<int>();
         var chunkStartIdx = 0;
         var chunkSentenceCount = 1;
-        ThrowIfSentenceExceedsBackstop(sentences, 0);
 
         for (var i = 0; i < similarities.Length; i++)
         {
-            var candidateSpan = sentences[i + 1].EndOffset - sentences[chunkStartIdx].StartOffset;
+            var candidateSpan = EmittedSpan(sentences, chunkStartIdx, i + 2);
             var wouldExceedChars = candidateSpan > _options.MaxChunkCharacters;
             var wouldExceedSentences = chunkSentenceCount + 1 > _options.MaxChunkSentences;
             var belowThreshold = similarities[i] <= threshold;
@@ -236,7 +241,6 @@ public sealed class SemanticChunker : ITextChunker
                 boundaries.Add(i + 1);
                 chunkStartIdx = i + 1;
                 chunkSentenceCount = 1;
-                ThrowIfSentenceExceedsBackstop(sentences, i + 1);
             }
             else
             {
@@ -246,15 +250,29 @@ public sealed class SemanticChunker : ITextChunker
         return boundaries;
     }
 
-    private void ThrowIfSentenceExceedsBackstop(
-        List<(string Text, int StartOffset, int EndOffset)> sentences, int index)
+    private void ValidateAllSentenceSizes(
+        List<(string Text, int StartOffset, int EndOffset)> sentences)
     {
-        var span = sentences[index].EndOffset - sentences[index].StartOffset;
-        if (span > _options.MaxChunkCharacters)
-            throw new InvalidOperationException(
-                $"Sentence at offset {sentences[index].StartOffset} is {span} characters, " +
-                $"which exceeds MaxChunkCharacters ({_options.MaxChunkCharacters}). " +
-                "Use a larger MaxChunkCharacters or a sentence splitter that produces shorter segments.");
+        for (var i = 0; i < sentences.Count; i++)
+        {
+            var span = sentences[i].EndOffset - sentences[i].StartOffset;
+            if (span > _options.MaxChunkCharacters)
+                throw new InvalidOperationException(
+                    $"Sentence at offset {sentences[i].StartOffset} is {span} characters, " +
+                    $"which exceeds MaxChunkCharacters ({_options.MaxChunkCharacters}). " +
+                    "Use a larger MaxChunkCharacters or a sentence splitter that produces shorter segments.");
+        }
+    }
+
+    private static int EmittedSpan(
+        List<(string Text, int StartOffset, int EndOffset)> sentences,
+        int chunkStart,
+        int toExclusive)
+    {
+        var endOffset = toExclusive < sentences.Count
+            ? sentences[toExclusive].StartOffset
+            : sentences[toExclusive - 1].EndOffset;
+        return endOffset - sentences[chunkStart].StartOffset;
     }
 
     private static TextChunk MakeChunk(
@@ -266,7 +284,9 @@ public sealed class SemanticChunker : ITextChunker
         int toExclusive)
     {
         var startOffset = sentences[fromInclusive].StartOffset;
-        var endOffset = sentences[toExclusive - 1].EndOffset;
+        var endOffset = toExclusive < sentences.Count
+            ? sentences[toExclusive].StartOffset
+            : sentences[toExclusive - 1].EndOffset;
         var text = documentText[startOffset..endOffset];
         return new TextChunk(documentId, chunkIndex, startOffset, endOffset, text);
     }

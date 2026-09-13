@@ -41,6 +41,17 @@ public class SemanticChunkerTests
                 $"Chunk {chunk.Index} text must match source span (verbatim contract)");
     }
 
+    private static void AssertContiguousCoverage(IReadOnlyList<TextChunk> chunks, string sourceText)
+    {
+        if (chunks.Count == 0) return;
+        for (var i = 1; i < chunks.Count; i++)
+            Assert.That(chunks[i].StartOffset, Is.EqualTo(chunks[i - 1].EndOffset),
+                $"Gap between chunk {i - 1} and chunk {i} — spans are not contiguous");
+        var reconstructed = string.Concat(chunks.Select(c => c.Text));
+        var covered = sourceText[chunks[0].StartOffset..chunks[^1].EndOffset];
+        Assert.That(reconstructed, Is.EqualTo(covered), "Concatenated chunks must reconstruct source span");
+    }
+
     [Test]
     public async Task PercentileMode_PlacesBoundaryAtSimilarityDrop()
     {
@@ -64,8 +75,9 @@ public class SemanticChunkerTests
         var chunks = await Collect(chunker.ChunkAsync(new RagDocument("doc", text)));
 
         Assert.That(chunks, Has.Count.EqualTo(2));
-        Assert.That(chunks[0].Text, Is.EqualTo("First sentence. Second sentence."));
+        Assert.That(chunks[0].Text, Is.EqualTo("First sentence. Second sentence. "));
         Assert.That(chunks[1].Text, Is.EqualTo("Third totally different."));
+        AssertContiguousCoverage(chunks, text);
         AssertVerbatimContract(chunks, text);
     }
 
@@ -92,8 +104,9 @@ public class SemanticChunkerTests
         var chunks = await Collect(chunker.ChunkAsync(new RagDocument("doc", text)));
 
         Assert.That(chunks, Has.Count.EqualTo(2));
-        Assert.That(chunks[0].Text, Is.EqualTo("Alpha here. Beta here."));
+        Assert.That(chunks[0].Text, Is.EqualTo("Alpha here. Beta here. "));
         Assert.That(chunks[1].Text, Is.EqualTo("Gamma different."));
+        AssertContiguousCoverage(chunks, text);
         AssertVerbatimContract(chunks, text);
     }
 
@@ -124,6 +137,7 @@ public class SemanticChunkerTests
         Assert.That(chunks, Has.Count.GreaterThanOrEqualTo(2));
         Assert.That(chunks.All(c => c.Text.Length <= charLimit), Is.True,
             $"All chunks must respect MaxChunkCharacters = {charLimit}");
+        AssertContiguousCoverage(chunks, text);
         AssertVerbatimContract(chunks, text);
     }
 
@@ -146,8 +160,9 @@ public class SemanticChunkerTests
         var chunks = await Collect(chunker.ChunkAsync(new RagDocument("doc", text)));
 
         Assert.That(chunks, Has.Count.EqualTo(2));
-        Assert.That(chunks[0].Text, Is.EqualTo("One. Two. Three."));
+        Assert.That(chunks[0].Text, Is.EqualTo("One. Two. Three. "));
         Assert.That(chunks[1].Text, Is.EqualTo("Four. Five. Six."));
+        AssertContiguousCoverage(chunks, text);
         AssertVerbatimContract(chunks, text);
     }
 
@@ -219,10 +234,11 @@ public class SemanticChunkerTests
             Assert.That(chunks[0].StartOffset, Is.EqualTo(0));
             Assert.That(chunks[0].EndOffset, Is.LessThanOrEqualTo(text.Length));
             Assert.That(chunks[0].EndOffset, Is.GreaterThan(0));
-            Assert.That(chunks.Last().EndOffset, Is.LessThanOrEqualTo(text.Length));
+            Assert.That(chunks.Last().EndOffset, Is.EqualTo(text.Length));
             Assert.That(chunks.All(c => c.DocumentId == "doc"), Is.True);
             Assert.That(chunks.Select(c => c.Index), Is.EqualTo(Enumerable.Range(0, chunks.Count)));
         });
+        AssertContiguousCoverage(chunks, text);
         AssertVerbatimContract(chunks, text);
     }
 
@@ -392,8 +408,9 @@ public class SemanticChunkerTests
         var chunks = await Collect(chunker.ChunkAsync(new RagDocument("doc", text)));
 
         Assert.That(chunks, Has.Count.EqualTo(2));
-        Assert.That(chunks[0].Text, Is.EqualTo("Hello world"));
+        Assert.That(chunks[0].Text, Is.EqualTo("Hello world|"));
         Assert.That(chunks[1].Text, Is.EqualTo("Goodbye world"));
+        AssertContiguousCoverage(chunks, text);
         AssertVerbatimContract(chunks, text);
     }
 
@@ -444,8 +461,9 @@ public class SemanticChunkerTests
         var chunks = await Collect(chunker.ChunkAsync(new RagDocument("doc", text)));
 
         Assert.That(chunks, Has.Count.EqualTo(2));
-        Assert.That(chunks[0].Text, Is.EqualTo("Alpha topic. Alpha related."));
+        Assert.That(chunks[0].Text, Is.EqualTo("Alpha topic. Alpha related. "));
         Assert.That(chunks[1].Text, Is.EqualTo("Beta topic. Beta related."));
+        AssertContiguousCoverage(chunks, text);
         AssertVerbatimContract(chunks, text);
     }
 
@@ -476,6 +494,7 @@ public class SemanticChunkerTests
             "Character backstop should force at least one cut");
         Assert.That(chunks.All(c => c.Text.Length <= charLimit), Is.True,
             $"All chunks must respect MaxChunkCharacters = {charLimit}");
+        AssertContiguousCoverage(chunks, text);
         AssertVerbatimContract(chunks, text);
     }
 
@@ -566,15 +585,10 @@ public class SemanticChunkerTests
     }
 
     [Test]
-    public void OversizedSentenceInMultiSentenceDocument_ThrowsInvalidOperationException()
+    public void OversizedSentenceInMultiSentenceDocument_ThrowsBeforeEmbedding()
     {
         var text = "This sentence is way too long for the configured maximum. Short.";
-        var vectors = new[]
-        {
-            new[] { 1f, 0f },
-            new[] { 0f, 1f }
-        };
-        var client = CreateFakeClient(MakeEmbeddingResponse(vectors));
+        var client = new FakeEmbeddingClient();
         var processor = CreateProcessor(client);
         var chunker = new SemanticChunker(processor, new SemanticChunkerOptions
         {
@@ -587,18 +601,15 @@ public class SemanticChunkerTests
         var ex = Assert.ThrowsAsync<InvalidOperationException>(async () =>
             await Collect(chunker.ChunkAsync(new RagDocument("doc", text))));
         Assert.That(ex!.Message, Does.Contain("MaxChunkCharacters"));
+        Assert.That(client.ReceivedRequests, Is.Empty,
+            "Oversized sentence must be caught before any embedding call");
     }
 
     [Test]
-    public void OversizedSentenceAfterBoundary_ThrowsInvalidOperationException()
+    public void OversizedSentenceAfterBoundary_ThrowsBeforeEmbedding()
     {
         var text = "Short. This sentence is much too long for the configured maximum chunk character limit here.";
-        var vectors = new[]
-        {
-            new[] { 1f, 0f },
-            new[] { 0f, 1f }
-        };
-        var client = CreateFakeClient(MakeEmbeddingResponse(vectors));
+        var client = new FakeEmbeddingClient();
         var processor = CreateProcessor(client);
         var chunker = new SemanticChunker(processor, new SemanticChunkerOptions
         {
@@ -611,6 +622,8 @@ public class SemanticChunkerTests
         var ex = Assert.ThrowsAsync<InvalidOperationException>(async () =>
             await Collect(chunker.ChunkAsync(new RagDocument("doc", text))));
         Assert.That(ex!.Message, Does.Contain("MaxChunkCharacters"));
+        Assert.That(client.ReceivedRequests, Is.Empty,
+            "Oversized sentence must be caught before any embedding call");
     }
 
     [Test]
@@ -658,6 +671,65 @@ public class SemanticChunkerTests
         Assert.That(chunks, Has.Count.EqualTo(1),
             "Near-uniform similarities (spread < epsilon) should produce no semantic boundaries");
         AssertVerbatimContract(chunks, text);
+    }
+
+    [Test]
+    public async Task SeparatorsAttachedToPrecedingChunk_ContiguousCoverage()
+    {
+        var text = "First.  Second.  Third different.";
+        var vectors = new[]
+        {
+            new[] { 1f, 0f },
+            new[] { 0.95f, 0.05f },
+            new[] { 0f, 1f }
+        };
+        var client = CreateFakeClient(MakeEmbeddingResponse(vectors));
+        var processor = CreateProcessor(client);
+        var chunker = new SemanticChunker(processor, new SemanticChunkerOptions
+        {
+            Strategy = SemanticThresholdStrategy.Percentile,
+            BreakPercentile = 50f,
+            MaxChunkCharacters = 10000,
+            MaxChunkSentences = 100
+        });
+
+        var chunks = await Collect(chunker.ChunkAsync(new RagDocument("doc", text)));
+
+        Assert.That(chunks, Has.Count.EqualTo(2));
+        Assert.That(chunks[0].Text, Is.EqualTo("First.  Second.  "),
+            "Separator (double space) must be attached to preceding chunk");
+        Assert.That(chunks[1].Text, Is.EqualTo("Third different."));
+        AssertContiguousCoverage(chunks, text);
+        AssertVerbatimContract(chunks, text);
+    }
+
+    [Test]
+    public async Task Cancellation_HonouredDuringYieldAfterEmbedding()
+    {
+        var text = "First sentence. Second sentence. Third different.";
+        var vectors = new[]
+        {
+            new[] { 1f, 0f },
+            new[] { 0.95f, 0.05f },
+            new[] { 0f, 1f }
+        };
+        var client = CreateFakeClient(MakeEmbeddingResponse(vectors));
+        var processor = CreateProcessor(client);
+        var chunker = new SemanticChunker(processor, new SemanticChunkerOptions
+        {
+            Strategy = SemanticThresholdStrategy.Absolute,
+            AbsoluteThreshold = 0.5f,
+            MaxChunkCharacters = 10000,
+            MaxChunkSentences = 100
+        });
+
+        using var cts = new CancellationTokenSource();
+        var enumerator = chunker.ChunkAsync(new RagDocument("doc", text), cts.Token)
+            .GetAsyncEnumerator(cts.Token);
+
+        Assert.That(await enumerator.MoveNextAsync(), Is.True, "First chunk should be yielded");
+        cts.Cancel();
+        Assert.ThrowsAsync<OperationCanceledException>(async () => await enumerator.MoveNextAsync());
     }
 
     private sealed class PipeSplitter : ISentenceSplitter
