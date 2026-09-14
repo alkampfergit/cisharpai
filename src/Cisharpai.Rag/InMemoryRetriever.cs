@@ -66,14 +66,18 @@ public sealed class InMemoryRetriever : IRetriever
         int topK,
         CancellationToken cancellationToken)
     {
+        cancellationToken.ThrowIfCancellationRequested();
+
         if (_store.Count == 0)
             return Array.Empty<ScoredChunk>();
 
         var embeddingResponse = await _embeddingClient.GetEmbeddingsAsync(
-            new EmbeddingRequest([query], _model),
+            new EmbeddingRequest([query], _model, InputType: EmbeddingInputType.Query),
             cancellationToken);
 
-        if (!embeddingResponse.IsSuccess)
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (!embeddingResponse.IsSuccess || embeddingResponse.Embeddings.Count == 0)
             return Array.Empty<ScoredChunk>();
 
         var queryVector = embeddingResponse.Embeddings[0];

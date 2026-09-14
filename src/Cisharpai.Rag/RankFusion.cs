@@ -14,7 +14,7 @@ public static class RankFusion
     /// <c>1 / (k + rank)</c> across all lists in which an item appears.
     /// Items present in only one list receive their single-list RRF score.
     /// </summary>
-    /// <param name="rankedLists">Two or more ranked result lists, each in descending relevance order.</param>
+    /// <param name="rankedLists">One or more ranked result lists, each in descending relevance order.</param>
     /// <param name="k">Smoothing constant (default 60). Higher values reduce the influence of high-rank items.</param>
     /// <returns>Fused list sorted by descending RRF score.</returns>
     public static IReadOnlyList<ScoredChunk> ReciprocalRank(
@@ -22,8 +22,8 @@ public static class RankFusion
         double k = DefaultK)
     {
         ArgumentNullException.ThrowIfNull(rankedLists);
-        if (k <= 0)
-            throw new ArgumentOutOfRangeException(nameof(k), k, "k must be positive.");
+        if (!double.IsFinite(k) || k <= 0)
+            throw new ArgumentOutOfRangeException(nameof(k), k, "k must be a finite positive number.");
 
         var scores = new Dictionary<TextChunkIdentity, (double Score, ScoredChunk Representative)>();
 

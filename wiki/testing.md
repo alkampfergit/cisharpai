@@ -325,8 +325,11 @@ Assert.That(fake.CallCount, Is.EqualTo(1));
 Or create one from `FakeResponses`:
 
 ```csharp
-var fake = FakeResponses.Retriever(); // returns empty results by default
-var fake = FakeResponses.Retriever(scoredChunks); // with a default response
+// Empty results by default
+var emptyRetriever = FakeResponses.Retriever();
+
+// With a default response
+var preloadedRetriever = FakeResponses.Retriever(scoredChunks);
 ```
 
 Via DI:

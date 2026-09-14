@@ -233,4 +233,77 @@ public class InMemoryRetrieverTests
             async () => await retriever.RetrieveAsync("query", 1, cts.Token),
             Throws.TypeOf<OperationCanceledException>());
     }
+
+    [Test]
+    public async Task RetrieveAsync_PassesQueryInputType()
+    {
+        var fakeEmbedding = new FakeEmbeddingClient();
+        fakeEmbedding.EnqueueResponse(FakeResponses.Embedding(new float[] { 1f }));
+
+        var retriever = new InMemoryRetriever(fakeEmbedding);
+        retriever.Add(MakeChunk("doc", 0, "text"), new float[] { 1f });
+
+        await retriever.RetrieveAsync("hello", 1);
+
+        Assert.That(fakeEmbedding.ReceivedRequests[0].InputType, Is.EqualTo(EmbeddingInputType.Query));
+    }
+
+    [Test]
+    public async Task RetrieveAsync_SuccessWithEmptyEmbeddings_ReturnsEmpty()
+    {
+        var embeddingClient = Substitute.For<IEmbeddingClient>();
+        var emptySuccess = new EmbeddingResponse(
+            Embeddings: Array.Empty<float[]>(),
+            Base64Embeddings: null,
+            Model: "test",
+            TotalTokens: 0,
+            IsSuccess: true);
+
+        embeddingClient.GetEmbeddingsAsync(Arg.Any<EmbeddingRequest>(), Arg.Any<CancellationToken>())
+            .Returns(emptySuccess);
+
+        var retriever = new InMemoryRetriever(embeddingClient);
+        retriever.Add(MakeChunk("doc", 0, "text"), new float[] { 1f });
+
+        var results = await retriever.RetrieveAsync("query", 5);
+
+        Assert.That(results, Is.Empty);
+    }
+
+    [Test]
+    public void RetrieveAsync_CancelledToken_EmptyStore_ThrowsBeforeReturning()
+    {
+        var fakeEmbedding = new FakeEmbeddingClient
+        {
+            DefaultResponse = FakeResponses.Embedding()
+        };
+        var retriever = new InMemoryRetriever(fakeEmbedding);
+        var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        Assert.That(
+            async () => await retriever.RetrieveAsync("query", 1, cts.Token),
+            Throws.TypeOf<OperationCanceledException>());
+    }
+
+    [Test]
+    public void RetrieveAsync_CancelledAfterEmbedding_Throws()
+    {
+        var embeddingClient = Substitute.For<IEmbeddingClient>();
+        var cts = new CancellationTokenSource();
+
+        embeddingClient.GetEmbeddingsAsync(Arg.Any<EmbeddingRequest>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                cts.Cancel();
+                return FakeResponses.Embedding(new float[] { 1f });
+            });
+
+        var retriever = new InMemoryRetriever(embeddingClient);
+        retriever.Add(MakeChunk("doc", 0, "text"), new float[] { 1f });
+
+        Assert.That(
+            async () => await retriever.RetrieveAsync("query", 1, cts.Token),
+            Throws.TypeOf<OperationCanceledException>());
+    }
 }

@@ -206,6 +206,36 @@ public class RankFusionTests
     }
 
     [Test]
+    public void ReciprocalRank_NaN_K_Throws()
+    {
+        var list = new[] { Scored("doc", 0, 0.9) };
+
+        Assert.That(
+            () => RankFusion.ReciprocalRank(new[] { list }, k: double.NaN),
+            Throws.TypeOf<ArgumentOutOfRangeException>());
+    }
+
+    [Test]
+    public void ReciprocalRank_PositiveInfinity_K_Throws()
+    {
+        var list = new[] { Scored("doc", 0, 0.9) };
+
+        Assert.That(
+            () => RankFusion.ReciprocalRank(new[] { list }, k: double.PositiveInfinity),
+            Throws.TypeOf<ArgumentOutOfRangeException>());
+    }
+
+    [Test]
+    public void ReciprocalRank_NegativeInfinity_K_Throws()
+    {
+        var list = new[] { Scored("doc", 0, 0.9) };
+
+        Assert.That(
+            () => RankFusion.ReciprocalRank(new[] { list }, k: double.NegativeInfinity),
+            Throws.TypeOf<ArgumentOutOfRangeException>());
+    }
+
+    [Test]
     public void ReciprocalRank_DifferentDocuments_IdentifiedCorrectly()
     {
         var list1 = new[] { Scored("docA", 0, 0.9), Scored("docB", 0, 0.5) };
