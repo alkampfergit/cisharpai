@@ -490,6 +490,12 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
 
             foreach (var cite in block.Citations)
             {
+                if (cite is null)
+                {
+                    _logger?.LogWarning("Skipping null citation entry in content block.");
+                    continue;
+                }
+
                 var citation = cite.Type == "search_result_location"
                     ? MapSearchResultCitation(cite, blockStart, blockText)
                     : MapDocumentCitation(cite, blockStart, blockText, documents);

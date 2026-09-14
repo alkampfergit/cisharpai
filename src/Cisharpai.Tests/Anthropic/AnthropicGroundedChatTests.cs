@@ -1048,6 +1048,36 @@ public sealed class AnthropicGroundedChatTests
         });
     }
 
+    [Test]
+    public async Task GroundedChat_NullCitationEntry_SkipsCitationGracefully()
+    {
+        const string responseWithNullCitation = """
+            {
+                "model": "claude-sonnet-4-20250514",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "The capital of France is Paris.",
+                        "citations": [
+                            null
+                        ]
+                    }
+                ],
+                "usage": { "input_tokens": 50, "output_tokens": 15 },
+                "stop_reason": "end_turn"
+            }
+            """;
+
+        var (response, _) = await ExecuteGroundedChat(responseWithNullCitation);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.True);
+            Assert.That(response.Citations, Is.Empty);
+            Assert.That(response.Content, Is.EqualTo("The capital of France is Paris."));
+        });
+    }
+
     #endregion
 
     #region Feature Discovery Tests
