@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Cisharpai.Models;
+using Cisharpai.Rag.Packing;
 
 namespace Cisharpai.Testing;
 
@@ -178,4 +179,16 @@ public static class FakeResponses
     /// </summary>
     public static FakeTokenCounter TokenCounter(int defaultCount = 10) =>
         new() { DefaultCount = defaultCount };
+
+    /// <summary>
+    /// Creates a pre-configured <see cref="FakeRetriever"/> with a fixed default response.
+    /// </summary>
+    public static FakeRetriever Retriever(IReadOnlyList<ScoredChunk> defaultResponse) =>
+        new() { DefaultResponse = defaultResponse };
+
+    /// <summary>
+    /// Creates a pre-configured <see cref="FakeRetriever"/> that returns no results.
+    /// </summary>
+    public static FakeRetriever Retriever() =>
+        new() { DefaultResponse = Array.Empty<ScoredChunk>() };
 }

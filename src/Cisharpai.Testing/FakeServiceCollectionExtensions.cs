@@ -1,3 +1,4 @@
+using Cisharpai.Rag;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Cisharpai.Testing;
@@ -57,6 +58,18 @@ public static class FakeServiceCollectionExtensions
         if (defaultCount is not null)
             fake.DefaultCount = defaultCount.Value;
         services.AddSingleton<ITokenCounter>(fake);
+        return fake;
+    }
+
+    /// <summary>
+    /// Registers a <see cref="FakeRetriever"/> as <see cref="IRetriever"/>.
+    /// Returns the fake instance for setup and assertions.
+    /// </summary>
+    public static FakeRetriever AddFakeRetriever(
+        this IServiceCollection services)
+    {
+        var fake = new FakeRetriever();
+        services.AddSingleton<IRetriever>(fake);
         return fake;
     }
 }
