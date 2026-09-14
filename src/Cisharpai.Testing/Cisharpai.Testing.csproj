@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Cisharpai\Cisharpai.csproj" />
+    <ProjectReference Include="..\Cisharpai.Rag\Cisharpai.Rag.csproj" />
   </ItemGroup>
 
 </Project>

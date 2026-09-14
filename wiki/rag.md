@@ -630,6 +630,73 @@ Include `""` as the final entry to guarantee max-size compliance.
 | `TokenSlicerFromStart` | `null` | `(text, maxTokens) → charIndex` for hard cuts; required in token mode |
 | `TokenSlicerFromEnd` | `null` | `(text, maxTokens) → charIndex` for overlap; **required** in token mode when `ChunkOverlap > 0` (the default) |
 
+## Retrieval
+
+`IRetriever` is the backend-agnostic retrieval contract. Implementations may use dense embeddings, sparse/lexical search (BM25), hybrid fusion, SQL full-text, or a hosted provider store — all strategies are first-class.
+
+```csharp
+using Cisharpai.Rag;
+using Cisharpai.Rag.Packing;
+
+IRetriever retriever = /* your implementation */;
+IReadOnlyList<ScoredChunk> results = await retriever.RetrieveAsync("What is the refund policy?", topK: 5);
+```
+
+The query parameter is a `string`, not a vector — implementations that need embeddings obtain them internally. The return type is the existing `ScoredChunk` record.
+
+### InMemoryRetriever (demo/testing)
+
+A brute-force cosine-similarity retriever for demos and tests. **Not suitable for production** — use a purpose-built vector store or search engine behind `IRetriever` instead.
+
+```csharp
+using Cisharpai.Rag;
+using Cisharpai.Rag.Models;
+
+var retriever = new InMemoryRetriever(embeddingClient, model: "text-embedding-3-small");
+
+// Add pre-computed chunk/vector pairs (e.g. from BulkEmbeddingProcessor output)
+retriever.Add(chunk, vector);
+retriever.AddRange(chunkVectorPairs);
+
+var results = await retriever.RetrieveAsync("search query", topK: 5);
+```
+
+### Hybrid retrieval with Reciprocal Rank Fusion
+
+`RankFusion.ReciprocalRank` merges multiple ranked lists into one by summing `1 / (k + rank)` across all lists in which an item appears. This enables hybrid retrieval — run a dense retriever and a BM25/lexical retriever independently, then fuse:
+
+```csharp
+using Cisharpai.Rag;
+
+IReadOnlyList<ScoredChunk> denseResults = await denseRetriever.RetrieveAsync(query, topK: 20);
+IReadOnlyList<ScoredChunk> lexicalResults = await bm25Retriever.RetrieveAsync(query, topK: 20);
+
+var fused = RankFusion.ReciprocalRank(new[] { denseResults, lexicalResults });
+// fused is sorted by descending RRF score
+```
+
+The library does not implement BM25 or any lexical search engine — that belongs in a purpose-built search engine. `RankFusion` makes a user's own BM25 retriever a first-class participant in hybrid pipelines.
+
+### Implementing IRetriever with BM25
+
+A BM25 retriever wraps your search engine behind the same `IRetriever` contract:
+
+```csharp
+public class Bm25Retriever : IRetriever
+{
+    private readonly ISearchEngine _engine;
+
+    public Bm25Retriever(ISearchEngine engine) => _engine = engine;
+
+    public async Task<IReadOnlyList<ScoredChunk>> RetrieveAsync(
+        string query, int topK, CancellationToken cancellationToken = default)
+    {
+        var hits = await _engine.SearchAsync(query, topK, cancellationToken);
+        return hits.Select(h => new ScoredChunk(h.Chunk, h.Score)).ToList();
+    }
+}
+```
+
 ## Offline tests
 
-Reuse `FakeEmbeddingClient` with one vector per submitted chunk, and `FakeTokenCounter` for token counting (including with `ContextPacker`). See [Testing](testing.md#rag-ingestion-tests) for a complete example and test commands.
+Reuse `FakeEmbeddingClient` with one vector per submitted chunk, `FakeTokenCounter` for token counting (including with `ContextPacker`), and `FakeRetriever` for retrieval. See [Testing](testing.md#rag-ingestion-tests) for a complete example and test commands.

@@ -91,11 +91,14 @@ Consolidated package for all Azure AI services. Uses HttpClient directly (no SDK
 - `Embeddings/` — `IBulkEmbeddingProcessor`, `BulkEmbeddingProcessor`, `BulkEmbeddingOptions`, `EmbeddingProviderProfile`; dual-constraint batching (item count + token budget) with per-provider presets via `ForProvider`/`ApplyProfile`, bounded concurrency (1–32 parallel requests with ordered output) and a bounded reordering window (`MaxPendingBatches`, default `MaxConcurrency * 2`) so read-ahead never grows with corpus size, transient failure retry (429 and the full 5xx range) with exponential backoff, `IProgress<BulkEmbeddingProgress>` observability, and continue-on-failure semantics.
 - `VectorMath` — Static brute-force vector operations: `CosineSimilarity`, `DotProduct`, `Normalize` (pure, returns new array), `NormalizeInPlace` (mutates `Span<float>`), `TopK` (returns index+score pairs). `ReadOnlySpan<float>` primary API with `float[]`/`IReadOnlyList<float>` overloads. Mismatched dimensions throw; zero-vector normalization returns zero vector unchanged.
 - `.Packing`: `IContextPacker` / `ContextPacker` — selects and orders ranked `ScoredChunk`(s) within a token budget. Constructor-injects `ITokenCounter`; greedy selection with `OverflowStrategy` (SkipAndContinue default, StopAtFirstMisfit); lost-in-the-middle ordering (on by default); per-call validated `ContextPackingOptions`; `ContextPackingResult` with `Selected`, `Dropped` (with `DropReason`), `TotalTokensUsed`, `BudgetRemaining`.
+- `IRetriever` — backend-agnostic retrieval contract: `RetrieveAsync(string query, int topK)` returns ranked `ScoredChunk` results. No vector vocabulary — implementations may use dense embeddings, BM25/lexical search, hybrid fusion, SQL, or hosted stores. No filter parameter.
+- `InMemoryRetriever` — brute-force cosine-similarity demo/testing retriever. Takes `IEmbeddingClient` + pre-loaded `(TextChunk, float[])` pairs. Not for production.
+- `RankFusion.ReciprocalRank()` — fuses multiple ranked `ScoredChunk` lists into one via `1/(k+rank)` scoring. Enables hybrid retrieval without the library implementing either search strategy.
 - `Models/BulkEmbeddingProgress` — progress record: `CompletedBatches`, `TotalChunksProcessed`, `FailedBatches`.
 - `IRagIngestionPipeline` / `RagIngestionPipeline` — compose document chunking with bulk embedding; collection and async-stream overloads, cancellation, progress pass-through, and partial batch results.
 - `RagOptions` and `AddCisharpaiRag` — validated option snapshots, callback configuration and embedding-client factory for keyed DI; scoped processors/pipelines.
 - Token estimation uses a pluggable `Func<string, int>` seam (default: `s.Length / 4`); real counting available via `TiktokenCounter.ToTokenEstimator()` from the separate `Cisharpai.Rag.Tokenizers` package.
-- No storage or retrieval. Existing embedding fakes support offline tests without core interface changes.
+- No storage drivers (Qdrant, pgvector, Pinecone, Redis). Existing embedding fakes and `FakeRetriever` support offline tests without core interface changes.
 - Consumer guide: `wiki/rag.md`; unit tests: `src/Cisharpai.Tests/Rag/` — example-based per chunker, plus `ChunkerInvariantPropertyTests` running every chunker over a deterministic seeded corpus (ASCII, emoji, CJK, mixed scripts, whitespace-heavy, whitespace-free, surrogate-only, empty) across a sweep of size/overlap settings.
 
 ## RAG Tokenizers — `src/Cisharpai.Rag.Tokenizers/`
@@ -111,7 +114,8 @@ Consolidated package for all Azure AI services. Uses HttpClient directly (no SDK
 - `FakeEmbeddingClient` — Fake for `IEmbeddingClient` + embedding features.
 - `FakeRerankerClient` — Fake for `IRerankerClient`. Response queue, default, request capture, `Reset()`. No feature flags (no optional rerank features exist).
 - `FakeTokenCounter` — Fake for `ITokenCounter`. Count queue, default, text capture, `Reset()`. No feature flags.
-- `FakeResponses` — Static factories: `Chat`, `ChatError`, `ToolCall`, `ToolCalls`, `GroundedChat`, `StreamingChunks`, `Embedding`, `Rerank`, `RerankError`, `TokenCounter`, etc.
+- `FakeRetriever` — Fake for `IRetriever`. Response queue, default, query capture, `Reset()`. No feature flags.
+- `FakeResponses` — Static factories: `Chat`, `ChatError`, `ToolCall`, `ToolCalls`, `GroundedChat`, `StreamingChunks`, `Embedding`, `Rerank`, `RerankError`, `TokenCounter`, `Retriever`, etc.
 - `FakeChatFeatures` / `FakeEmbeddingFeatures` — `[Flags]` enums for selective feature registration.
 - `FakeServiceCollectionExtensions` — DI helpers.
 

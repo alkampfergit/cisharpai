@@ -6,9 +6,9 @@ description: >
   LLM providers. Use when writing, debugging, or architecting code that uses
   Cisharpai clients, features, DTOs, DI registration, or provider-specific
   integrations. Activates on mentions of "Cisharpai", "IChatCompletionClient",
-  "IEmbeddingClient", "IRerankerClient", "ITokenCounter", provider setup, tool calling,
-  streaming, JSON output, grounded chat, vision, embeddings, reranking, token counting,
-  RAG ingestion, or fake clients for testing.
+  "IEmbeddingClient", "IRerankerClient", "ITokenCounter", "IRetriever", provider setup,
+  tool calling, streaming, JSON output, grounded chat, vision, embeddings, reranking,
+  token counting, RAG ingestion, retrieval, rank fusion, or fake clients for testing.
 ---
 
 # Cisharpai Expert
@@ -349,9 +349,9 @@ All feature interfaces live in the `Cisharpai.Features.Chat` namespace (not `Cis
 
 Reranking is not a feature interface — it is its own top-level client (`IRerankerClient`),
 implemented by Cohere only.
-## RAG Ingestion (`Cisharpai.Rag`)
+## RAG (`Cisharpai.Rag`)
 
-Use the separate `Cisharpai.Rag` package for ingestion with any `IEmbeddingClient`. This is independent of `IGroundedChatFeature`; it does not provide storage, retrieval or generation.
+Use the separate `Cisharpai.Rag` package for ingestion, retrieval, and context packing with any `IEmbeddingClient`. This is independent of `IGroundedChatFeature`; it does not provide storage drivers or generation.
 
 - Root namespace `Cisharpai.Rag`: `IRagIngestionPipeline`, `RagIngestionPipeline`, `RagOptions`, `AddCisharpaiRag`.
 - `.Chunking`: `ITextChunker.ChunkAsync(RagDocument, CancellationToken)` returns `IAsyncEnumerable<TextChunk>`, `FixedSizeChunker`, `FixedSizeChunkerOptions`. `SemanticChunker(IBulkEmbeddingProcessor, SemanticChunkerOptions?, ISentenceSplitter?)` — similarity-based chunking; `SemanticThresholdStrategy.Percentile` (default, self-calibrating) or `Absolute`; both modes buffer all sentence embeddings in memory before emitting the first chunk; backstops via `MaxChunkCharacters` (default 8000) and `MaxChunkSentences` (default 50). `ISentenceSplitter` / `RegexSentenceSplitter` — pluggable sentence splitting (default targets English prose, will mis-split on abbreviations). **This chunker embeds the entire document at chunking time — costs money and latency on top of downstream embedding.** `RecursiveChunker(RecursiveChunkerOptions?)` — structure-aware recursive splitting with a configurable separator ladder (default: `["\n\n", "\n", ". ", " ", ""]` — paragraph, line, sentence, word, hard cut). Character-based sizing by default (Unicode scalar values, matching `FixedSizeChunker`); set `TokenCounter` to an `ITokenCounter` for token-based sizing. Token mode requires `TokenSlicerFromStart` for hard cuts and `TokenSlicerFromEnd` when `ChunkOverlap > 0` (the default) — use `TiktokenCounter.ToTokenSlicerFromStart()` / `ToTokenSlicerFromEnd()`. Token mode issues one counter call per candidate boundary, so a remote counter is impractical for large documents; `TiktokenCounter` (local) is strongly recommended. The implementation materialises all raw chunks before yielding. Options: `MaxChunkSize` (1024), `ChunkOverlap` (128, same unit as size), `Separators`. The empty-string terminal separator guarantees every chunk fits the budget; without it, oversized atomic units are emitted as-is.
@@ -369,6 +369,9 @@ Use the separate `Cisharpai.Rag` package for ingestion with any `IEmbeddingClien
 - Check `batch.IsSuccess` before reading `batch.Items`; each item has `Chunk` and `Vector`. `batch.Chunks`, zero-based `BatchIndex` and `Response` retain input identity and provider metadata/raw payloads. Failed batches (provider error, malformed response, exhausted retries) have empty items but do NOT stop the run — processing continues. Transient failures are retried with exponential backoff and jitter; `DefaultIsTransient` matches a standalone `429` or any `500`-`599` status in the error message plus the usual throttling/server-error phrases, and `IsTransientError` overrides it. No rollback/checkpoints. Provider HTTP resilience remains independent.
 - Cancellation and network/configuration exceptions propagate. Fake with existing `FakeEmbeddingClient`, queuing one float vector per expected chunk; a default single-vector response fails validation for multi-chunk batches.
 - `.Packing`: `IContextPacker.PackAsync(rankedChunks, options, ct)`, `ContextPacker` (constructor-injects `ITokenCounter`). Input: `IReadOnlyList<ScoredChunk>` where `ScoredChunk(TextChunk, double Score)`. Output: `ContextPackingResult(Selected, Dropped, TotalTokensUsed, BudgetRemaining)`. `DroppedChunk(ScoredChunk, TokenCount, DropReason)` with `DropReason.BudgetExhausted` or `IndividuallyOversized`. Per-call `ContextPackingOptions`: `TokenBudget` (positive), `ReservedTokens` (non-negative, < budget), `Separator` ("\n\n" default, null rejected), `UseLostInMiddleOrdering` (true default — strongest chunks at context edges), `OverflowStrategy` (SkipAndContinue default or StopAtFirstMisfit). Budget accounting: `TokenBudget - ReservedTokens - separators(n-1) - chunkTokens`. Each chunk counted once via the injected `ITokenCounter` and cached for the call. Individually oversized chunks are always skipped (even in StopAtFirstMisfit). Anthropic `count_tokens` is deferred — it is message-shaped and must not be called inside the packing loop.
+- **Retrieval**: `IRetriever.RetrieveAsync(string query, int topK, CancellationToken)` returns `Task<IReadOnlyList<ScoredChunk>>`. Backend-agnostic — no vector vocabulary in the contract. The query is a `string`, not a vector; no filter parameter. Implementations may use dense embeddings, BM25/lexical search, hybrid fusion, SQL, or hosted stores. `InMemoryRetriever(IEmbeddingClient, model?)` is a brute-force cosine-similarity demo/testing aid — load via `Add(TextChunk, float[])` / `AddRange(...)`, not for production. Returns empty on embedding failure instead of throwing.
+- **Rank Fusion**: `RankFusion.ReciprocalRank(IReadOnlyList<IReadOnlyList<ScoredChunk>>, k=60)` merges multiple ranked lists into one via `1/(k+rank)` scoring. Enables hybrid retrieval without the library implementing either search strategy. Items in only one list receive their single-list score. Items are identified by `(DocumentId, Index)`.
+- **Testing**: `FakeRetriever` in `Cisharpai.Testing` — queue/default/capture pattern like the other fakes. `FakeResponses.Retriever()` (empty default) or `FakeResponses.Retriever(scoredChunks)`. DI: `services.AddFakeRetriever()`.
 
 ## Provider-Specific Guides
 
@@ -446,7 +449,7 @@ var request = new ChatCompletionRequest(
 - `src/Cisharpai.Azure/` — Azure OpenAI + Azure AI Inference
 - `src/Cisharpai.Anthropic/` — Anthropic provider
 - `src/Cisharpai.Cohere/` — Cohere provider
-- `src/Cisharpai.Rag/` — Fixed-size and semantic chunking, bulk embeddings, document ingestion, context packing, and configuration
+- `src/Cisharpai.Rag/` — Chunking, bulk embeddings, document ingestion, context packing, retrieval contract, rank fusion, and configuration
 - `src/Cisharpai.Testing/` — Fake clients for unit testing
 - `src/Cisharpai.Tests/` — Unit tests (all providers)
 - `src/Cisharpai.Integration.Tests/` — Integration tests (.NET 10 only)
