@@ -75,7 +75,7 @@ public class InMemoryRetrieverTests
     }
 
     [Test]
-    public void RetrieveAsync_NullQuery_Throws()
+    public void RetrieveAsync_NullQuery_ThrowsSynchronously()
     {
         var fakeEmbedding = new FakeEmbeddingClient
         {
@@ -83,13 +83,11 @@ public class InMemoryRetrieverTests
         };
         var retriever = new InMemoryRetriever(fakeEmbedding);
 
-        Assert.That(
-            async () => await retriever.RetrieveAsync(null!, 5),
-            Throws.ArgumentNullException);
+        Assert.Throws<ArgumentNullException>(() => retriever.RetrieveAsync(null!, 5));
     }
 
     [Test]
-    public void RetrieveAsync_ZeroTopK_Throws()
+    public void RetrieveAsync_ZeroTopK_ThrowsSynchronously()
     {
         var fakeEmbedding = new FakeEmbeddingClient
         {
@@ -97,13 +95,11 @@ public class InMemoryRetrieverTests
         };
         var retriever = new InMemoryRetriever(fakeEmbedding);
 
-        Assert.That(
-            async () => await retriever.RetrieveAsync("query", 0),
-            Throws.TypeOf<ArgumentOutOfRangeException>());
+        Assert.Throws<ArgumentOutOfRangeException>(() => retriever.RetrieveAsync("query", 0));
     }
 
     [Test]
-    public void RetrieveAsync_NegativeTopK_Throws()
+    public void RetrieveAsync_NegativeTopK_ThrowsSynchronously()
     {
         var fakeEmbedding = new FakeEmbeddingClient
         {
@@ -111,9 +107,7 @@ public class InMemoryRetrieverTests
         };
         var retriever = new InMemoryRetriever(fakeEmbedding);
 
-        Assert.That(
-            async () => await retriever.RetrieveAsync("query", -1),
-            Throws.TypeOf<ArgumentOutOfRangeException>());
+        Assert.Throws<ArgumentOutOfRangeException>(() => retriever.RetrieveAsync("query", -1));
     }
 
     [Test]

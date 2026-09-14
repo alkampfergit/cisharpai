@@ -49,7 +49,7 @@ public sealed class InMemoryRetriever : IRetriever
     public int Count => _store.Count;
 
     /// <inheritdoc />
-    public async Task<IReadOnlyList<ScoredChunk>> RetrieveAsync(
+    public Task<IReadOnlyList<ScoredChunk>> RetrieveAsync(
         string query,
         int topK,
         CancellationToken cancellationToken = default)
@@ -58,6 +58,14 @@ public sealed class InMemoryRetriever : IRetriever
         if (topK <= 0)
             throw new ArgumentOutOfRangeException(nameof(topK), topK, "topK must be positive.");
 
+        return RetrieveCoreAsync(query, topK, cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<ScoredChunk>> RetrieveCoreAsync(
+        string query,
+        int topK,
+        CancellationToken cancellationToken)
+    {
         if (_store.Count == 0)
             return Array.Empty<ScoredChunk>();
 
