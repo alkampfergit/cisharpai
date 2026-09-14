@@ -301,7 +301,7 @@ public class ChunkerInvariantPropertyTests
     // Scenarios — one entry per (chunker, option set)
     // ---------------------------------------------------------------------
 
-    public static IEnumerable<TestCaseData> Scenarios()
+    private static IEnumerable<TestCaseData> Scenarios()
     {
         foreach (var scenario in BuildScenarios())
             yield return new TestCaseData(scenario).SetArgDisplayNames(scenario.Name);
@@ -433,7 +433,7 @@ public class ChunkerInvariantPropertyTests
         }
     }
 
-    private static ITextChunker CreateSemanticChunker(GeneratedDocument document, SemanticChunkerOptions options)
+    private static SemanticChunker CreateSemanticChunker(GeneratedDocument document, SemanticChunkerOptions options)
     {
         var splitter = new RegexSentenceSplitter();
         var sentences = splitter.Split(document.Text);
