@@ -551,7 +551,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
             Type: cite.Type);
     }
 
-    private static IReadOnlyDictionary<string, string>? BuildTitleData(string? title)
+    private static System.Collections.ObjectModel.ReadOnlyDictionary<string, string>? BuildTitleData(string? title)
     {
         return title is not null
             ? new System.Collections.ObjectModel.ReadOnlyDictionary<string, string>(
