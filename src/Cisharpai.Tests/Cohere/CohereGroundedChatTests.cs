@@ -312,6 +312,20 @@ public sealed class CohereGroundedChatTests
     }
 
     [Test]
+    public async Task GroundedChat_SearchResultMode_FallsBackToEnabled()
+    {
+        var (_, capturedBody) = await ExecuteGroundedChat(
+            GroundedResponseWithCitations,
+            options: new GroundedChatOptions(
+                Documents: [new DocumentChunk(Text: "Some text")],
+                CitationMode: CitationMode.SearchResult));
+
+        var doc = JsonDocument.Parse(capturedBody!);
+        var citationOptions = doc.RootElement.GetProperty("citation_options");
+        Assert.That(citationOptions.GetProperty("mode").GetString(), Is.EqualTo("ENABLED"));
+    }
+
+    [Test]
     public async Task GroundedChat_DoesNotSetResponseFormat()
     {
         var (_, capturedBody) = await ExecuteGroundedChat(GroundedResponseWithCitations);

@@ -6,7 +6,10 @@ namespace Cisharpai.Models;
 /// </summary>
 public sealed record DocumentChunk(
     /// <summary>
-    /// Optional document identifier. Used to trace citations back to source documents.
+    /// Optional internal document identifier. Used to trace citations back to
+    /// source documents in your own system (a primary key, a database row id, etc.).
+    /// Distinct from <see cref="Source"/>, which is the caller-facing identifier
+    /// passed through verbatim in citations.
     /// </summary>
     string? Id = null,
 
@@ -22,6 +25,21 @@ public sealed record DocumentChunk(
     /// </summary>
     string? Text = null)
 {
+    /// <summary>
+    /// Caller-facing source identifier (a URL, a document path, a permanent link)
+    /// passed through verbatim in citations. Required when using
+    /// <see cref="CitationMode.SearchResult"/>; optional otherwise.
+    /// Other providers ignore this property for now.
+    /// </summary>
+    public string? Source { get; init; }
+
+    /// <summary>
+    /// Human-readable display title for this document chunk.
+    /// When using <see cref="CitationMode.SearchResult"/>, passed through
+    /// verbatim in citations. Optional; other providers ignore this for now.
+    /// </summary>
+    public string? Title { get; init; }
+
     /// <summary>
     /// Validates that exactly one of Data or Text is provided.
     /// </summary>

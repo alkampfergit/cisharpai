@@ -76,12 +76,45 @@ var response = await groundedFeature.GetGroundedChatCompletionAsync(request, opt
 | `CitationMode.Accurate` | Model generates the full response first, then produces fine-grained citations. Higher latency, more precise. **Cohere**: only supported by the `command-r` family — `command-a` models reject this value (the provider logs a warning and downgrades to `Fast`). **Anthropic**: treated as `Enabled` (warning logged; citations are binary on/off). **Fallback (Azure AI Inference)**: no distinction — treated identically to `Fast`. |
 | `CitationMode.Fast` (default) | Citations generated inline as the response is produced. Lower latency, slightly less precise. **Cohere**: supported by both `command-r` and `command-a` families. **Anthropic**: treated as `Enabled` (warning logged). **Fallback**: same behavior as all other modes. |
 | `CitationMode.Enabled` | Provider-default citation behavior. Both Cohere and Anthropic honour this directly. **Fallback**: same behavior as all other modes. |
+| `CitationMode.SearchResult` | Anthropic-specific: emit `search_result` content blocks instead of `document` blocks. Citations come back as `search_result_location` with the caller's verbatim `Source` and `Title`. Requires `DocumentChunk.Source` on every chunk; returns `IsSuccess=false` if missing. **Cohere**: logs a warning and falls back to `ENABLED`. **OpenAI / Azure OpenAI / Azure AI Inference**: ignore this value silently. |
 
 ```csharp
 var options = new GroundedChatOptions(
     Documents: documents,
     CitationMode: CitationMode.Fast);
 ```
+
+### Search Result Mode (Anthropic)
+
+When you want Claude to cite your passages exactly as it cites web-search results — returning `search_result_location` citations that carry your own `Source` and `Title` — use `CitationMode.SearchResult`:
+
+```csharp
+var documents = new List<DocumentChunk>
+{
+    new(Text: "Paris is the capital of France.")
+        { Source = "https://docs.example.com/france", Title = "France" },
+    new(Text: "Berlin is the capital of Germany.")
+        { Source = "https://docs.example.com/germany", Title = "Germany" }
+};
+
+var options = new GroundedChatOptions(
+    Documents: documents,
+    CitationMode: CitationMode.SearchResult);
+
+var response = await groundedFeature.GetGroundedChatCompletionAsync(request, options);
+
+foreach (var citation in response.Citations)
+{
+    // citation.Type == "search_result_location"
+    // citation.Sources[0].Id == "https://docs.example.com/france"
+    // citation.Sources[0].Data?["title"] == "France"
+}
+```
+
+**Key points:**
+- Every `DocumentChunk` must have `Source` set (non-null, non-empty). Missing `Source` returns `IsSuccess=false` with an error naming the offending chunk.
+- `Title` on `DocumentChunk` is optional; when present, it appears in `CitationSource.Data["title"]`.
+- The `Source` and `Title` are passed through verbatim — the library does not normalize them.
 
 ## Document Formats
 
@@ -110,6 +143,20 @@ new DocumentChunk(Id: "doc-1", Text: "The actual content of the document.")
 
 **Note:** `Data` and `Text` are mutually exclusive — set exactly one.
 
+### Source and Title (Optional)
+
+`Source` and `Title` are optional properties on `DocumentChunk`. They are required for `CitationMode.SearchResult` (Anthropic `search_result` blocks) and ignored by other modes/providers for now.
+
+- `Id` — internal tracking identifier (a primary key, database row id)
+- `Source` — caller-facing identifier passed through verbatim in citations (a URL, document path, permanent link)
+
+```csharp
+new DocumentChunk(
+    Id: "row-42",
+    Text: "Paris is the capital of France.")
+    { Source = "https://docs.example.com/france", Title = "France" }
+```
+
 **Tip:** Keep document chunks to approximately 300-400 words or less for optimal model performance.
 
 ## Working with Citations
@@ -117,6 +164,7 @@ new DocumentChunk(Id: "doc-1", Text: "The actual content of the document.")
 Each `Citation` in the response has:
 - `Start` / `End`: Character offsets (inclusive/exclusive) in the response content
 - `Text`: The cited text span
+- `Type`: Citation type string (e.g., `"char_location"`, `"search_result_location"`, `"TEXT_CONTENT"`)
 - `Sources`: List of `CitationSource` objects, each with an `Id`, optional `Data` dictionary, and optional `CitedText`
 
 ### `Start`/`End` Semantics Per Provider
@@ -324,6 +372,7 @@ var response = await groundedFeature.GetGroundedChatCompletionAsync(
 
 ### Anthropic
 - **Citation modes are binary**: Anthropic citations are enabled or disabled — there is no accuracy/speed tradeoff. `CitationMode.Fast` and `CitationMode.Accurate` are treated as `Enabled` with a logged warning.
+- **`CitationMode.SearchResult`**: Emits `search_result` blocks instead of `document` blocks. Citations come back as `search_result_location` with the caller's `Source` and `Title` passed through. Every `DocumentChunk` must have `Source` set; missing `Source` returns `IsSuccess=false`. Title goes into `CitationSource.Data["title"]`.
 - **PDF / base64 sources**: Only `text` and `custom_content` source types are mapped. Anthropic's richer source types (PDF base64 etc.) are reachable via `ExtraParameters` and may get first-class mapping in a future release.
 - **Offset granularity**: Each text block maps to one citation span. If a text block carries multiple citations from different documents, they share the same `Start`/`End` range; use `CitationSource.CitedText` to distinguish.
 

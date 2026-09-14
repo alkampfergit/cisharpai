@@ -7,7 +7,7 @@ namespace Cisharpai.Anthropic.Models;
 /// Separate from <see cref="AnthropicContentBlock"/> to avoid JSON property
 /// conflicts on the 'source' field (image vs document have different shapes).
 /// </summary>
-public sealed class AnthropicDocumentBlock
+public sealed class AnthropicDocumentBlock : IAnthropicDocumentContentBlock
 {
     public string Type { get; set; } = "document";
 

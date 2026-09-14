@@ -489,6 +489,69 @@ public sealed class AnthropicPromptCachingTests
     }
 
     [Test]
+    public async Task GetGroundedChatCompletionWithCachingAsync_SearchResultMode_AppliesCacheBreakpointToLastSearchResultBlock()
+    {
+        string? capturedBody = null;
+        var handler = new MockHttpMessageHandler(async (request, _) =>
+        {
+            capturedBody = await request.Content!.ReadAsStringAsync(CancellationToken.None);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(GroundedWithCacheResponseJson, System.Text.Encoding.UTF8, "application/json")
+            };
+        });
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
+        var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
+
+        var cachingFeature = client.Features.Get<IPromptCachingFeature>()!;
+        var request = new ChatCompletionRequest(
+            Messages:
+            [
+                new LlmMessage(LlmRole.System, "You are a helpful assistant"),
+                new LlmMessage(LlmRole.User, "What does the doc say?")
+            ],
+            Model: "claude-sonnet-4-20250514");
+
+        var groundedOptions = new GroundedChatOptions(
+            [new DocumentChunk(Text: "The sky is blue.") { Source = "https://example.com/sky", Title = "Sky" }],
+            CitationMode: CitationMode.SearchResult);
+        var cachingOptions = new PromptCachingOptions
+        {
+            CacheSystemMessage = true,
+            MessageBreakpoints = [0]
+        };
+
+        var response = await cachingFeature.GetGroundedChatCompletionWithCachingAsync(
+            request, groundedOptions, cachingOptions);
+
+        Assert.That(response.ChatCompletion.IsSuccess, Is.True);
+
+        var doc = JsonDocument.Parse(capturedBody!);
+        var firstMsg = doc.RootElement.GetProperty("messages")[0];
+        var content = firstMsg.GetProperty("content");
+        Assert.That(content.GetArrayLength(), Is.GreaterThan(1), "Should contain search_result blocks + user text");
+
+        var lastSearchResultIndex = -1;
+        for (var i = content.GetArrayLength() - 1; i >= 0; i--)
+        {
+            if (content[i].TryGetProperty("type", out var t) && t.GetString() == "search_result")
+            {
+                lastSearchResultIndex = i;
+                break;
+            }
+        }
+
+        Assert.That(lastSearchResultIndex, Is.GreaterThanOrEqualTo(0), "Should contain at least one search_result block");
+        Assert.That(content[lastSearchResultIndex].TryGetProperty("cache_control", out _), Is.True,
+            "cache_control should be on the last search_result block");
+
+        var lastElement = content[content.GetArrayLength() - 1];
+        Assert.That(lastElement.TryGetProperty("cache_control", out _), Is.False,
+            "The question text (last element) should NOT have cache_control");
+    }
+
+    [Test]
     public async Task PromptTokens_IsUniversalTotal_IncludesCacheTokens()
     {
         var handler = new MockHttpMessageHandler((_, _) =>

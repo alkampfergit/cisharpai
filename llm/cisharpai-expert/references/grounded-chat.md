@@ -69,6 +69,14 @@ new DocumentChunk("doc-1", "Plain text content of the document...")
 
 `Data` and `Text` are mutually exclusive — use one or the other.
 
+### Source and Title
+
+`DocumentChunk.Source` (caller-facing identifier, e.g. a URL) and `DocumentChunk.Title` (display title) are optional properties. Required for `CitationMode.SearchResult` (`Source` must be non-null); ignored by other modes/providers.
+
+```csharp
+new DocumentChunk(Id: "row-42", Text: "...") { Source = "https://example.com/doc", Title = "My Doc" }
+```
+
 ## Citation Modes
 
 | Mode | Cohere | Anthropic | Azure AI Inference (fallback) |
@@ -76,6 +84,7 @@ new DocumentChunk("doc-1", "Plain text content of the document...")
 | `CitationMode.Accurate` | Full response first, then citations. Only `command-r` family. | Treated as `Enabled` (warning logged). | No distinction — same as Fast. |
 | `CitationMode.Fast` (default) | Inline citations during generation. All models. | Treated as `Enabled` (warning logged). | Same behavior for all modes. |
 | `CitationMode.Enabled` | Provider default. | Citations enabled. | Same behavior for all modes. |
+| `CitationMode.SearchResult` | Ignored (warn-and-fallback). | Emits `search_result` blocks; citations are `search_result_location` with pass-through `Source`/`Title`. | Ignored. |
 
 > **Cohere model compatibility.** `Accurate` is supported only by the `command-r`
 > family. `command-a` models reject it; the provider logs a warning and downgrades
@@ -84,6 +93,12 @@ new DocumentChunk("doc-1", "Plain text content of the document...")
 > **Anthropic.** Citations are binary (enabled or not). `Fast` and `Accurate` are
 > both treated as `Enabled` with a logged warning.
 
+> **`CitationMode.SearchResult` (Anthropic only).** Emits `search_result` content
+> blocks instead of `document` blocks. Each `DocumentChunk` must have `Source` set
+> (returns `IsSuccess=false` if missing). `Title` is optional. Citations come back
+> as `search_result_location` type with the caller's `Source` in `CitationSource.Id`
+> and `Title` in `CitationSource.Data["title"]`.
+
 ## Citation Model
 
 **Citation:**
@@ -91,11 +106,11 @@ new DocumentChunk("doc-1", "Plain text content of the document...")
 - `End` — Character offset in the response content (exclusive)
 - `Text` — The response text span that is cited
 - `Sources` — Array of `CitationSource`
-- `Type` — Provider-specific type (e.g. `"TEXT_CONTENT"` for Cohere, `"char_location"` for Anthropic)
+- `Type` — Provider-specific type (e.g. `"TEXT_CONTENT"` for Cohere, `"char_location"` or `"search_result_location"` for Anthropic)
 
 **CitationSource:**
-- `Id` — Document chunk ID
-- `Data` — Optional key-value metadata (populated when `DocumentChunk.Data` was used)
+- `Id` — For default/document modes: the document chunk ID (`DocumentChunk.Id`). For `CitationMode.SearchResult`: the caller's `DocumentChunk.Source` (passed through verbatim).
+- `Data` — Optional key-value metadata. For default/document modes: populated when `DocumentChunk.Data` was used. For `CitationMode.SearchResult`: contains `Data["title"]` when the caller provided `DocumentChunk.Title`.
 - `CitedText` — Text from the source document that was cited (Anthropic only; `null` for Cohere)
 
 ### `Start`/`End` Semantics
@@ -169,4 +184,4 @@ var response = await feature.GetGroundedChatCompletionAsync(request, groundedOpt
 - **Cohere**: supported models — Command-R, Command-R+, Command-A only
 - **OpenAI/Azure: GPT-5 only** — Non-GPT-5 models return `IsSuccess=false` with a descriptive error
 - **Azure AI Inference (fallback)** — citation quality depends on model's instruction-following ability; smaller models may not always emit markers
-- **Anthropic**: `CitationMode.Fast`/`Accurate` are treated as `Enabled`; PDF/base64 sources not yet first-class (reachable via `ExtraParameters`)
+- **Anthropic**: `CitationMode.Fast`/`Accurate` are treated as `Enabled`; `CitationMode.SearchResult` emits `search_result` blocks (requires `DocumentChunk.Source`); PDF/base64 sources not yet first-class (reachable via `ExtraParameters`)
