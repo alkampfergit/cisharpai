@@ -32,7 +32,7 @@ public sealed class InMemoryRetriever : IRetriever
     {
         ArgumentNullException.ThrowIfNull(chunk);
         ArgumentNullException.ThrowIfNull(vector);
-        _store.Add((chunk, vector));
+        _store.Add((chunk, (float[])vector.Clone()));
     }
 
     /// <summary>
@@ -43,6 +43,17 @@ public sealed class InMemoryRetriever : IRetriever
         ArgumentNullException.ThrowIfNull(items);
         foreach (var (chunk, vector) in items)
             Add(chunk, vector);
+    }
+
+    /// <summary>
+    /// Adds multiple <see cref="ChunkEmbedding"/> items to the store — the natural handoff
+    /// from <see cref="Embeddings.BulkEmbeddingProcessor"/>.
+    /// </summary>
+    public void AddRange(IEnumerable<ChunkEmbedding> items)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+        foreach (var item in items)
+            Add(item.Chunk, item.Vector);
     }
 
     /// <summary>Number of chunks currently stored.</summary>
@@ -73,7 +84,7 @@ public sealed class InMemoryRetriever : IRetriever
 
         var embeddingResponse = await _embeddingClient.GetEmbeddingsAsync(
             new EmbeddingRequest([query], _model, InputType: EmbeddingInputType.Query),
-            cancellationToken);
+            cancellationToken).ConfigureAwait(false);
 
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -81,6 +92,9 @@ public sealed class InMemoryRetriever : IRetriever
             return Array.Empty<ScoredChunk>();
 
         var queryVector = embeddingResponse.Embeddings[0];
+        if (queryVector is null || queryVector.Length == 0 || queryVector.Any(v => !float.IsFinite(v)))
+            return Array.Empty<ScoredChunk>();
+
         var candidates = new float[_store.Count][];
         for (var i = 0; i < _store.Count; i++)
             candidates[i] = _store[i].Vector;

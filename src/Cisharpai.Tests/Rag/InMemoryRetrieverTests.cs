@@ -1,6 +1,7 @@
 using Cisharpai.Models;
 using Cisharpai.Rag;
 using Cisharpai.Rag.Models;
+using Cisharpai.Rag.Packing;
 using Cisharpai.Testing;
 using NSubstitute;
 
@@ -305,5 +306,130 @@ public class InMemoryRetrieverTests
         Assert.That(
             async () => await retriever.RetrieveAsync("query", 1, cts.Token),
             Throws.TypeOf<OperationCanceledException>());
+    }
+
+    [Test]
+    public async Task RetrieveAsync_NullQueryVector_ReturnsEmpty()
+    {
+        var embeddingClient = Substitute.For<IEmbeddingClient>();
+        var response = new EmbeddingResponse(
+            Embeddings: new float[][] { null! },
+            Base64Embeddings: null,
+            Model: "test",
+            TotalTokens: 0,
+            IsSuccess: true);
+
+        embeddingClient.GetEmbeddingsAsync(Arg.Any<EmbeddingRequest>(), Arg.Any<CancellationToken>())
+            .Returns(response);
+
+        var retriever = new InMemoryRetriever(embeddingClient);
+        retriever.Add(MakeChunk("doc", 0, "text"), new float[] { 1f });
+
+        var results = await retriever.RetrieveAsync("query", 5);
+
+        Assert.That(results, Is.Empty);
+    }
+
+    [Test]
+    public async Task RetrieveAsync_EmptyQueryVector_ReturnsEmpty()
+    {
+        var embeddingClient = Substitute.For<IEmbeddingClient>();
+        var response = new EmbeddingResponse(
+            Embeddings: new float[][] { Array.Empty<float>() },
+            Base64Embeddings: null,
+            Model: "test",
+            TotalTokens: 0,
+            IsSuccess: true);
+
+        embeddingClient.GetEmbeddingsAsync(Arg.Any<EmbeddingRequest>(), Arg.Any<CancellationToken>())
+            .Returns(response);
+
+        var retriever = new InMemoryRetriever(embeddingClient);
+        retriever.Add(MakeChunk("doc", 0, "text"), new float[] { 1f });
+
+        var results = await retriever.RetrieveAsync("query", 5);
+
+        Assert.That(results, Is.Empty);
+    }
+
+    [Test]
+    public async Task RetrieveAsync_NonFiniteQueryVector_ReturnsEmpty()
+    {
+        var embeddingClient = Substitute.For<IEmbeddingClient>();
+        var response = new EmbeddingResponse(
+            Embeddings: new float[][] { new[] { 1f, float.NaN, 0f } },
+            Base64Embeddings: null,
+            Model: "test",
+            TotalTokens: 0,
+            IsSuccess: true);
+
+        embeddingClient.GetEmbeddingsAsync(Arg.Any<EmbeddingRequest>(), Arg.Any<CancellationToken>())
+            .Returns(response);
+
+        var retriever = new InMemoryRetriever(embeddingClient);
+        retriever.Add(MakeChunk("doc", 0, "text"), new float[] { 1f, 0f, 0f });
+
+        var results = await retriever.RetrieveAsync("query", 5);
+
+        Assert.That(results, Is.Empty);
+    }
+
+    [Test]
+    public void Add_SnapshotsVector_CallerMutationDoesNotAffectStore()
+    {
+        var fakeEmbedding = new FakeEmbeddingClient();
+        fakeEmbedding.EnqueueResponse(FakeResponses.Embedding(new float[] { 1f, 0f }));
+
+        var retriever = new InMemoryRetriever(fakeEmbedding);
+        var vector = new float[] { 1f, 0f };
+        retriever.Add(MakeChunk("doc", 0, "text"), vector);
+
+        vector[0] = 0f;
+        vector[1] = 1f;
+
+        // The stored vector should still be [1, 0], so "text" should rank first
+        // against a query vector of [1, 0]
+        var results = retriever.RetrieveAsync("query", 1).GetAwaiter().GetResult();
+
+        Assert.That(results, Has.Count.EqualTo(1));
+        Assert.That(results[0].Score, Is.GreaterThan(0.99).Within(0.01));
+    }
+
+    [Test]
+    public void AddRange_ChunkEmbedding_AddsItems()
+    {
+        var fakeEmbedding = new FakeEmbeddingClient
+        {
+            DefaultResponse = FakeResponses.Embedding()
+        };
+        var retriever = new InMemoryRetriever(fakeEmbedding);
+
+        var items = new[]
+        {
+            new ChunkEmbedding(MakeChunk("doc", 0, "a"), new float[] { 1f }),
+            new ChunkEmbedding(MakeChunk("doc", 1, "b"), new float[] { 0f })
+        };
+        retriever.AddRange(items);
+
+        Assert.That(retriever.Count, Is.EqualTo(2));
+    }
+
+    [Test]
+    public async Task AddRange_ChunkEmbedding_RetrievesCorrectly()
+    {
+        var fakeEmbedding = new FakeEmbeddingClient();
+        fakeEmbedding.EnqueueResponse(FakeResponses.Embedding(new float[] { 1f, 0f }));
+
+        var retriever = new InMemoryRetriever(fakeEmbedding);
+        retriever.AddRange(new[]
+        {
+            new ChunkEmbedding(MakeChunk("doc", 0, "aligned"), new float[] { 1f, 0f }),
+            new ChunkEmbedding(MakeChunk("doc", 1, "orthogonal"), new float[] { 0f, 1f })
+        });
+
+        var results = await retriever.RetrieveAsync("query", 1);
+
+        Assert.That(results, Has.Count.EqualTo(1));
+        Assert.That(results[0].Chunk.Text, Is.EqualTo("aligned"));
     }
 }

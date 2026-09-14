@@ -236,6 +236,51 @@ public class RankFusionTests
     }
 
     [Test]
+    public void ReciprocalRank_DuplicateInSingleList_CountsOnce()
+    {
+        // List contains A, A, B — A should get only one term from this list, not two
+        var list = new[]
+        {
+            Scored("doc", 0, 0.9),
+            Scored("doc", 0, 0.8),
+            Scored("doc", 1, 0.7)
+        };
+
+        var fused = RankFusion.ReciprocalRank(new[] { list });
+
+        var scoreA = fused.First(c => c.Chunk.Index == 0).Score;
+        var scoreB = fused.First(c => c.Chunk.Index == 1).Score;
+
+        // A is at rank 0, B is at rank 2 (the duplicate at rank 1 is skipped).
+        // A: 1/(60+0+1) = 1/61; B: 1/(60+2+1) = 1/63
+        Assert.That(scoreA, Is.EqualTo(1.0 / 61.0).Within(1e-10));
+        Assert.That(scoreB, Is.EqualTo(1.0 / 63.0).Within(1e-10));
+        Assert.That(fused, Has.Count.EqualTo(2));
+    }
+
+    [Test]
+    public void ReciprocalRank_DuplicateDoesNotOutrankItemInBothLists()
+    {
+        // List1 has A,A,B — duplicate A should not outrank B which appears in both lists
+        var list1 = new[]
+        {
+            Scored("doc", 0, 0.9),
+            Scored("doc", 0, 0.8),
+            Scored("doc", 1, 0.7)
+        };
+        var list2 = new[] { Scored("doc", 1, 0.9) };
+
+        var fused = RankFusion.ReciprocalRank(new[] { list1, list2 });
+
+        var scoreA = fused.First(c => c.Chunk.Index == 0).Score;
+        var scoreB = fused.First(c => c.Chunk.Index == 1).Score;
+
+        // B appears in both lists: 1/(60+2+1) + 1/(60+0+1) > A's single 1/(60+0+1)
+        Assert.That(scoreB, Is.GreaterThan(scoreA),
+            "Item in both lists should beat item with a duplicate in only one list");
+    }
+
+    [Test]
     public void ReciprocalRank_DifferentDocuments_IdentifiedCorrectly()
     {
         var list1 = new[] { Scored("docA", 0, 0.9), Scored("docB", 0, 0.5) };

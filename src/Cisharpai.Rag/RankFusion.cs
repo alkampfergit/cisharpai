@@ -32,11 +32,17 @@ public static class RankFusion
             if (list is null)
                 continue;
 
+            var seenInList = new HashSet<TextChunkIdentity>();
+
             for (var rank = 0; rank < list.Count; rank++)
             {
                 var item = list[rank];
-                var rrfScore = 1.0 / (k + rank + 1);
                 var key = new TextChunkIdentity(item.Chunk.DocumentId, item.Chunk.Index);
+
+                if (!seenInList.Add(key))
+                    continue;
+
+                var rrfScore = 1.0 / (k + rank + 1);
 
                 if (scores.TryGetValue(key, out var existing))
                     scores[key] = (existing.Score + rrfScore, existing.Representative);

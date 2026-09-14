@@ -658,6 +658,9 @@ var retriever = new InMemoryRetriever(embeddingClient, model: "text-embedding-3-
 retriever.Add(chunk, vector);
 retriever.AddRange(chunkVectorPairs);
 
+// Or feed BulkEmbeddingProcessor output directly — ChunkEmbedding is accepted natively
+retriever.AddRange(batchResult.Items);
+
 var results = await retriever.RetrieveAsync("search query", topK: 5);
 ```
 
