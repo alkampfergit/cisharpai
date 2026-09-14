@@ -26,10 +26,11 @@ The only dependency needed by consuming applications.
   - Reranking: `RerankRequest` (Query, Documents, Model?, TopN, MaxTokensPerDocument, ExtraParameters), `RerankResponse` (Results, Model, SearchUnits/InputTokens, IsSuccess/ErrorMessage, raw payloads), `RerankResult` (Index into the request documents, RelevanceScore)
   - `LlmMessage` (Role, Content, ContentParts, ToolCallId, ToolCalls) + factory methods `WithImage()`, `WithBase64Image()`
   - `MessageContentPart` hierarchy: `TextContentPart`, `ImageFileContentPart`, `ImageBase64ContentPart`
+  - `DocumentChunk(Id, Data, Text, Source, Title)` — `Source` and `Title` are optional, required for `CitationMode.SearchResult`
   - `ChatCompletionChunk` (streaming) with `ToolCallDelta`
   - Tool calling: `ToolDefinition`, `ToolCall`, `ToolResult`, `ToolChoice` (Auto/None/Required/Specific), `ToolCallingOptions`, `ToolCallingResponse`
   - JSON output: `JsonOutputMode`, `JsonOutputOptions`
-  - Grounded chat: `DocumentChunk`, `Citation`, `CitationSource`, `CitationMode`, `GroundingKind`, `GroundedChatOptions`, `GroundedChatCompletionResponse`
+  - Grounded chat: `DocumentChunk`, `Citation`, `CitationSource`, `CitationMode` (Accurate, Fast, Enabled, SearchResult), `GroundingKind`, `GroundedChatOptions`, `GroundedChatCompletionResponse`
   - Prompt caching: `PromptCachingOptions` (CacheSystemMessage, MessageBreakpoints, ToolBreakpoints)
   - Multimodal: `MultimodalEmbeddingInput`, `EmbeddingContentPart`, `TextEmbeddingContent`, `ImageEmbeddingContent`
 - **`Helpers/`** — Shared utilities: `JsonOutputHelper`, `RoleMapper`, `ContentPartHelper`, `ToolCallingHelper`, `EmbeddingHelper`, `GroundedChatHelper`, `GroundedChatFallbackHelper`
@@ -66,7 +67,7 @@ Consolidated package for all Azure AI services. Uses HttpClient directly (no SDK
 - **Factory configs**: `AzureOpenAiClientConfiguration`, `AzureAiInferenceClientConfiguration` + corresponding factory providers.
 
 ### `src/Cisharpai.Anthropic/`
-- `AnthropicChatCompletionClient` — Chat + JSON output (via `output_config.format`) + tool calling (`tool_use`/`tool_result` blocks) + streaming (event-based SSE) + grounded chat (RAG via `document` content blocks with native citations). Vision uses raw base64 (NOT data URIs). Static `Create(IHttpMessageHandlerFactory, options, ...)` for runtime construction.
+- `AnthropicChatCompletionClient` — Chat + JSON output (via `output_config.format`) + tool calling (`tool_use`/`tool_result` blocks) + streaming (event-based SSE) + grounded chat (RAG via `document` content blocks with native citations; `CitationMode.SearchResult` switches to `search_result` blocks with pass-through `Source`/`Title`). Vision uses raw base64 (NOT data URIs). Static `Create(IHttpMessageHandlerFactory, options, ...)` for runtime construction.
 - `AnthropicModels` — Constants: `Chat.ClaudeOpus4_5`, `Chat.ClaudeSonnet4_5`, `Chat.ClaudeHaiku4_5`, etc.
 - `AnthropicClientOptions` — BaseUrl, ApiKey, ApiVersion, DefaultModel.
 - `AnthropicClientConfiguration` — Factory config record (chat only, no embedding).

@@ -48,4 +48,16 @@ public sealed class AnthropicCitationResult
 
     [JsonPropertyName("end_char_index")]
     public int? EndCharIndex { get; set; }
+
+    /// <summary>
+    /// For <c>search_result_location</c> citations: the caller-supplied source identifier.
+    /// </summary>
+    [JsonPropertyName("source")]
+    public string? Source { get; set; }
+
+    /// <summary>
+    /// For <c>search_result_location</c> citations: the caller-supplied title.
+    /// </summary>
+    [JsonPropertyName("title")]
+    public string? Title { get; set; }
 }

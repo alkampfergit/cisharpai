@@ -125,7 +125,7 @@ Azure OpenAI truncation is surfaced as a failed unified response when the provid
 | Chat Completions | Claude model family (claude-opus-4-5, claude-sonnet-4-5, claude-haiku-4-5) |
 | JSON Mode | Implemented via system-message injection; auto-strips markdown fences |
 | Structured Outputs | Via native `output_config.format` parameter; refusal via `stop_reason: "refusal"` |
-| Grounded Chat (RAG) | Document grounding via `document` content blocks with `citations: {enabled: true}`; text documents use `text` source type, key-value documents use `custom_content` source type; `CitationMode.Fast`/`Accurate` treated as `Enabled` (Anthropic citations are binary: on/off) with a logged warning |
+| Grounded Chat (RAG) | Document grounding via `document` content blocks with `citations: {enabled: true}`; text documents use `text` source type, key-value documents use `custom_content` source type; `CitationMode.Fast`/`Accurate` treated as `Enabled` (Anthropic citations are binary: on/off) with a logged warning. `CitationMode.SearchResult` emits `search_result` blocks instead, producing `search_result_location` citations with pass-through `Source`/`Title` (requires `DocumentChunk.Source`; returns `IsSuccess=false` if missing) |
 | Tool Calling | All Claude models; `ToolChoice` maps Auto->auto, Required->any, Specific->{type:tool,name}, None is omitted |
 | Vision | Images sent as raw base64 (NOT data URIs) via `source.type: "base64"` in content blocks |
 | Prompt Caching | Explicit breakpoints via `IPromptCachingFeature`; `CachedInputTokens` from `cache_read_input_tokens`, `CacheCreationInputTokens` from `cache_creation_input_tokens`; system, message, and tool breakpoints |

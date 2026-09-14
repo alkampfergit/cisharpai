@@ -240,8 +240,22 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         {
             ValidateGroundedChatOptions(groundedChatOptions);
 
+            if (groundedChatOptions.CitationMode == CitationMode.SearchResult)
+            {
+                for (var i = 0; i < groundedChatOptions.Documents.Count; i++)
+                {
+                    var doc = groundedChatOptions.Documents[i];
+                    if (string.IsNullOrWhiteSpace(doc.Source))
+                    {
+                        var chunkName = doc.Id ?? $"at index {i}";
+                        return GroundedChatCompletionResponse.Error(
+                            $"DocumentChunk '{chunkName}' is missing a required Source for CitationMode.SearchResult.");
+                    }
+                }
+            }
+
             var providerRequest = await BuildRequestAsync(request, cancellationToken);
-            InjectDocumentBlocks(providerRequest, groundedChatOptions.Documents);
+            InjectDocumentBlocks(providerRequest, groundedChatOptions.Documents, groundedChatOptions.CitationMode);
 
             if (cachingOptions is not null)
                 ApplyCacheBreakpoints(providerRequest, cachingOptions);
@@ -341,9 +355,9 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         {
             for (var i = mixedBlocks.Count - 1; i >= 0; i--)
             {
-                if (mixedBlocks[i] is AnthropicDocumentBlock docBlock)
+                if (mixedBlocks[i] is IAnthropicDocumentContentBlock docContentBlock)
                 {
-                    docBlock.CacheControl = new AnthropicCacheControl { Type = EphemeralCacheType };
+                    docContentBlock.CacheControl = new AnthropicCacheControl { Type = EphemeralCacheType };
                     return;
                 }
             }
@@ -369,13 +383,14 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
 
     private static void InjectDocumentBlocks(
         AnthropicChatRequest providerRequest,
-        IReadOnlyList<DocumentChunk> documents)
+        IReadOnlyList<DocumentChunk> documents,
+        CitationMode citationMode)
     {
         var lastUserMessage = providerRequest.Messages.LastOrDefault(m => m.Role == "user");
         if (lastUserMessage is null)
             return;
 
-        var documentBlocks = documents.Select(MapDocumentChunkToBlock).ToList<object>();
+        var documentBlocks = documents.Select(d => MapDocumentChunk(d, citationMode)).ToList<object>();
 
         if (lastUserMessage.Content is List<AnthropicContentBlock> existingBlocks)
         {
@@ -393,8 +408,38 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         }
     }
 
-    private static AnthropicDocumentBlock MapDocumentChunkToBlock(DocumentChunk chunk)
+    private static IAnthropicDocumentContentBlock MapDocumentChunk(DocumentChunk chunk, CitationMode citationMode)
     {
+        if (citationMode == CitationMode.SearchResult)
+        {
+            var contentBlocks = new List<AnthropicCustomContentBlock>();
+
+            if (chunk.Data is not null)
+            {
+                contentBlocks.AddRange(chunk.Data.Select(kvp => new AnthropicCustomContentBlock
+                {
+                    Type = "text",
+                    Text = $"{kvp.Key}: {kvp.Value}"
+                }));
+            }
+            else
+            {
+                contentBlocks.Add(new AnthropicCustomContentBlock
+                {
+                    Type = "text",
+                    Text = chunk.Text!
+                });
+            }
+
+            return new AnthropicSearchResultBlock
+            {
+                Source = chunk.Source!,
+                Title = chunk.Title,
+                Content = contentBlocks,
+                Citations = new AnthropicCitationConfig { Enabled = true }
+            };
+        }
+
         AnthropicDocumentSource source;
 
         if (chunk.Data is not null)
@@ -427,7 +472,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         };
     }
 
-    private static (string content, List<Citation> citations) ExtractContentAndCitations(
+    private (string content, List<Citation> citations) ExtractContentAndCitations(
         List<AnthropicContentBlock> contentBlocks,
         IReadOnlyList<DocumentChunk> documents)
     {
@@ -447,6 +492,33 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
             {
                 var responseStart = blockStart;
                 var responseEnd = blockStart + blockText.Length;
+
+                if (cite.Type == "search_result_location")
+                {
+                    if (string.IsNullOrEmpty(cite.Source))
+                    {
+                        _logger?.LogWarning(
+                            "Skipping search_result_location citation with missing source.");
+                        continue;
+                    }
+
+                    var titleData = cite.Title is not null
+                        ? new System.Collections.ObjectModel.ReadOnlyDictionary<string, string>(
+                            new Dictionary<string, string> { ["title"] = cite.Title })
+                        : null;
+
+                    citations.Add(new Citation(
+                        Start: responseStart,
+                        End: responseEnd,
+                        Text: blockText,
+                        Sources: [new CitationSource(
+                            Id: cite.Source,
+                            Data: titleData,
+                            CitedText: cite.CitedText)],
+                        Type: cite.Type));
+
+                    continue;
+                }
 
                 string? sourceId = cite.DocumentTitle;
                 IReadOnlyDictionary<string, string>? sourceData = null;
@@ -562,8 +634,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         foreach (var doc in groundedChatOptions.Documents)
             doc.Validate();
 
-        if (groundedChatOptions.CitationMode is CitationMode.Accurate or CitationMode.Fast
-            && groundedChatOptions.CitationMode != CitationMode.Enabled)
+        if (groundedChatOptions.CitationMode is CitationMode.Accurate or CitationMode.Fast)
         {
             _logger?.LogWarning(
                 "Anthropic does not distinguish citation modes; CitationMode.{Mode} is treated as Enabled.",
@@ -571,7 +642,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         }
     }
 
-    private static GroundedChatCompletionResponse BuildGroundedResponse(
+    private GroundedChatCompletionResponse BuildGroundedResponse(
         AnthropicChatResponse raw,
         string? rawResponseJson,
         string? rawRequestJson,
