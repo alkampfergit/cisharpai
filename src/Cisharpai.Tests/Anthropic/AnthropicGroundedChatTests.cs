@@ -660,7 +660,7 @@ public sealed class AnthropicGroundedChatTests
     public async Task GroundedChat_CitationModeFast_StillEmitsDocumentBlocks()
     {
         var options = new GroundedChatOptions(
-            Documents: [new DocumentChunk(Text: "Some text", Source: "https://example.com", Title: "Example")],
+            Documents: [new DocumentChunk(Text: "Some text") { Source = "https://example.com", Title = "Example" }],
             CitationMode: CitationMode.Fast);
 
         var (response, capturedBody) = await ExecuteGroundedChat(GroundedResponseNoCitations, options: options);
@@ -681,9 +681,8 @@ public sealed class AnthropicGroundedChatTests
         var options = new GroundedChatOptions(
             Documents: [new DocumentChunk(
                 Id: "doc-1",
-                Text: "Paris is the capital of France.",
-                Source: "https://example.com/france",
-                Title: "France Article")]);
+                Text: "Paris is the capital of France.")
+                { Source = "https://example.com/france", Title = "France Article" }]);
 
         var (response, capturedBody) = await ExecuteGroundedChat(GroundedResponseNoCitations, options: options);
 
@@ -713,13 +712,11 @@ public sealed class AnthropicGroundedChatTests
             Documents:
             [
                 new DocumentChunk(
-                    Text: "Paris is the capital of France.",
-                    Source: "https://example.com/france",
-                    Title: "France"),
+                    Text: "Paris is the capital of France.")
+                    { Source = "https://example.com/france", Title = "France" },
                 new DocumentChunk(
-                    Text: "Berlin is the capital of Germany.",
-                    Source: "https://example.com/germany",
-                    Title: "Germany")
+                    Text: "Berlin is the capital of Germany.")
+                    { Source = "https://example.com/germany", Title = "Germany" }
             ],
             CitationMode: CitationMode.SearchResult);
 
@@ -780,9 +777,8 @@ public sealed class AnthropicGroundedChatTests
 
         var options = new GroundedChatOptions(
             Documents: [new DocumentChunk(
-                Text: "Paris is the capital of France.",
-                Source: "https://example.com/france",
-                Title: "France")],
+                Text: "Paris is the capital of France.")
+                { Source = "https://example.com/france", Title = "France" }],
             CitationMode: CitationMode.SearchResult);
 
         var (response, _) = await ExecuteGroundedChat(responseWithSearchResultCitations, options: options);
@@ -833,8 +829,8 @@ public sealed class AnthropicGroundedChatTests
 
         var options = new GroundedChatOptions(
             Documents: [new DocumentChunk(
-                Text: "Paris is the capital of France.",
-                Source: "https://example.com/france")],
+                Text: "Paris is the capital of France.")
+                { Source = "https://example.com/france" }],
             CitationMode: CitationMode.SearchResult);
 
         var (response, _) = await ExecuteGroundedChat(responseWithMalformedCitation, options: options);
@@ -853,7 +849,7 @@ public sealed class AnthropicGroundedChatTests
         var options = new GroundedChatOptions(
             Documents:
             [
-                new DocumentChunk(Id: "doc-1", Text: "Some text", Source: "https://example.com"),
+                new DocumentChunk(Id: "doc-1", Text: "Some text") { Source = "https://example.com" },
                 new DocumentChunk(Id: "doc-2", Text: "Other text")
             ],
             CitationMode: CitationMode.SearchResult);
@@ -893,9 +889,8 @@ public sealed class AnthropicGroundedChatTests
                 {
                     ["title"] = "France",
                     ["snippet"] = "Paris is the capital."
-                },
-                Source: "https://example.com/france",
-                Title: "France Article")],
+                })
+                { Source = "https://example.com/france", Title = "France Article" }],
             CitationMode: CitationMode.SearchResult);
 
         var (response, capturedBody) = await ExecuteGroundedChat(GroundedResponseNoCitations, options: options);
@@ -975,6 +970,82 @@ public sealed class AnthropicGroundedChatTests
 
         var response = client.GetGroundedChatCompletionAsync(CreateRequest(), options).Result;
         Assert.That(response.IsSuccess, Is.False);
+    }
+
+    [Test]
+    public async Task GroundedChat_SearchResultMode_BlankId_ReportsIndex()
+    {
+        var options = new GroundedChatOptions(
+            Documents: [new DocumentChunk(Id: "  ", Text: "Some text")],
+            CitationMode: CitationMode.SearchResult);
+
+        var (response, _) = await ExecuteGroundedChat(GroundedResponseNoCitations, options: options);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.False);
+            Assert.That(response.ErrorMessage, Does.Contain("at index 0"));
+            Assert.That(response.ErrorMessage, Does.Not.Contain("'  '"));
+        });
+    }
+
+    [Test]
+    public async Task GroundedChat_SearchResultMode_EmptyId_ReportsIndex()
+    {
+        var options = new GroundedChatOptions(
+            Documents: [new DocumentChunk(Id: "", Text: "Some text")],
+            CitationMode: CitationMode.SearchResult);
+
+        var (response, _) = await ExecuteGroundedChat(GroundedResponseNoCitations, options: options);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.False);
+            Assert.That(response.ErrorMessage, Does.Contain("at index 0"));
+        });
+    }
+
+    [Test]
+    public async Task GroundedChat_SearchResultLocation_WhitespaceSource_SkipsCitation()
+    {
+        const string responseWithWhitespaceSource = """
+            {
+                "model": "claude-sonnet-4-20250514",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "The capital of France is Paris.",
+                        "citations": [
+                            {
+                                "type": "search_result_location",
+                                "cited_text": "Paris is the capital of France.",
+                                "source": "   ",
+                                "title": "France",
+                                "start_char_index": 0,
+                                "end_char_index": 31
+                            }
+                        ]
+                    }
+                ],
+                "usage": { "input_tokens": 50, "output_tokens": 15 },
+                "stop_reason": "end_turn"
+            }
+            """;
+
+        var options = new GroundedChatOptions(
+            Documents: [new DocumentChunk(
+                Text: "Paris is the capital of France.")
+                { Source = "https://example.com/france" }],
+            CitationMode: CitationMode.SearchResult);
+
+        var (response, _) = await ExecuteGroundedChat(responseWithWhitespaceSource, options: options);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.True);
+            Assert.That(response.Citations, Is.Empty);
+            Assert.That(response.Content, Is.EqualTo("The capital of France is Paris."));
+        });
     }
 
     #endregion

@@ -247,7 +247,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
                     var doc = groundedChatOptions.Documents[i];
                     if (string.IsNullOrWhiteSpace(doc.Source))
                     {
-                        var chunkName = doc.Id ?? $"at index {i}";
+                        var chunkName = string.IsNullOrWhiteSpace(doc.Id) ? $"at index {i}" : doc.Id;
                         return GroundedChatCompletionResponse.Error(
                             $"DocumentChunk '{chunkName}' is missing a required Source for CitationMode.SearchResult.");
                     }
@@ -505,7 +505,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
     private Citation? MapSearchResultCitation(
         AnthropicCitationResult cite, int blockStart, string blockText)
     {
-        if (string.IsNullOrEmpty(cite.Source))
+        if (string.IsNullOrWhiteSpace(cite.Source))
         {
             _logger?.LogWarning(
                 "Skipping search_result_location citation with missing source.");

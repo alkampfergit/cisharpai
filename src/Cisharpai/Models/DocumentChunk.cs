@@ -23,23 +23,23 @@ public sealed record DocumentChunk(
     /// Plain text document content.
     /// Mutually exclusive with <see cref="Data"/>.
     /// </summary>
-    string? Text = null,
-
+    string? Text = null)
+{
     /// <summary>
     /// Caller-facing source identifier (a URL, a document path, a permanent link)
     /// passed through verbatim in citations. Required when using
     /// <see cref="CitationMode.SearchResult"/>; optional otherwise.
     /// Other providers ignore this property for now.
     /// </summary>
-    string? Source = null,
+    public string? Source { get; init; }
 
     /// <summary>
     /// Human-readable display title for this document chunk.
     /// When using <see cref="CitationMode.SearchResult"/>, passed through
     /// verbatim in citations. Optional; other providers ignore this for now.
     /// </summary>
-    string? Title = null)
-{
+    public string? Title { get; init; }
+
     /// <summary>
     /// Validates that exactly one of Data or Text is provided.
     /// </summary>

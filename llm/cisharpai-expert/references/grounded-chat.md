@@ -74,7 +74,7 @@ new DocumentChunk("doc-1", "Plain text content of the document...")
 `DocumentChunk.Source` (caller-facing identifier, e.g. a URL) and `DocumentChunk.Title` (display title) are optional properties. Required for `CitationMode.SearchResult` (`Source` must be non-null); ignored by other modes/providers.
 
 ```csharp
-new DocumentChunk(Id: "row-42", Text: "...", Source: "https://example.com/doc", Title: "My Doc")
+new DocumentChunk(Id: "row-42", Text: "...") { Source = "https://example.com/doc", Title = "My Doc" }
 ```
 
 ## Citation Modes
@@ -109,8 +109,8 @@ new DocumentChunk(Id: "row-42", Text: "...", Source: "https://example.com/doc", 
 - `Type` — Provider-specific type (e.g. `"TEXT_CONTENT"` for Cohere, `"char_location"` or `"search_result_location"` for Anthropic)
 
 **CitationSource:**
-- `Id` — Document chunk ID
-- `Data` — Optional key-value metadata (populated when `DocumentChunk.Data` was used)
+- `Id` — For default/document modes: the document chunk ID (`DocumentChunk.Id`). For `CitationMode.SearchResult`: the caller's `DocumentChunk.Source` (passed through verbatim).
+- `Data` — Optional key-value metadata. For default/document modes: populated when `DocumentChunk.Data` was used. For `CitationMode.SearchResult`: contains `Data["title"]` when the caller provided `DocumentChunk.Title`.
 - `CitedText` — Text from the source document that was cited (Anthropic only; `null` for Cohere)
 
 ### `Start`/`End` Semantics

@@ -60,7 +60,7 @@ interface, implemented by Cohere only.
 - Only provider with image embeddings (besides Cohere)
 
 ### Anthropic
-- Grounded chat via `document` content blocks with native citations; `CitedText` on `CitationSource`
+- Grounded chat via `document` content blocks (default) or `search_result` blocks (`CitationMode.SearchResult`) with native citations; `CitedText` on `CitationSource`; `search_result` mode passes through `DocumentChunk.Source` as `CitationSource.Id` and `DocumentChunk.Title` as `CitationSource.Data["title"]`
 - Event-based SSE streaming (not `[DONE]` based)
 - Raw base64 images (not data URIs)
 - Claude model family only

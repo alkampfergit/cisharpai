@@ -91,12 +91,10 @@ When you want Claude to cite your passages exactly as it cites web-search result
 ```csharp
 var documents = new List<DocumentChunk>
 {
-    new(Text: "Paris is the capital of France.",
-        Source: "https://docs.example.com/france",
-        Title: "France"),
-    new(Text: "Berlin is the capital of Germany.",
-        Source: "https://docs.example.com/germany",
-        Title: "Germany")
+    new(Text: "Paris is the capital of France.")
+        { Source = "https://docs.example.com/france", Title = "France" },
+    new(Text: "Berlin is the capital of Germany.")
+        { Source = "https://docs.example.com/germany", Title = "Germany" }
 };
 
 var options = new GroundedChatOptions(
@@ -155,9 +153,8 @@ new DocumentChunk(Id: "doc-1", Text: "The actual content of the document.")
 ```csharp
 new DocumentChunk(
     Id: "row-42",
-    Text: "Paris is the capital of France.",
-    Source: "https://docs.example.com/france",
-    Title: "France")
+    Text: "Paris is the capital of France.")
+    { Source = "https://docs.example.com/france", Title = "France" }
 ```
 
 **Tip:** Keep document chunks to approximately 300-400 words or less for optimal model performance.
