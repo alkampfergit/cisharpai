@@ -11,7 +11,8 @@ public static class RankFusion
 
     /// <summary>
     /// Reciprocal Rank Fusion (RRF): merges multiple ranked lists into one by summing
-    /// <c>1 / (k + rank)</c> across all lists in which an item appears.
+    /// <c>1 / (k + rank)</c> across all lists in which an item appears, where rank is
+    /// one-based (the first item has rank 1, scoring <c>1 / (k + 1)</c>).
     /// Items present in only one list receive their single-list RRF score.
     /// </summary>
     /// <param name="rankedLists">One or more ranked result lists, each in descending relevance order.</param>

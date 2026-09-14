@@ -9,6 +9,8 @@ namespace Cisharpai.Rag;
 /// Embeds the query at retrieval time via <see cref="IEmbeddingClient"/> and scores
 /// each stored chunk by cosine similarity. Not suitable for production workloads —
 /// use a purpose-built store behind <see cref="IRetriever"/> instead.
+/// This type is not thread-safe. Concurrent <see cref="Add"/>/<see cref="AddRange(IEnumerable{ValueTuple{TextChunk, float[]}})"/>
+/// and <see cref="RetrieveAsync"/> calls are not supported.
 /// </summary>
 public sealed class InMemoryRetriever : IRetriever
 {
@@ -95,18 +97,22 @@ public sealed class InMemoryRetriever : IRetriever
         if (queryVector is null || queryVector.Length == 0 || queryVector.Any(v => !float.IsFinite(v)))
             return Array.Empty<ScoredChunk>();
 
-        var candidates = new float[_store.Count][];
-        for (var i = 0; i < _store.Count; i++)
-            candidates[i] = _store[i].Vector;
+        var snapshot = _store.ToArray();
+
+        var candidates = new float[snapshot.Length][];
+        for (var i = 0; i < snapshot.Length; i++)
+            candidates[i] = snapshot[i].Vector;
 
         var topResults = VectorMath.TopK(
             (ReadOnlySpan<float>)queryVector,
             (ReadOnlySpan<float[]>)candidates,
             topK);
 
+        cancellationToken.ThrowIfCancellationRequested();
+
         var results = new ScoredChunk[topResults.Length];
         for (var i = 0; i < topResults.Length; i++)
-            results[i] = new ScoredChunk(_store[topResults[i].Index].Chunk, topResults[i].Score);
+            results[i] = new ScoredChunk(snapshot[topResults[i].Index].Chunk, topResults[i].Score);
 
         return results;
     }

@@ -666,7 +666,7 @@ var results = await retriever.RetrieveAsync("search query", topK: 5);
 
 ### Hybrid retrieval with Reciprocal Rank Fusion
 
-`RankFusion.ReciprocalRank` merges multiple ranked lists into one by summing `1 / (k + rank)` across all lists in which an item appears. This enables hybrid retrieval — run a dense retriever and a BM25/lexical retriever independently, then fuse:
+`RankFusion.ReciprocalRank` merges multiple ranked lists into one by summing `1 / (k + rank)` (where rank is one-based) across all lists in which an item appears. This enables hybrid retrieval — run a dense retriever and a BM25/lexical retriever independently, then fuse:
 
 ```csharp
 using Cisharpai.Rag;
