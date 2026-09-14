@@ -732,6 +732,76 @@ public class SemanticChunkerTests
         Assert.ThrowsAsync<OperationCanceledException>(async () => await enumerator.MoveNextAsync());
     }
 
+    // --- Full coverage of the source document (regression, issue #68) ---
+
+    [Test]
+    public async Task TrailingTextAfterLastSentence_IsKeptInTheLastChunk()
+    {
+        var text = "First sentence. Second totally different.\n\t  ";
+        var client = CreateFakeClient(MakeEmbeddingResponse([[1f, 0f], [0f, 1f]]));
+        var chunker = new SemanticChunker(CreateProcessor(client), new SemanticChunkerOptions
+        {
+            Strategy = SemanticThresholdStrategy.Absolute,
+            AbsoluteThreshold = 0.5f,
+            MaxChunkCharacters = 10000,
+            MaxChunkSentences = 100
+        });
+
+        var chunks = await Collect(chunker.ChunkAsync(new RagDocument("doc", text)));
+
+        Assert.That(chunks[^1].EndOffset, Is.EqualTo(text.Length), "Trailing whitespace must not be dropped");
+        Assert.That(chunks[^1].Text, Does.EndWith("\n\t  "));
+        AssertContiguousCoverage(chunks, text);
+        AssertVerbatimContract(chunks, text);
+        Assert.That(string.Concat(chunks.Select(c => c.Text)), Is.EqualTo(text));
+    }
+
+    [Test]
+    public async Task LeadingTextBeforeFirstSentence_IsKeptInTheFirstChunk()
+    {
+        // The pipe splitter ignores the leading "  " entirely, so the first sentence starts at
+        // offset 2 — the first chunk must still be anchored at 0.
+        var text = "  alpha|beta";
+        var client = CreateFakeClient(MakeEmbeddingResponse([[1f, 0f], [0f, 1f]]));
+        var chunker = new SemanticChunker(
+            CreateProcessor(client),
+            new SemanticChunkerOptions
+            {
+                Strategy = SemanticThresholdStrategy.Absolute,
+                AbsoluteThreshold = 0.5f,
+                MaxChunkCharacters = 10000,
+                MaxChunkSentences = 100
+            },
+            new PipeSplitter());
+
+        var chunks = await Collect(chunker.ChunkAsync(new RagDocument("doc", text)));
+
+        Assert.That(chunks[0].StartOffset, Is.Zero, "Leading text must not be dropped");
+        Assert.That(string.Concat(chunks.Select(c => c.Text)), Is.EqualTo(text));
+        AssertContiguousCoverage(chunks, text);
+        AssertVerbatimContract(chunks, text);
+    }
+
+    [Test]
+    public void SentenceWhoseEmittedChunkExceedsTheBudget_Throws()
+    {
+        // The sentence itself is 6 characters, but the chunk it produces carries the 40-character
+        // trailing run as well — the backstop must measure the emitted span, not the sentence.
+        var text = "alpha." + new string(' ', 40);
+        var client = CreateFakeClient(MakeEmbeddingResponse([[1f, 0f]]));
+        var chunker = new SemanticChunker(CreateProcessor(client), new SemanticChunkerOptions
+        {
+            Strategy = SemanticThresholdStrategy.Absolute,
+            AbsoluteThreshold = 0.5f,
+            MaxChunkCharacters = 20,
+            MaxChunkSentences = 100
+        });
+
+        var ex = Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await Collect(chunker.ChunkAsync(new RagDocument("doc", text))));
+        Assert.That(ex!.Message, Does.Contain("exceeds MaxChunkCharacters"));
+    }
+
     private sealed class PipeSplitter : ISentenceSplitter
     {
         public IReadOnlyList<string> Split(string text) =>

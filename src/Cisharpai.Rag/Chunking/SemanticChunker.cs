@@ -17,9 +17,17 @@ namespace Cisharpai.Rag.Chunking;
 /// <c>sentences × embedding dimensions × 4 bytes</c>.
 /// </para>
 /// <para>
-/// If a single sentence exceeds <see cref="SemanticChunkerOptions.MaxChunkCharacters"/>,
-/// an <see cref="InvalidOperationException"/> is thrown — use a larger limit or a sentence
-/// splitter that produces shorter segments.
+/// <b>Coverage:</b> emitted chunks cover the document exactly — no gaps, no overlap. Separator
+/// text between sentences is attached to the preceding chunk, the first chunk is anchored at
+/// offset 0, and the last chunk extends to the end of the document, so leading and trailing text
+/// the sentence splitter did not claim is preserved rather than dropped. A document the splitter
+/// finds no sentences in (for example, whitespace only) yields no chunks at all.
+/// </para>
+/// <para>
+/// If the chunk for a single sentence — including the surrounding separator text it carries —
+/// exceeds <see cref="SemanticChunkerOptions.MaxChunkCharacters"/>, an
+/// <see cref="InvalidOperationException"/> is thrown, rather than emitting an over-budget chunk.
+/// Use a larger limit or a sentence splitter that produces shorter segments.
 /// </para>
 /// </summary>
 public sealed class SemanticChunker : ITextChunker
@@ -68,7 +76,7 @@ public sealed class SemanticChunker : ITextChunker
         if (sentences.Count == 0)
             yield break;
 
-        ValidateAllSentenceSizes(sentences);
+        ValidateAllSentenceSizes(sentences, document.Text.Length);
 
         if (sentences.Count == 1)
         {
@@ -82,7 +90,7 @@ public sealed class SemanticChunker : ITextChunker
 
         var similarities = ComputeConsecutiveSimilarities(embeddings);
         var threshold = ComputePercentileThreshold(similarities, _options.BreakPercentile);
-        var boundaries = FindBoundaries(sentences, similarities, threshold);
+        var boundaries = FindBoundaries(sentences, similarities, threshold, document.Text.Length);
 
         var chunkIndex = 0;
         var start = 0;
@@ -105,7 +113,7 @@ public sealed class SemanticChunker : ITextChunker
         if (sentences.Count == 0)
             yield break;
 
-        ValidateAllSentenceSizes(sentences);
+        ValidateAllSentenceSizes(sentences, document.Text.Length);
 
         if (sentences.Count == 1)
         {
@@ -124,7 +132,7 @@ public sealed class SemanticChunker : ITextChunker
         for (var i = 1; i < sentences.Count; i++)
         {
             var sim = VectorMath.CosineSimilarity(embeddings[i - 1], embeddings[i]);
-            var candidateSpan = EmittedSpan(sentences, chunkStart, i + 1);
+            var candidateSpan = EmittedSpan(sentences, chunkStart, i + 1, document.Text.Length);
             var wouldExceedChars = candidateSpan > _options.MaxChunkCharacters;
             var wouldExceedSentences = chunkSentenceCount + 1 > _options.MaxChunkSentences;
             var belowThreshold = sim < _options.AbsoluteThreshold;
@@ -223,7 +231,8 @@ public sealed class SemanticChunker : ITextChunker
     private List<int> FindBoundaries(
         List<(string Text, int StartOffset, int EndOffset)> sentences,
         float[] similarities,
-        float threshold)
+        float threshold,
+        int textLength)
     {
         var boundaries = new List<int>();
         var chunkStartIdx = 0;
@@ -231,7 +240,7 @@ public sealed class SemanticChunker : ITextChunker
 
         for (var i = 0; i < similarities.Length; i++)
         {
-            var candidateSpan = EmittedSpan(sentences, chunkStartIdx, i + 2);
+            var candidateSpan = EmittedSpan(sentences, chunkStartIdx, i + 2, textLength);
             var wouldExceedChars = candidateSpan > _options.MaxChunkCharacters;
             var wouldExceedSentences = chunkSentenceCount + 1 > _options.MaxChunkSentences;
             var belowThreshold = similarities[i] <= threshold;
@@ -251,29 +260,51 @@ public sealed class SemanticChunker : ITextChunker
     }
 
     private void ValidateAllSentenceSizes(
-        List<(string Text, int StartOffset, int EndOffset)> sentences)
+        List<(string Text, int StartOffset, int EndOffset)> sentences,
+        int textLength)
     {
         for (var i = 0; i < sentences.Count; i++)
         {
-            var span = sentences[i].EndOffset - sentences[i].StartOffset;
+            // Measure what a single-sentence chunk would actually emit, not the sentence alone:
+            // the emitted span also carries the separator text up to the next sentence, plus any
+            // leading text for the first sentence and trailing text for the last.
+            var span = EmittedSpan(sentences, i, i + 1, textLength);
             if (span > _options.MaxChunkCharacters)
                 throw new InvalidOperationException(
-                    $"Sentence at offset {sentences[i].StartOffset} is {span} characters, " +
-                    $"which exceeds MaxChunkCharacters ({_options.MaxChunkCharacters}). " +
+                    $"The chunk for the sentence at offset {sentences[i].StartOffset} spans {span} characters " +
+                    $"(including surrounding separator text), which exceeds MaxChunkCharacters " +
+                    $"({_options.MaxChunkCharacters}). " +
                     "Use a larger MaxChunkCharacters or a sentence splitter that produces shorter segments.");
         }
     }
 
+    /// <summary>
+    /// Start offset of the chunk beginning at <paramref name="fromInclusive"/>. The first chunk is
+    /// anchored at 0 so text the sentence splitter did not claim is never dropped.
+    /// </summary>
+    private static int EmittedStart(
+        List<(string Text, int StartOffset, int EndOffset)> sentences,
+        int fromInclusive) =>
+        fromInclusive == 0 ? 0 : sentences[fromInclusive].StartOffset;
+
+    /// <summary>
+    /// Exclusive end offset of the chunk ending before <paramref name="toExclusive"/>. Non-final
+    /// chunks extend to the next sentence start so inter-sentence separators stay attached to the
+    /// preceding chunk; the final chunk extends to the end of the document so trailing text
+    /// (whitespace, or a fragment the splitter rejected) is never dropped.
+    /// </summary>
+    private static int EmittedEnd(
+        List<(string Text, int StartOffset, int EndOffset)> sentences,
+        int toExclusive,
+        int textLength) =>
+        toExclusive < sentences.Count ? sentences[toExclusive].StartOffset : textLength;
+
     private static int EmittedSpan(
         List<(string Text, int StartOffset, int EndOffset)> sentences,
         int chunkStart,
-        int toExclusive)
-    {
-        var endOffset = toExclusive < sentences.Count
-            ? sentences[toExclusive].StartOffset
-            : sentences[toExclusive - 1].EndOffset;
-        return endOffset - sentences[chunkStart].StartOffset;
-    }
+        int toExclusive,
+        int textLength) =>
+        EmittedEnd(sentences, toExclusive, textLength) - EmittedStart(sentences, chunkStart);
 
     private static TextChunk MakeChunk(
         string documentId,
@@ -283,10 +314,8 @@ public sealed class SemanticChunker : ITextChunker
         int fromInclusive,
         int toExclusive)
     {
-        var startOffset = sentences[fromInclusive].StartOffset;
-        var endOffset = toExclusive < sentences.Count
-            ? sentences[toExclusive].StartOffset
-            : sentences[toExclusive - 1].EndOffset;
+        var startOffset = EmittedStart(sentences, fromInclusive);
+        var endOffset = EmittedEnd(sentences, toExclusive, documentText.Length);
         var text = documentText[startOffset..endOffset];
         return new TextChunk(documentId, chunkIndex, startOffset, endOffset, text);
     }
