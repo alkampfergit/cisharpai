@@ -457,12 +457,20 @@ await foreach (var chunk in chunker.ChunkAsync(new RagDocument("handbook", text)
 | `Percentile` (default) | `BreakPercentile = 10` | Bottom N-th percentile of similarity drops in *this* document become boundaries. Self-calibrating across models and domains. **Buffers all sentence embeddings in memory** before emitting the first chunk — memory is proportional to `sentences × embedding dimensions × 4 bytes`. |
 | `Absolute` | `AbsoluteThreshold = 0.5` | Boundary when cosine similarity drops below a fixed threshold. The right number varies by embedding model and domain — tune per model. Buffers all sentence embeddings like Percentile mode. |
 
+### Coverage
+
+Emitted chunks cover the source document exactly — no gaps, no overlap. Separator text between sentences is attached to the preceding chunk, the first chunk is anchored at offset 0, and the last chunk extends to `document.Text.Length`, so leading and trailing text the sentence splitter did not claim (whitespace, or a fragment without terminal punctuation) is preserved rather than dropped. `string.Concat(chunks.Select(c => c.Text))` reconstructs the document verbatim.
+
+The one exception is a document the splitter finds no sentences in at all — whitespace only, for example. That yields no chunks, because there is nothing retrievable in it.
+
 ### Backstops
 
 Two backstops prevent any chunk from growing unbounded. Whichever limit trips first forces the cut:
 
 - **`MaxChunkCharacters`** (default 8000) — hard size-based backstop preventing a chunk from exceeding the embedding model's input limit. A sentence count alone does not bound this — 50 sentences of legal prose can be tens of thousands of characters.
 - **`MaxChunkSentences`** (default 50) — secondary guard limiting the number of sentences per chunk.
+
+Both backstops measure the chunk that is actually **emitted**, which is wider than the sentences it contains: it also carries the separator text up to the next sentence, plus any leading text for the first chunk and trailing text for the last. If the chunk for a *single* sentence already exceeds `MaxChunkCharacters`, `SemanticChunker` throws an `InvalidOperationException` rather than emitting an over-budget chunk — raise the limit, or inject a sentence splitter that produces shorter segments.
 
 ### Sentence splitting
 
