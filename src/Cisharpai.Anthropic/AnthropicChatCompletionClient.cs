@@ -490,64 +490,73 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
 
             foreach (var cite in block.Citations)
             {
-                var responseStart = blockStart;
-                var responseEnd = blockStart + blockText.Length;
+                var citation = cite.Type == "search_result_location"
+                    ? MapSearchResultCitation(cite, blockStart, blockText)
+                    : MapDocumentCitation(cite, blockStart, blockText, documents);
 
-                if (cite.Type == "search_result_location")
-                {
-                    if (string.IsNullOrEmpty(cite.Source))
-                    {
-                        _logger?.LogWarning(
-                            "Skipping search_result_location citation with missing source.");
-                        continue;
-                    }
-
-                    var titleData = cite.Title is not null
-                        ? new System.Collections.ObjectModel.ReadOnlyDictionary<string, string>(
-                            new Dictionary<string, string> { ["title"] = cite.Title })
-                        : null;
-
-                    citations.Add(new Citation(
-                        Start: responseStart,
-                        End: responseEnd,
-                        Text: blockText,
-                        Sources: [new CitationSource(
-                            Id: cite.Source,
-                            Data: titleData,
-                            CitedText: cite.CitedText)],
-                        Type: cite.Type));
-
-                    continue;
-                }
-
-                string? sourceId = cite.DocumentTitle;
-                IReadOnlyDictionary<string, string>? sourceData = null;
-
-                if (cite.DocumentIndex is not null && cite.DocumentIndex.Value < documents.Count)
-                {
-                    var doc = documents[cite.DocumentIndex.Value];
-                    sourceId ??= doc.Id;
-                    sourceData = doc.Data is not null
-                        ? new System.Collections.ObjectModel.ReadOnlyDictionary<string, string>(
-                            new Dictionary<string, string>(doc.Data))
-                        : null;
-                }
-
-                var citationSource = new CitationSource(
-                    Id: sourceId ?? $"doc-{cite.DocumentIndex}",
-                    Data: sourceData,
-                    CitedText: cite.CitedText);
-
-                citations.Add(new Citation(
-                    Start: responseStart,
-                    End: responseEnd,
-                    Text: blockText,
-                    Sources: [citationSource],
-                    Type: cite.Type));
+                if (citation is not null)
+                    citations.Add(citation);
             }
         }
 
         return (textBuilder.ToString(), citations);
+    }
+
+    private Citation? MapSearchResultCitation(
+        AnthropicCitationResult cite, int blockStart, string blockText)
+    {
+        if (string.IsNullOrEmpty(cite.Source))
+        {
+            _logger?.LogWarning(
+                "Skipping search_result_location citation with missing source.");
+            return null;
+        }
+
+        return new Citation(
+            Start: blockStart,
+            End: blockStart + blockText.Length,
+            Text: blockText,
+            Sources: [new CitationSource(
+                Id: cite.Source,
+                Data: BuildTitleData(cite.Title),
+                CitedText: cite.CitedText)],
+            Type: cite.Type);
+    }
+
+    private static Citation MapDocumentCitation(
+        AnthropicCitationResult cite, int blockStart, string blockText,
+        IReadOnlyList<DocumentChunk> documents)
+    {
+        string? sourceId = cite.DocumentTitle;
+        IReadOnlyDictionary<string, string>? sourceData = null;
+
+        if (cite.DocumentIndex is not null && cite.DocumentIndex.Value < documents.Count)
+        {
+            var doc = documents[cite.DocumentIndex.Value];
+            sourceId ??= doc.Id;
+            sourceData = doc.Data is not null
+                ? new System.Collections.ObjectModel.ReadOnlyDictionary<string, string>(
+                    new Dictionary<string, string>(doc.Data))
+                : null;
+        }
+
+        return new Citation(
+            Start: blockStart,
+            End: blockStart + blockText.Length,
+            Text: blockText,
+            Sources: [new CitationSource(
+                Id: sourceId ?? $"doc-{cite.DocumentIndex}",
+                Data: sourceData,
+                CitedText: cite.CitedText)],
+            Type: cite.Type);
+    }
+
+    private static IReadOnlyDictionary<string, string>? BuildTitleData(string? title)
+    {
+        return title is not null
+            ? new System.Collections.ObjectModel.ReadOnlyDictionary<string, string>(
+                new Dictionary<string, string> { ["title"] = title })
+            : null;
     }
 
     private string ResolveModel(string? model)
