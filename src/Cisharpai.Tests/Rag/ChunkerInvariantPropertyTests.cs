@@ -38,16 +38,27 @@ public class ChunkerInvariantPropertyTests
     /// <param name="Measure">Measures a source span in the chunker's own sizing unit.</param>
     /// <param name="MaxSize">The configured budget, expressed in the same unit as <paramref name="Measure"/>.</param>
     /// <param name="SizeBoundIsStrict">
-    /// False for configurations that are documented to emit oversized chunks — specifically a
-    /// <see cref="RecursiveChunker"/> separator ladder without the terminal empty separator, which
-    /// leaves an unsplittable atomic unit oversized rather than cutting it.
+    /// When true, every chunk must fit within <paramref name="MaxSize"/>. When false (specifically
+    /// for <see cref="RecursiveChunker"/> without the terminal empty separator), individual chunks
+    /// may exceed the budget but only if they are genuinely unsplittable — verified per-chunk by
+    /// checking that no separator from <paramref name="Separators"/> appears in the chunk text.
+    /// </param>
+    /// <param name="Separators">
+    /// The separator ladder for the chunker, when applicable. Used to verify that oversized chunks
+    /// in non-strict scenarios are genuinely unsplittable atomic units rather than merge regressions.
+    /// </param>
+    /// <param name="ChunkOverlap">
+    /// The overlap size for the chunker. Used to exclude the overlap prefix from the
+    /// unsplittability check — pieces in the overlap region come from the previous chunk.
     /// </param>
     public sealed record ChunkerScenario(
         string Name,
         Func<GeneratedDocument, ITextChunker> Factory,
         Func<string, int, int, int> Measure,
         int MaxSize,
-        bool SizeBoundIsStrict)
+        bool SizeBoundIsStrict,
+        IReadOnlyList<string>? Separators = null,
+        int ChunkOverlap = 0)
     {
         public override string ToString() => Name;
     }
@@ -65,6 +76,7 @@ public class ChunkerInvariantPropertyTests
     public async Task EveryChunkSatisfiesTheChunkerInvariants(ChunkerScenario scenario)
     {
         var documentsExercised = 0;
+        var documentsWithChunks = 0;
 
         foreach (var document in Corpus())
         {
@@ -84,10 +96,16 @@ public class ChunkerInvariantPropertyTests
 
             documentsExercised++;
             AssertInvariants(scenario, document, chunks);
+
+            if (chunks.Count > 0)
+                documentsWithChunks++;
         }
 
         Assert.That(documentsExercised, Is.GreaterThan(0),
             $"Scenario '{scenario.Name}' skipped every generated document — the suite asserted nothing.");
+        Assert.That(documentsWithChunks, Is.GreaterThan(0),
+            $"Scenario '{scenario.Name}' never produced chunks — only empty or whitespace-only " +
+            $"documents passed, masking potential regressions that reject all real input.");
     }
 
     /// <summary>
@@ -153,13 +171,19 @@ public class ChunkerInvariantPropertyTests
         AssertCoverage(scenario, document, chunks, context);
 
         // --- Invariant 3: size bound -------------------------------------
-        if (!scenario.SizeBoundIsStrict)
-            return;
-
         foreach (var chunk in chunks)
         {
             var size = scenario.Measure(text, chunk.StartOffset, chunk.EndOffset);
-            Assert.That(size, Is.LessThanOrEqualTo(scenario.MaxSize),
+            if (size <= scenario.MaxSize)
+                continue;
+
+            if (!scenario.SizeBoundIsStrict)
+            {
+                AssertChunkIsUnsplittableAtomicUnit(scenario, chunk, context);
+                continue;
+            }
+
+            Assert.Fail(
                 $"Chunk {chunk.Index} measures {size} against a budget of {scenario.MaxSize} " +
                 $"(span [{chunk.StartOffset}, {chunk.EndOffset})). {context}");
         }
@@ -203,6 +227,69 @@ public class ChunkerInvariantPropertyTests
             Assert.That(chunks[i].StartOffset, Is.LessThanOrEqualTo(chunks[i - 1].EndOffset),
                 $"Gap between chunk {i - 1} (ends {chunks[i - 1].EndOffset}) and chunk {i} " +
                 $"(starts {chunks[i].StartOffset}) — source text was dropped. {context}");
+        }
+    }
+
+    private static void AssertChunkIsUnsplittableAtomicUnit(
+        ChunkerScenario scenario, TextChunk chunk, string context)
+    {
+        if (scenario.Separators is null)
+            return;
+
+        var chunkText = chunk.Text;
+
+        // Chunks at index > 0 may have an overlap prefix from the previous chunk.
+        // Pieces starting within that prefix are not part of the raw atom and should
+        // not trigger a "splittable" failure. ChunkOverlap is in scalars; convert to
+        // UTF-16 character positions since pieceStart uses char indices.
+        var overlapPrefix = 0;
+        if (chunk.Index > 0 && scenario.ChunkOverlap > 0)
+        {
+            var pos = 0;
+            for (var s = 0; s < scenario.ChunkOverlap && pos < chunkText.Length; s++)
+                pos += char.IsHighSurrogate(chunkText[pos]) && pos + 1 < chunkText.Length
+                       && char.IsLowSurrogate(chunkText[pos + 1]) ? 2 : 1;
+            overlapPrefix = pos;
+        }
+
+        foreach (var sep in scenario.Separators)
+        {
+            if (sep.Length == 0)
+                continue;
+
+            var contentStarts = new List<int> { 0 };
+            var searchFrom = 0;
+            while (searchFrom <= chunkText.Length - sep.Length)
+            {
+                var pos = chunkText.IndexOf(sep, searchFrom, StringComparison.Ordinal);
+                if (pos < 0) break;
+                contentStarts.Add(pos + sep.Length);
+                searchFrom = pos + sep.Length;
+            }
+
+            if (contentStarts.Count <= 1)
+                continue;
+
+            for (var i = 0; i < contentStarts.Count; i++)
+            {
+                var pieceStart = contentStarts[i];
+                if (pieceStart < overlapPrefix)
+                    continue;
+
+                var pieceEnd = i + 1 < contentStarts.Count ? contentStarts[i + 1] : chunkText.Length;
+                var pieceLen = pieceEnd - pieceStart;
+                var pieceSize = scenario.Measure(chunkText, pieceStart, pieceEnd);
+                // Both the test's measure (scalars) AND the chunker's internal measure
+                // (UTF-16 code units) must agree the piece fits, since the chunker uses
+                // UTF-16 sizing to decide whether a piece exceeds the budget.
+                if (pieceLen > 0 && pieceSize <= scenario.MaxSize && pieceLen <= scenario.MaxSize)
+                {
+                    Assert.Fail(
+                        $"Chunk {chunk.Index} exceeds MaxSize ({scenario.MaxSize}) but separator " +
+                        $"\"{Escape(sep)}\" splits it into pieces where at least one (size {pieceSize}) " +
+                        $"fits within the budget — it is not genuinely unsplittable. {context}");
+                }
+            }
         }
     }
 
@@ -293,7 +380,9 @@ public class ChunkerInvariantPropertyTests
                 _ => new RecursiveChunker(options),
                 ScalarCount,
                 max,
-                SizeBoundIsStrict: false);
+                SizeBoundIsStrict: false,
+                Separators: separators,
+                ChunkOverlap: overlap);
         }
 
         // --- RecursiveChunker, token mode (local tokenizer only) ---------
