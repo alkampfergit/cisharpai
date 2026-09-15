@@ -1,6 +1,5 @@
 using System.Collections.ObjectModel;
 using Cisharpai.OpenAi.Models;
-using Cisharpai.Rag;
 using Cisharpai.Rag.Models;
 using Cisharpai.Rag.Packing;
 using Microsoft.Extensions.Logging;
@@ -81,7 +80,7 @@ internal sealed class OpenAiFileSearchRetriever : IRetriever
         }
     }
 
-    private IReadOnlyList<ScoredChunk> MapFileSearchResults(OpenAiResponsesApiResponse response)
+    private List<ScoredChunk> MapFileSearchResults(OpenAiResponsesApiResponse response)
     {
         var fileSearchCalls = response.Output
             .Where(o => o.Type == "file_search_call")

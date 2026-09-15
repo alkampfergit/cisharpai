@@ -1,5 +1,4 @@
 using Cisharpai.OpenAi;
-using Cisharpai.Rag;
 using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.Rag.OpenAi;

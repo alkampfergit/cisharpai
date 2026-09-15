@@ -1,5 +1,3 @@
-using Cisharpai.OpenAi.Models;
-
 namespace Cisharpai.OpenAi;
 
 /// <summary>

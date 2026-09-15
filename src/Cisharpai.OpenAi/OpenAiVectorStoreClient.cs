@@ -189,8 +189,11 @@ public sealed class OpenAiVectorStoreClient
             if (status is "completed" or "failed" or "cancelled")
                 return result;
 
-            _logger.LogDebug("File {FileId} in store {StoreId} status: {Status}, polling again in {Interval}ms",
-                fileId, vectorStoreId, status, effectiveInterval.TotalMilliseconds);
+            if (_logger.IsEnabled(LogLevel.Debug))
+            {
+                _logger.LogDebug("File {FileId} in store {StoreId} status: {Status}, polling again in {Interval}ms",
+                    fileId, vectorStoreId, status, effectiveInterval.TotalMilliseconds);
+            }
 
             await Task.Delay(effectiveInterval, cancellationToken);
         }

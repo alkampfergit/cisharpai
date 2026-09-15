@@ -1,5 +1,4 @@
 using Cisharpai.OpenAi;
-using Cisharpai.Rag;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 

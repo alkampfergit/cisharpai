@@ -22,7 +22,6 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
 
     private readonly LlmHttpClient _client;
     private readonly OpenAiClientOptions _options;
-    private readonly ILoggerFactory? _loggerFactory;
 
     public IFeatureCollection Features { get; }
 
@@ -30,7 +29,6 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
     {
         _client = new LlmHttpClient(httpClient, logger: loggerFactory?.CreateLogger<LlmHttpClient>());
         _options = options;
-        _loggerFactory = loggerFactory;
 
         var features = new FeatureCollection();
         features.Set<IJsonOutputFeature>(this);
