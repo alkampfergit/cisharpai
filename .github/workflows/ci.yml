@@ -281,16 +281,6 @@ jobs:
           name: nuget-symbols
           path: ./nupkg
 
-      - name: Attest build provenance (nupkg)
-        uses: actions/attest-build-provenance@v2
-        with:
-          subject-path: './nupkg/*.nupkg'
-
-      - name: Attest build provenance (snupkg)
-        uses: actions/attest-build-provenance@v2
-        with:
-          subject-path: './nupkg/*.snupkg'
-
       - name: Push to NuGet (trusted publishing)
         run: >
           dotnet nuget push "./nupkg/*.nupkg"
@@ -302,3 +292,13 @@ jobs:
           dotnet nuget push "./nupkg/*.snupkg"
           --source https://api.nuget.org/v3/index.json
           --skip-duplicate
+
+      - name: Attest build provenance (nupkg)
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: './nupkg/*.nupkg'
+
+      - name: Attest build provenance (snupkg)
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: './nupkg/*.snupkg'
