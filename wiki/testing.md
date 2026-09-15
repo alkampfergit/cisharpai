@@ -362,6 +362,32 @@ fake.DefaultResponse = myChunks;
 
 `IRetriever` has no optional feature interfaces, so `FakeRetriever` takes no feature flags.
 
+## FakeHostedRetrievalFeature
+
+`FakeHostedRetrievalFeature` fakes `IHostedRetrievalFeature` — the factory that produces per-store `IRetriever` instances. Each store is backed by a `FakeRetriever` that can be pre-loaded with canned responses.
+
+```csharp
+var fake = new FakeHostedRetrievalFeature();
+
+// Register a store with canned results
+var fakeRetriever = fake.AddStore("vs_my_store");
+fakeRetriever.EnqueueResponse(new[] { new ScoredChunk(myChunk, 0.95) });
+
+// Use in application code
+IRetriever retriever = fake.ForStore("vs_my_store");
+var results = await retriever.RetrieveAsync("query", 5);
+// results[0].Score == 0.95
+
+// Unregistered stores return empty results by default
+var emptyRetriever = fake.ForStore("vs_unknown");
+var empty = await emptyRetriever.RetrieveAsync("query", 5);
+// empty.Count == 0
+
+// Assert which stores were accessed
+Assert.That(fake.StoreIds, Does.Contain("vs_my_store"));
+Assert.That(fake.GetRetriever("vs_my_store")!.CallCount, Is.EqualTo(1));
+```
+
 ## Feature Opt-Out
 
 Both fake chat and embedding clients register all feature interfaces by default. Use the flags enums to control which features are available -- useful for testing feature-detection code paths.

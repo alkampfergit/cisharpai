@@ -5,12 +5,13 @@ using Cisharpai.Features.Chat;
 using Cisharpai.Helpers;
 using Cisharpai.Models;
 using Cisharpai.OpenAi.Models;
+using Cisharpai.Rag;
 using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.OpenAi;
 
-public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature, IStreamingChatFeature, IGroundedChatFeature, IWebSearchFeature
+public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature, IStreamingChatFeature, IGroundedChatFeature, IWebSearchFeature, IHostedRetrievalFeature
 {
     private const string ChatCompletionsEndpoint = "chat/completions";
     private const string ResponsesEndpoint = "responses";
@@ -22,6 +23,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
 
     private readonly LlmHttpClient _client;
     private readonly OpenAiClientOptions _options;
+    private readonly ILoggerFactory? _loggerFactory;
 
     public IFeatureCollection Features { get; }
 
@@ -29,6 +31,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
     {
         _client = new LlmHttpClient(httpClient, logger: loggerFactory?.CreateLogger<LlmHttpClient>());
         _options = options;
+        _loggerFactory = loggerFactory;
 
         var features = new FeatureCollection();
         features.Set<IJsonOutputFeature>(this);
@@ -36,6 +39,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         features.Set<IStreamingChatFeature>(this);
         features.Set<IGroundedChatFeature>(this);
         features.Set<IWebSearchFeature>(this);
+        features.Set<IHostedRetrievalFeature>(this);
         Features = features;
     }
 
@@ -658,6 +662,8 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         var parsed = ParseResponsesApiOutput(raw);
         var cachedTokens = raw.Usage.InputTokensDetails?.CachedTokens;
 
+        var (isSuccess, errorMessage) = CheckFileSearchCallFailures(raw, parsed);
+
         return new ChatCompletionResponse(
             Content: parsed.Content,
             Model: raw.Model,
@@ -667,10 +673,37 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
             RawRequestJson: rawRequestJson,
             Status: raw.Status,
             IncompleteReason: parsed.IncompleteReason,
-            IsSuccess: !parsed.IsError,
-            ErrorMessage: parsed.ErrorMessage,
+            IsSuccess: isSuccess,
+            ErrorMessage: errorMessage,
             Refusal: parsed.Refusal,
             CachedInputTokens: cachedTokens > 0 ? cachedTokens : null);
+    }
+
+    private static (bool IsSuccess, string? ErrorMessage) CheckFileSearchCallFailures(
+        OpenAiResponsesApiResponse raw,
+        ParsedResponsesApiOutput parsed)
+    {
+        var fileSearchCalls = raw.Output
+            .Where(o => o.Type == "file_search_call")
+            .ToList();
+
+        if (fileSearchCalls.Count == 0)
+            return (!parsed.IsError, parsed.ErrorMessage);
+
+        var failedSearches = fileSearchCalls
+            .Where(o => o.Status is not null && o.Status != "completed")
+            .ToList();
+
+        var isSuccess = !parsed.IsError && failedSearches.Count == 0;
+        var errorMessage = parsed.ErrorMessage;
+        if (failedSearches.Count > 0 && errorMessage is null)
+        {
+            var failedIds = string.Join(", ",
+                failedSearches.Select(f => f.Id ?? "unknown"));
+            errorMessage = $"{failedSearches.Count} of {fileSearchCalls.Count} file search(es) failed (ids: {failedIds})";
+        }
+
+        return (isSuccess, errorMessage);
     }
 
     private static ChatCompletionResponse MapChatResponse(
@@ -927,6 +960,16 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
                     Type: a.Type);
             })
             .ToList();
+    }
+
+    public IRetriever ForStore(string vectorStoreId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(vectorStoreId);
+        return new OpenAiFileSearchRetriever(
+            _client,
+            _options,
+            vectorStoreId,
+            _loggerFactory?.CreateLogger<OpenAiFileSearchRetriever>());
     }
 
     private string ResolveModel(string? model)

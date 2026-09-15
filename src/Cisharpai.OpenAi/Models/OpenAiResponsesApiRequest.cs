@@ -18,6 +18,9 @@ public sealed class OpenAiResponsesApiRequest
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<OpenAiResponsesApiTool>? Tools { get; set; }
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<string>? Include { get; set; }
+
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool Stream { get; set; }
 }
@@ -25,6 +28,14 @@ public sealed class OpenAiResponsesApiRequest
 public sealed class OpenAiResponsesApiTool
 {
     public string Type { get; set; } = string.Empty;
+
+    [JsonPropertyName("vector_store_ids")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<string>? VectorStoreIds { get; set; }
+
+    [JsonPropertyName("max_num_results")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? MaxNumResults { get; set; }
 }
 
 public sealed class OpenAiReasoningOption
