@@ -99,6 +99,25 @@ FakeResponses.CachedChat("cached answer", cachedInputTokens: 500);
 FakeResponses.CachedChat("answer", cachedInputTokens: 500, cacheCreationInputTokens: 200);
 ```
 
+### Web Search Responses
+
+```csharp
+// Default web search response (WebSearchCount = 1, GroundingKind.WebSearch)
+FakeResponses.WebSearch("The capital of France is Paris.");
+
+// With citations
+var citations = new List<Citation>
+{
+    new(0, 30, "The capital of France is Paris.",
+        [new CitationSource("https://example.com", Data: new Dictionary<string, string> { ["title"] = "Example" }.AsReadOnly())],
+        Type: "web_search_result_location")
+};
+FakeResponses.WebSearch("The capital of France is Paris.", citations, webSearchCount: 1);
+
+// Custom search count
+FakeResponses.WebSearch("answer", webSearchCount: 3);
+```
+
 ### Streaming Responses
 
 ```csharp
@@ -168,6 +187,7 @@ Each feature method has its own queue and default:
 | `GetGroundedChatCompletionAsync` | `EnqueueGroundedChatResponse()` | `DefaultGroundedChatResponse` |
 | `GetChatCompletionStreamAsync` | `EnqueueStreamingResponse()` | `DefaultStreamingResponse` |
 | `GetChatCompletionWithCachingAsync` | `EnqueuePromptCachingResponse()` | `DefaultPromptCachingResponse` |
+| `GetChatCompletionWithWebSearchAsync` | `EnqueueWebSearchResponse()` | `DefaultWebSearchResponse` |
 
 ### Request Capture
 
@@ -199,6 +219,7 @@ Available capture lists:
 | `ReceivedGroundedChatRequests` | `GetGroundedChatCompletionAsync` (includes `GroundedChatOptions`) |
 | `ReceivedStreamingRequests` | `GetChatCompletionStreamAsync` |
 | `ReceivedPromptCachingRequests` | `GetChatCompletionWithCachingAsync` (includes `PromptCachingOptions`) |
+| `ReceivedWebSearchRequests` | `GetChatCompletionWithWebSearchAsync` (includes `WebSearchOptions`) |
 
 ### Reset
 
@@ -363,7 +384,7 @@ var streaming = bare.Features.Get<IStreamingChatFeature>();
 Assert.That(streaming, Is.Null); // Feature not available
 ```
 
-Available flags: `Streaming`, `ToolCalling`, `JsonOutput`, `GroundedChat`, `PromptCaching`, `All`, `None`.
+Available flags: `Streaming`, `ToolCalling`, `JsonOutput`, `GroundedChat`, `PromptCaching`, `WebSearch`, `All`, `None`.
 
 ### FakeEmbeddingFeatures
 

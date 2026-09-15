@@ -191,4 +191,26 @@ public static class FakeResponses
     /// </summary>
     public static FakeRetriever Retriever() =>
         new() { DefaultResponse = Array.Empty<ScoredChunk>() };
+
+    /// <summary>
+    /// Creates a grounded chat response representing a web search result with citations.
+    /// </summary>
+    public static GroundedChatCompletionResponse WebSearch(
+        string content,
+        IReadOnlyList<Citation>? citations = null,
+        int? webSearchCount = 1,
+        string model = DefaultModel) =>
+        new(
+            ChatCompletion: new ChatCompletionResponse(
+                Content: content,
+                Model: model,
+                PromptTokens: 10,
+                CompletionTokens: 5)
+            {
+                WebSearchCount = webSearchCount
+            },
+            Citations: citations ?? [])
+        {
+            GroundingKind = GroundingKind.WebSearch
+        };
 }

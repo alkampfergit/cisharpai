@@ -19,6 +19,12 @@ public sealed record ChatCompletionResponse(
     int? CachedInputTokens = null,
     int? CacheCreationInputTokens = null)
 {
+    /// <summary>
+    /// Number of web searches performed by a provider-hosted search tool during this request.
+    /// Null when web search was not used. Each search is billed separately from tokens.
+    /// </summary>
+    public int? WebSearchCount { get; init; }
+
     public static ChatCompletionResponse Error(string errorMessage, string? rawResponseJson = null) =>
         new(
             Content: string.Empty,

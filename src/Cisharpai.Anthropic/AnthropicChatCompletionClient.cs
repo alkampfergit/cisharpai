@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.Anthropic;
 
-public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature, IStreamingChatFeature, IGroundedChatFeature, IPromptCachingFeature
+public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature, IStreamingChatFeature, IGroundedChatFeature, IPromptCachingFeature, IWebSearchFeature
 {
     private const string MessagesEndpoint = "messages";
     private const string EphemeralCacheType = "ephemeral";
@@ -38,6 +38,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         features.Set<IStreamingChatFeature>(this);
         features.Set<IGroundedChatFeature>(this);
         features.Set<IPromptCachingFeature>(this);
+        features.Set<IWebSearchFeature>(this);
         Features = features;
     }
 
@@ -189,6 +190,32 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         GroundedChatOptions groundedChatOptions,
         CancellationToken cancellationToken = default)
         => ExecuteGroundedChatCoreAsync(request, groundedChatOptions, cachingOptions: null, cancellationToken);
+
+    public async Task<GroundedChatCompletionResponse> GetChatCompletionWithWebSearchAsync(
+        ChatCompletionRequest request,
+        WebSearchOptions webSearchOptions,
+        CancellationToken cancellationToken = default)
+    {
+        request = request with { Model = ResolveModel(request.Model) };
+
+        try
+        {
+            var providerRequest = await BuildRequestAsync(request, cancellationToken);
+            InjectWebSearchTool(providerRequest);
+
+            var (raw, rawResponseJson, rawRequestJson) = await PostRequestAsync(providerRequest, request, cancellationToken);
+
+            return BuildWebSearchResponse(raw, rawResponseJson, rawRequestJson);
+        }
+        catch (LlmHttpRequestException ex)
+        {
+            return GroundedChatCompletionResponse.Error(ex.Message, ex.ResponseBody);
+        }
+        catch (Exception ex)
+        {
+            return GroundedChatCompletionResponse.Error(ex.Message);
+        }
+    }
 
     public async Task<ChatCompletionResponse> GetChatCompletionWithCachingAsync(
         ChatCompletionRequest request,
@@ -563,6 +590,103 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
             ? new System.Collections.ObjectModel.ReadOnlyDictionary<string, string>(
                 new Dictionary<string, string> { ["title"] = title })
             : null;
+    }
+
+    private void InjectWebSearchTool(AnthropicChatRequest providerRequest)
+    {
+        providerRequest.Tools ??= [];
+        providerRequest.Tools.Add(new AnthropicToolDefinition
+        {
+            Name = "web_search",
+            Type = _options.WebSearchToolVersion
+        });
+    }
+
+    private GroundedChatCompletionResponse BuildWebSearchResponse(
+        AnthropicChatResponse raw,
+        string? rawResponseJson,
+        string? rawRequestJson)
+    {
+        var (content, citations) = ExtractWebSearchContentAndCitations(raw.Content);
+
+        var refusal = raw.StopReason == "refusal" ? content : null;
+        if (refusal is not null)
+            content = string.Empty;
+
+        var incompleteReason = raw.StopReason == "max_tokens" ? "max_tokens" : null;
+
+        var webSearchCount = raw.Usage.ServerToolUse?.WebSearchRequests;
+
+        var chatCompletion = new ChatCompletionResponse(
+            Content: content,
+            Model: raw.Model,
+            PromptTokens: ComputeTotalInputTokens(raw.Usage),
+            CompletionTokens: raw.Usage.OutputTokens,
+            RawResponseJson: rawResponseJson,
+            RawRequestJson: rawRequestJson,
+            Status: raw.StopReason,
+            IncompleteReason: incompleteReason,
+            Refusal: refusal,
+            CachedInputTokens: raw.Usage.CacheReadInputTokens,
+            CacheCreationInputTokens: raw.Usage.CacheCreationInputTokens)
+        {
+            WebSearchCount = webSearchCount
+        };
+
+        return new GroundedChatCompletionResponse(chatCompletion, citations)
+        {
+            GroundingKind = GroundingKind.WebSearch
+        };
+    }
+
+    private (string content, List<Citation> citations) ExtractWebSearchContentAndCitations(
+        List<AnthropicContentBlock> contentBlocks)
+    {
+        var textBuilder = new System.Text.StringBuilder();
+        var citations = new List<Citation>();
+
+        foreach (var block in contentBlocks.Where(b => b.Type == "text"))
+        {
+            var blockStart = textBuilder.Length;
+            var blockText = block.Text ?? string.Empty;
+            textBuilder.Append(blockText);
+
+            if (block.Citations is null || block.Citations.Count == 0)
+                continue;
+
+            foreach (var cite in block.Citations)
+            {
+                if (cite is null)
+                {
+                    _logger?.LogWarning("Skipping null citation entry in web search content block.");
+                    continue;
+                }
+
+                if (cite.Type != "web_search_result_location")
+                {
+                    _logger?.LogWarning("Skipping unexpected citation type '{Type}' in web search response.", cite.Type);
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(cite.Url))
+                {
+                    _logger?.LogWarning("Skipping web_search_result_location citation with missing URL.");
+                    continue;
+                }
+
+                citations.Add(new Citation(
+                    Start: blockStart,
+                    End: blockStart + blockText.Length,
+                    Text: blockText,
+                    Sources: [new CitationSource(
+                        Id: cite.Url!,
+                        Data: BuildTitleData(cite.Title),
+                        CitedText: cite.CitedText)],
+                    Type: cite.Type));
+            }
+        }
+
+        return (textBuilder.ToString(), citations);
     }
 
     private string ResolveModel(string? model)

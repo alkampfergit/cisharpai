@@ -7,8 +7,8 @@ description: >
   Cisharpai clients, features, DTOs, DI registration, or provider-specific
   integrations. Activates on mentions of "Cisharpai", "IChatCompletionClient",
   "IEmbeddingClient", "IRerankerClient", "ITokenCounter", "IRetriever", provider setup,
-  tool calling, streaming, JSON output, grounded chat, vision, embeddings, reranking,
-  token counting, RAG ingestion, retrieval, rank fusion, or fake clients for testing.
+  tool calling, streaming, JSON output, grounded chat, web search, vision, embeddings,
+  reranking, token counting, RAG ingestion, retrieval, rank fusion, or fake clients for testing.
 ---
 
 # Cisharpai Expert
@@ -343,6 +343,7 @@ All feature interfaces live in the `Cisharpai.Features.Chat` namespace (not `Cis
 | Tool Calling | `IToolCallingFeature` | All 5 |
 | Streaming | `IStreamingChatFeature` | All 5 |
 | Grounded Chat | `IGroundedChatFeature` | OpenAI (GPT-5, native), Azure OpenAI (GPT-5, native), Azure AI Inference (synthesized fallback), Anthropic (native), Cohere (native) |
+| Web Search | `IWebSearchFeature` | Anthropic (server-side `web_search` tool), OpenAI (GPT-5 only, Responses API `web_search` tool) |
 | Prompt Caching | `IPromptCachingFeature` | Anthropic only (control); OpenAI/Azure report cache usage on the unified response without this interface |
 | Image Embedding | `IImageEmbeddingFeature` | Azure AI Inference, Cohere |
 | Multimodal Embedding | `IMultimodalEmbeddingFeature` | Cohere only |
@@ -392,6 +393,7 @@ See the reference files for detailed information:
 - [references/embeddings.md](references/embeddings.md) — Text, image, and multimodal embeddings
 - [references/reranking.md](references/reranking.md) — Relevance reranking with `IRerankerClient` (Cohere)
 - [references/grounded-chat.md](references/grounded-chat.md) — RAG with citations (OpenAI, Azure OpenAI, Anthropic, Cohere)
+- [references/web-search.md](references/web-search.md) — Web search with citations (Anthropic, OpenAI GPT-5)
 - [references/testing.md](references/testing.md) — Fake clients, response queues, DI
 - [references/provider-features.md](references/provider-features.md) — Complete feature support matrix
 - [references/runtime-configuration.md](references/runtime-configuration.md) — Dynamic client creation at runtime (multi-tenant, runtime API keys)

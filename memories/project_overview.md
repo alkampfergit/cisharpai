@@ -17,11 +17,12 @@ The only dependency needed by consuming applications.
   - `Chat/IStreamingChatFeature.cs` — Token-by-token streaming via `IAsyncEnumerable<ChatCompletionChunk>`.
   - `Chat/IGroundedChatFeature.cs` — RAG with document citations (native or synthesized via prompt-injection fallback).
   - `Chat/IPromptCachingFeature.cs` — Explicit cache breakpoints (Anthropic only).
+  - `Chat/IWebSearchFeature.cs` — Provider-hosted server-side web search with cited answers (Anthropic, OpenAI GPT-5).
   - `Embeddings/IImageEmbeddingFeature.cs` — Single image embedding.
   - `Embeddings/IMultimodalEmbeddingFeature.cs` — Mixed text+image embedding (Cohere Embed v4).
 - **`Models/`** — Unified DTOs (all immutable records):
   - `ChatCompletionRequest` (Messages, Model?, Temperature, MaxTokens, ExtraParameters)
-  - `ChatCompletionResponse` (Content, Usage, Status/IncompleteReason, IsSuccess/ErrorMessage, RawResponseJson/RawRequestJson, Refusal, CachedInputTokens, CacheCreationInputTokens)
+  - `ChatCompletionResponse` (Content, Usage, Status/IncompleteReason, IsSuccess/ErrorMessage, RawResponseJson/RawRequestJson, Refusal, CachedInputTokens, CacheCreationInputTokens, WebSearchCount `init`)
   - `EmbeddingRequest` / `EmbeddingResponse`
   - Reranking: `RerankRequest` (Query, Documents, Model?, TopN, MaxTokensPerDocument, ExtraParameters), `RerankResponse` (Results, Model, SearchUnits/InputTokens, IsSuccess/ErrorMessage, raw payloads), `RerankResult` (Index into the request documents, RelevanceScore)
   - `LlmMessage` (Role, Content, ContentParts, ToolCallId, ToolCalls) + factory methods `WithImage()`, `WithBase64Image()`
@@ -30,7 +31,8 @@ The only dependency needed by consuming applications.
   - `ChatCompletionChunk` (streaming) with `ToolCallDelta`
   - Tool calling: `ToolDefinition`, `ToolCall`, `ToolResult`, `ToolChoice` (Auto/None/Required/Specific), `ToolCallingOptions`, `ToolCallingResponse`
   - JSON output: `JsonOutputMode`, `JsonOutputOptions`
-  - Grounded chat: `DocumentChunk`, `Citation`, `CitationSource`, `CitationMode` (Accurate, Fast, Enabled, SearchResult), `GroundingKind`, `GroundedChatOptions`, `GroundedChatCompletionResponse`
+  - Grounded chat: `DocumentChunk`, `Citation`, `CitationSource`, `CitationMode` (Accurate, Fast, Enabled, SearchResult), `GroundingKind` (Native, Synthesized, WebSearch), `GroundedChatOptions`, `GroundedChatCompletionResponse`
+  - Web search: `WebSearchOptions` (Enabled)
   - Prompt caching: `PromptCachingOptions` (CacheSystemMessage, MessageBreakpoints, ToolBreakpoints)
   - Multimodal: `MultimodalEmbeddingInput`, `EmbeddingContentPart`, `TextEmbeddingContent`, `ImageEmbeddingContent`
 - **`Helpers/`** — Shared utilities: `JsonOutputHelper`, `RoleMapper`, `ContentPartHelper`, `ToolCallingHelper`, `EmbeddingHelper`, `GroundedChatHelper`, `GroundedChatFallbackHelper`
@@ -50,7 +52,7 @@ The only dependency needed by consuming applications.
 ## Providers
 
 ### `src/Cisharpai.OpenAi/`
-- `OpenAiChatCompletionClient` — Implements chat + JSON output + tool calling + streaming + grounded chat (GPT-5 only via Responses API `input_file`). Reports `CachedInputTokens` from `prompt_tokens_details.cached_tokens` (Chat Completions) and `input_tokens_details.cached_tokens` (Responses API). Routes by model: legacy (GPT-4), reasoning (o1/o3/o4), Responses API (GPT-5). Vision via data URI `image_url`. Static `Create(IHttpMessageHandlerFactory, options, ...)` for runtime construction.
+- `OpenAiChatCompletionClient` — Implements chat + JSON output + tool calling + streaming + grounded chat (GPT-5 only via Responses API `input_file`) + web search (GPT-5 only via Responses API `web_search` tool). Reports `CachedInputTokens` from `prompt_tokens_details.cached_tokens` (Chat Completions) and `input_tokens_details.cached_tokens` (Responses API). Routes by model: legacy (GPT-4), reasoning (o1/o3/o4), Responses API (GPT-5). Vision via data URI `image_url`. Static `Create(IHttpMessageHandlerFactory, options, ...)` for runtime construction.
 - `OpenAiEmbeddingClient` — Text embeddings. Static `Create(IHttpMessageHandlerFactory, options, ...)` for runtime construction.
 - `OpenAiModels` — Constants: `Chat.Gpt4_1`, `Chat.O3`, `Chat.O4Mini`, `Embedding.TextEmbedding3Small`, etc.
 - `OpenAiClientOptions` — BaseUrl, ApiKey, Organization, ReasoningEffort, TextVerbosity, DefaultModel.
@@ -67,9 +69,9 @@ Consolidated package for all Azure AI services. Uses HttpClient directly (no SDK
 - **Factory configs**: `AzureOpenAiClientConfiguration`, `AzureAiInferenceClientConfiguration` + corresponding factory providers.
 
 ### `src/Cisharpai.Anthropic/`
-- `AnthropicChatCompletionClient` — Chat + JSON output (via `output_config.format`) + tool calling (`tool_use`/`tool_result` blocks) + streaming (event-based SSE) + grounded chat (RAG via `document` content blocks with native citations; `CitationMode.SearchResult` switches to `search_result` blocks with pass-through `Source`/`Title`). Vision uses raw base64 (NOT data URIs). Static `Create(IHttpMessageHandlerFactory, options, ...)` for runtime construction.
+- `AnthropicChatCompletionClient` — Chat + JSON output (via `output_config.format`) + tool calling (`tool_use`/`tool_result` blocks) + streaming (event-based SSE) + grounded chat (RAG via `document` content blocks with native citations; `CitationMode.SearchResult` switches to `search_result` blocks with pass-through `Source`/`Title`) + web search (server-side `web_search` tool with configurable version). Vision uses raw base64 (NOT data URIs). Static `Create(IHttpMessageHandlerFactory, options, ...)` for runtime construction.
 - `AnthropicModels` — Constants: `Chat.ClaudeOpus4_5`, `Chat.ClaudeSonnet4_5`, `Chat.ClaudeHaiku4_5`, etc.
-- `AnthropicClientOptions` — BaseUrl, ApiKey, ApiVersion, DefaultModel.
+- `AnthropicClientOptions` — BaseUrl, ApiKey, ApiVersion, DefaultModel, WebSearchToolVersion (default `web_search_20260209`).
 - `AnthropicClientConfiguration` — Factory config record (chat only, no embedding).
 - `AnthropicClientFactoryProvider` / `AnthropicFactoryBuilderExtensions` — Factory support.
 
