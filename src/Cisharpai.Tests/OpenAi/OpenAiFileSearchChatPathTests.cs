@@ -215,4 +215,104 @@ public sealed class OpenAiFileSearchChatPathTests
             Assert.That(response.Content, Is.EqualTo("Partial results."));
         });
     }
+
+    #region Search Diagnostics
+
+    [Test]
+    public async Task FileSearch_FailedCallPlusFailedStatus_AppendsDiagnostic()
+    {
+        const string response = """
+            {
+                "id": "resp_1",
+                "model": "gpt-5-0",
+                "status": "failed",
+                "incomplete_details": { "reason": "content_filter" },
+                "output": [
+                    {
+                        "type": "file_search_call",
+                        "id": "fs_fail_001",
+                        "status": "failed"
+                    },
+                    {
+                        "type": "message",
+                        "role": "assistant",
+                        "content": [{ "type": "output_text", "text": "Partial answer." }]
+                    }
+                ],
+                "usage": { "input_tokens": 50, "output_tokens": 10 }
+            }
+            """;
+
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(response, System.Text.Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.openai.com/v1/") };
+        var client = new OpenAiChatCompletionClient(httpClient, new OpenAiClientOptions());
+
+        var result = await client.GetChatCompletionAsync(
+            new ChatCompletionRequest(
+                Messages: [new LlmMessage(LlmRole.User, "test")],
+                Model: "gpt-5-0"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.IsSuccess, Is.False);
+            Assert.That(result.ErrorMessage, Does.Contain("content_filter"),
+                "Original error from the failed status should be present");
+            Assert.That(result.ErrorMessage, Does.Contain("fs_fail_001"),
+                "Failed file search call ids should be appended, not dropped");
+            Assert.That(result.ErrorMessage, Does.Contain("file search"),
+                "File search failure detail should be appended");
+        });
+    }
+
+    [Test]
+    public async Task FileSearch_FailedCallOnlyNoTopLevelError_SetsDiagnostic()
+    {
+        const string response = """
+            {
+                "id": "resp_2",
+                "model": "gpt-5-0",
+                "status": "completed",
+                "output": [
+                    {
+                        "type": "file_search_call",
+                        "id": "fs_fail_002",
+                        "status": "failed"
+                    },
+                    {
+                        "type": "message",
+                        "role": "assistant",
+                        "content": [{ "type": "output_text", "text": "Answer without search." }]
+                    }
+                ],
+                "usage": { "input_tokens": 50, "output_tokens": 10 }
+            }
+            """;
+
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(response, System.Text.Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.openai.com/v1/") };
+        var client = new OpenAiChatCompletionClient(httpClient, new OpenAiClientOptions());
+
+        var result = await client.GetChatCompletionAsync(
+            new ChatCompletionRequest(
+                Messages: [new LlmMessage(LlmRole.User, "test")],
+                Model: "gpt-5-0"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.IsSuccess, Is.False);
+            Assert.That(result.ErrorMessage, Does.Contain("fs_fail_002"));
+        });
+    }
+
+    #endregion
 }

@@ -560,4 +560,106 @@ public sealed class OpenAiWebSearchTests
     }
 
     #endregion
+
+    #region Search Diagnostics
+
+    [Test]
+    public async Task WebSearch_FailedCallPlusFailedStatus_AppendsDiagnostic()
+    {
+        const string responseJson = """
+            {
+                "id": "resp_3",
+                "model": "gpt-5-0",
+                "status": "failed",
+                "incomplete_details": { "reason": "content_filter" },
+                "output": [
+                    {
+                        "type": "web_search_call",
+                        "id": "ws_fail_001",
+                        "status": "failed"
+                    },
+                    {
+                        "type": "message",
+                        "role": "assistant",
+                        "content": [{ "type": "output_text", "text": "Partial web answer." }]
+                    }
+                ],
+                "usage": { "input_tokens": 50, "output_tokens": 10 }
+            }
+            """;
+
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(responseJson, System.Text.Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.openai.com/v1/") };
+        var client = new OpenAiChatCompletionClient(httpClient, new OpenAiClientOptions());
+
+        var result = await client.GetChatCompletionWithWebSearchAsync(
+            new ChatCompletionRequest(
+                Messages: [new LlmMessage(LlmRole.User, "test")],
+                Model: "gpt-5-0"),
+            new WebSearchOptions());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.ChatCompletion.IsSuccess, Is.False);
+            Assert.That(result.ChatCompletion.ErrorMessage, Does.Contain("content_filter"),
+                "Original error from the failed status should be present");
+            Assert.That(result.ChatCompletion.ErrorMessage, Does.Contain("ws_fail_001"),
+                "Failed web search call ids should be appended, not dropped");
+            Assert.That(result.ChatCompletion.ErrorMessage, Does.Contain("web search"),
+                "Web search failure detail should be appended");
+        });
+    }
+
+    [Test]
+    public async Task WebSearch_FailedCallOnlyNoTopLevelError_SetsDiagnostic()
+    {
+        const string responseJson = """
+            {
+                "id": "resp_4",
+                "model": "gpt-5-0",
+                "status": "completed",
+                "output": [
+                    {
+                        "type": "web_search_call",
+                        "id": "ws_fail_002",
+                        "status": "failed"
+                    },
+                    {
+                        "type": "message",
+                        "role": "assistant",
+                        "content": [{ "type": "output_text", "text": "Answer." }]
+                    }
+                ],
+                "usage": { "input_tokens": 50, "output_tokens": 10 }
+            }
+            """;
+
+        var handler = new MockHttpMessageHandler((_, _) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(responseJson, System.Text.Encoding.UTF8, "application/json")
+            }));
+
+        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.openai.com/v1/") };
+        var client = new OpenAiChatCompletionClient(httpClient, new OpenAiClientOptions());
+
+        var result = await client.GetChatCompletionWithWebSearchAsync(
+            new ChatCompletionRequest(
+                Messages: [new LlmMessage(LlmRole.User, "test")],
+                Model: "gpt-5-0"),
+            new WebSearchOptions());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.ChatCompletion.IsSuccess, Is.False);
+            Assert.That(result.ChatCompletion.ErrorMessage, Does.Contain("ws_fail_002"));
+        });
+    }
+
+    #endregion
 }
