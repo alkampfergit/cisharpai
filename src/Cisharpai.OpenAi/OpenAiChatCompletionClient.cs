@@ -692,11 +692,12 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
 
         var isSuccess = !parsed.IsError && failedSearches.Count == 0;
         var errorMessage = parsed.ErrorMessage;
-        if (failedSearches.Count > 0 && errorMessage is null)
+        if (failedSearches.Count > 0)
         {
             var failedIds = string.Join(", ",
                 failedSearches.Select(f => f.Id ?? "unknown"));
-            errorMessage = $"{failedSearches.Count} of {fileSearchCalls.Count} file search(es) failed (ids: {failedIds})";
+            var detail = $"{failedSearches.Count} of {fileSearchCalls.Count} file search(es) failed (ids: {failedIds})";
+            errorMessage = errorMessage is null ? detail : $"{errorMessage}; {detail}";
         }
 
         return (isSuccess, errorMessage);
@@ -878,11 +879,12 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
 
         var isSuccess = !parsed.IsError && failedSearches.Count == 0;
         var errorMessage = parsed.ErrorMessage;
-        if (failedSearches.Count > 0 && errorMessage is null)
+        if (failedSearches.Count > 0)
         {
             var failedIds = string.Join(", ",
                 failedSearches.Select(f => f.Id ?? "unknown"));
-            errorMessage = $"{failedSearches.Count} of {searchCalls.Count} web search(es) failed (ids: {failedIds})";
+            var detail = $"{failedSearches.Count} of {searchCalls.Count} web search(es) failed (ids: {failedIds})";
+            errorMessage = errorMessage is null ? detail : $"{errorMessage}; {detail}";
         }
 
         var chatCompletion = new ChatCompletionResponse(

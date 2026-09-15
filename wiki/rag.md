@@ -727,10 +727,10 @@ Each `ForStore` call creates an independent retriever with no shared mutable sta
 
 ```csharp
 // Register OpenAI chat client first
-services.AddOpenAiClient(options => { options.ApiKey = "..."; });
+services.AddOpenAiClient(options => { options.ApiKey = "..."; options.DefaultModel = "gpt-5-0"; });
 
 // Then add hosted retrieval — injects IHostedRetrievalFeature into the client's features
-services.AddOpenAiHostedRetrieval(options => { options.ApiKey = "..."; });
+services.AddOpenAiHostedRetrieval(options => { options.ApiKey = "..."; options.DefaultModel = "gpt-5-0"; });
 
 // Bind a single store as a plain IRetriever
 services.AddSingleton<IRetriever>(sp =>

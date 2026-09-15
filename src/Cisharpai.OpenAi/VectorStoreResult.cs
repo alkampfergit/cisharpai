@@ -10,6 +10,15 @@ public sealed record VectorStoreResult<T>(
     T? Value,
     string? ErrorMessage = null)
 {
-    public static VectorStoreResult<T> Success(T value) => new(true, value);
-    public static VectorStoreResult<T> Error(string errorMessage) => new(false, default, errorMessage);
+    /// <summary>Raw JSON response body from the API, when available.</summary>
+    public string? RawResponseJson { get; init; }
+
+    /// <summary>Raw JSON request body sent to the API, when available.</summary>
+    public string? RawRequestJson { get; init; }
+
+    public static VectorStoreResult<T> Success(T value, string? rawResponseJson = null, string? rawRequestJson = null)
+        => new(true, value) { RawResponseJson = rawResponseJson, RawRequestJson = rawRequestJson };
+
+    public static VectorStoreResult<T> Error(string errorMessage, string? rawResponseJson = null, string? rawRequestJson = null)
+        => new(false, default, errorMessage) { RawResponseJson = rawResponseJson, RawRequestJson = rawRequestJson };
 }

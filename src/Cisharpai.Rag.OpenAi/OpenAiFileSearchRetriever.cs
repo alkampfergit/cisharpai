@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Text.Json;
 using Cisharpai.OpenAi.Models;
 using Cisharpai.Rag.Models;
 using Cisharpai.Rag.Packing;
@@ -30,10 +31,22 @@ internal sealed class OpenAiFileSearchRetriever : IRetriever
         _logger = logger;
     }
 
-    public async Task<IReadOnlyList<ScoredChunk>> RetrieveAsync(
+    public Task<IReadOnlyList<ScoredChunk>> RetrieveAsync(
         string query,
         int topK,
         CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        if (topK <= 0)
+            throw new ArgumentOutOfRangeException(nameof(topK), topK, "topK must be positive.");
+
+        return RetrieveCoreAsync(query, topK, cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<ScoredChunk>> RetrieveCoreAsync(
+        string query,
+        int topK,
+        CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
@@ -65,7 +78,7 @@ internal sealed class OpenAiFileSearchRetriever : IRetriever
             var response = await _client.PostAsync<OpenAiResponsesApiRequest, OpenAiResponsesApiResponse>(
                 "responses", request, cancellationToken: cancellationToken);
 
-            return MapFileSearchResults(response);
+            return MapFileSearchResults(response, topK);
         }
         catch (LlmHttpRequestException ex)
         {
@@ -73,14 +86,19 @@ internal sealed class OpenAiFileSearchRetriever : IRetriever
                 _vectorStoreId, ex.StatusCode);
             return [];
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
+        catch (JsonException ex)
+        {
+            _logger?.LogWarning(ex, "File search response parsing failed for store {StoreId}", _vectorStoreId);
+            return [];
+        }
+        catch (InvalidOperationException ex)
         {
             _logger?.LogWarning(ex, "File search retrieval failed for store {StoreId}", _vectorStoreId);
             return [];
         }
     }
 
-    private List<ScoredChunk> MapFileSearchResults(OpenAiResponsesApiResponse response)
+    private List<ScoredChunk> MapFileSearchResults(OpenAiResponsesApiResponse response, int topK)
     {
         var fileSearchCalls = response.Output
             .Where(o => o.Type == "file_search_call")
@@ -102,6 +120,7 @@ internal sealed class OpenAiFileSearchRetriever : IRetriever
             .Where(o => o.Status == "completed" && o.Results is not null)
             .SelectMany(o => o.Results!)
             .Select(MapToScoredChunk)
+            .Take(topK)
             .ToList();
 
         return results;

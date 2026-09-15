@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Cisharpai.Helpers;
 using Cisharpai.OpenAi.Models;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -48,10 +49,11 @@ public sealed class OpenAiVectorStoreClient
 
     public async Task<VectorStoreResult<OpenAiVectorStore>> CreateStoreAsync(
         OpenAiVectorStoreCreateRequest request,
+        JsonElement? extraParameters = null,
         CancellationToken cancellationToken = default)
     {
         return await PostAsync<OpenAiVectorStoreCreateRequest, OpenAiVectorStore>(
-            "vector_stores", request, cancellationToken);
+            "vector_stores", request, extraParameters, cancellationToken);
     }
 
     public async Task<VectorStoreResult<OpenAiVectorStore>> GetStoreAsync(
@@ -68,7 +70,7 @@ public sealed class OpenAiVectorStoreClient
         CancellationToken cancellationToken = default)
     {
         var query = $"vector_stores?limit={limit}";
-        if (after is not null) query += $"&after={after}";
+        if (after is not null) query += $"&after={Uri.EscapeDataString(after)}";
         return await GetAsync<OpenAiVectorStoreListResponse>(query, cancellationToken);
     }
 
@@ -97,14 +99,15 @@ public sealed class OpenAiVectorStoreClient
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
 
             if (!response.IsSuccessStatusCode)
-                return VectorStoreResult<OpenAiUploadedFile>.Error($"HTTP {(int)response.StatusCode}: {body}");
+                return VectorStoreResult<OpenAiUploadedFile>.Error(
+                    $"HTTP {(int)response.StatusCode}: {body}", rawResponseJson: body);
 
             var result = JsonSerializer.Deserialize<OpenAiUploadedFile>(body, JsonOptions);
             return result is not null
-                ? VectorStoreResult<OpenAiUploadedFile>.Success(result)
-                : VectorStoreResult<OpenAiUploadedFile>.Error("Failed to deserialize upload response.");
+                ? VectorStoreResult<OpenAiUploadedFile>.Success(result, rawResponseJson: body)
+                : VectorStoreResult<OpenAiUploadedFile>.Error("Failed to deserialize upload response.", rawResponseJson: body);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return VectorStoreResult<OpenAiUploadedFile>.Error(ex.Message);
         }
@@ -113,11 +116,12 @@ public sealed class OpenAiVectorStoreClient
     public async Task<VectorStoreResult<OpenAiVectorStoreFile>> AddFileToStoreAsync(
         string vectorStoreId,
         string fileId,
+        JsonElement? extraParameters = null,
         CancellationToken cancellationToken = default)
     {
         var request = new { file_id = fileId };
         return await PostAsync<object, OpenAiVectorStoreFile>(
-            $"vector_stores/{vectorStoreId}/files", request, cancellationToken);
+            $"vector_stores/{vectorStoreId}/files", request, extraParameters, cancellationToken);
     }
 
     public async Task<VectorStoreResult<OpenAiVectorStoreFile>> GetFileInStoreAsync(
@@ -136,7 +140,7 @@ public sealed class OpenAiVectorStoreClient
         CancellationToken cancellationToken = default)
     {
         var query = $"vector_stores/{vectorStoreId}/files?limit={limit}";
-        if (after is not null) query += $"&after={after}";
+        if (after is not null) query += $"&after={Uri.EscapeDataString(after)}";
         return await GetAsync<OpenAiVectorStoreFileListResponse>(query, cancellationToken);
     }
 
@@ -159,13 +163,9 @@ public sealed class OpenAiVectorStoreClient
     /// <summary>
     /// Polls the file status in a vector store until it reaches a terminal state
     /// (<c>completed</c>, <c>failed</c>, or <c>cancelled</c>) or the timeout expires.
+    /// Uses a deadline-linked cancellation token so that both in-flight requests and
+    /// delays are cancelled when the deadline passes.
     /// </summary>
-    /// <param name="vectorStoreId">The vector store ID.</param>
-    /// <param name="fileId">The file ID to poll.</param>
-    /// <param name="timeout">Maximum time to wait. Defaults to 5 minutes.</param>
-    /// <param name="pollInterval">Interval between polls. Defaults to 1 second.</param>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>The final file status, or an error if the timeout was reached or an API call failed.</returns>
     public async Task<VectorStoreResult<OpenAiVectorStoreFile>> PollFileUntilProcessedAsync(
         string vectorStoreId,
         string fileId,
@@ -177,25 +177,41 @@ public sealed class OpenAiVectorStoreClient
         var effectiveInterval = pollInterval ?? TimeSpan.FromSeconds(1);
         var deadline = DateTimeOffset.UtcNow + effectiveTimeout;
 
-        while (DateTimeOffset.UtcNow < deadline)
+        using var deadlineCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        deadlineCts.CancelAfter(effectiveTimeout);
+        var deadlineToken = deadlineCts.Token;
+
+        try
         {
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var result = await GetFileInStoreAsync(vectorStoreId, fileId, cancellationToken);
-            if (!result.IsSuccess)
-                return result;
-
-            var status = result.Value!.Status;
-            if (status is "completed" or "failed" or "cancelled")
-                return result;
-
-            if (_logger.IsEnabled(LogLevel.Debug))
+            while (true)
             {
-                _logger.LogDebug("File {FileId} in store {StoreId} status: {Status}, polling again in {Interval}ms",
-                    fileId, vectorStoreId, status, effectiveInterval.TotalMilliseconds);
-            }
+                deadlineToken.ThrowIfCancellationRequested();
 
-            await Task.Delay(effectiveInterval, cancellationToken);
+                var result = await GetFileInStoreAsync(vectorStoreId, fileId, deadlineToken);
+                if (!result.IsSuccess)
+                    return result;
+
+                var status = result.Value!.Status;
+                if (status is "completed" or "failed" or "cancelled")
+                    return result;
+
+                if (_logger.IsEnabled(LogLevel.Debug))
+                {
+                    _logger.LogDebug("File {FileId} in store {StoreId} status: {Status}, polling again in {Interval}ms",
+                        fileId, vectorStoreId, status, effectiveInterval.TotalMilliseconds);
+                }
+
+                var remaining = deadline - DateTimeOffset.UtcNow;
+                if (remaining <= TimeSpan.Zero)
+                    break;
+
+                var delay = effectiveInterval < remaining ? effectiveInterval : remaining;
+                await Task.Delay(delay, deadlineToken);
+            }
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            // Deadline expired, not caller cancellation
         }
 
         return VectorStoreResult<OpenAiVectorStoreFile>.Error(
@@ -203,16 +219,19 @@ public sealed class OpenAiVectorStoreClient
     }
 
     private async Task<VectorStoreResult<TResponse>> PostAsync<TRequest, TResponse>(
-        string uri, TRequest payload, CancellationToken cancellationToken)
+        string uri, TRequest payload, JsonElement? extraParameters, CancellationToken cancellationToken)
     {
         try
         {
             var json = JsonSerializer.Serialize(payload, JsonOptions);
+            if (extraParameters.HasValue && extraParameters.Value.ValueKind == JsonValueKind.Object)
+                json = JsonDeepMerge.Merge(json, extraParameters.Value);
+
             using var content = new StringContent(json, Encoding.UTF8, "application/json");
             using var response = await _httpClient.PostAsync(uri, content, cancellationToken);
-            return await ReadResponseAsync<TResponse>(response, cancellationToken);
+            return await ReadResponseAsync<TResponse>(response, json, cancellationToken);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return VectorStoreResult<TResponse>.Error(ex.Message);
         }
@@ -224,9 +243,9 @@ public sealed class OpenAiVectorStoreClient
         try
         {
             using var response = await _httpClient.GetAsync(uri, cancellationToken);
-            return await ReadResponseAsync<TResponse>(response, cancellationToken);
+            return await ReadResponseAsync<TResponse>(response, rawRequestJson: null, cancellationToken);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return VectorStoreResult<TResponse>.Error(ex.Message);
         }
@@ -238,25 +257,28 @@ public sealed class OpenAiVectorStoreClient
         try
         {
             using var response = await _httpClient.DeleteAsync(uri, cancellationToken);
-            return await ReadResponseAsync<TResponse>(response, cancellationToken);
+            return await ReadResponseAsync<TResponse>(response, rawRequestJson: null, cancellationToken);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
             return VectorStoreResult<TResponse>.Error(ex.Message);
         }
     }
 
     private static async Task<VectorStoreResult<TResponse>> ReadResponseAsync<TResponse>(
-        HttpResponseMessage response, CancellationToken cancellationToken)
+        HttpResponseMessage response, string? rawRequestJson, CancellationToken cancellationToken)
     {
         var body = await response.Content.ReadAsStringAsync(cancellationToken);
 
         if (!response.IsSuccessStatusCode)
-            return VectorStoreResult<TResponse>.Error($"HTTP {(int)response.StatusCode}: {body}");
+            return VectorStoreResult<TResponse>.Error(
+                $"HTTP {(int)response.StatusCode}: {body}",
+                rawResponseJson: body,
+                rawRequestJson: rawRequestJson);
 
         var result = JsonSerializer.Deserialize<TResponse>(body, JsonOptions);
         return result is not null
-            ? VectorStoreResult<TResponse>.Success(result)
-            : VectorStoreResult<TResponse>.Error("Failed to deserialize response.");
+            ? VectorStoreResult<TResponse>.Success(result, rawResponseJson: body, rawRequestJson: rawRequestJson)
+            : VectorStoreResult<TResponse>.Error("Failed to deserialize response.", rawResponseJson: body, rawRequestJson: rawRequestJson);
     }
 }
