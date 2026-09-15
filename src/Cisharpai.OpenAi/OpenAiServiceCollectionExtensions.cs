@@ -62,6 +62,30 @@ public static class OpenAiServiceCollectionExtensions
         return builder;
     }
 
+    public static IHttpClientBuilder AddOpenAiVectorStoreClient(
+        this IServiceCollection services,
+        Action<OpenAiClientOptions> configure)
+    {
+        var options = new OpenAiClientOptions();
+        configure(options);
+
+        var builder = services.AddHttpClient<OpenAiVectorStoreClient>(client =>
+            {
+                client.BaseAddress = new Uri(options.BaseUrl);
+                client.Timeout = TimeSpan.FromMinutes(5);
+            })
+            .AddHttpMessageHandler(() => new OpenAiAuthenticationHandler(options));
+
+        builder.AddCisharpaiResilienceHandler();
+
+        services.AddTransient(sp =>
+            new OpenAiVectorStoreClient(
+                sp.GetRequiredService<IHttpClientFactory>().CreateClient(typeof(OpenAiVectorStoreClient).Name),
+                sp.GetService<ILoggerFactory>()));
+
+        return builder;
+    }
+
     public static IHttpClientBuilder AddOpenAiClient(
         this IServiceCollection services,
         string key,

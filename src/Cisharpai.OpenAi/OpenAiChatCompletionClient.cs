@@ -658,6 +658,8 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         var parsed = ParseResponsesApiOutput(raw);
         var cachedTokens = raw.Usage.InputTokensDetails?.CachedTokens;
 
+        var (isSuccess, errorMessage) = CheckFileSearchCallFailures(raw, parsed);
+
         return new ChatCompletionResponse(
             Content: parsed.Content,
             Model: raw.Model,
@@ -667,10 +669,38 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
             RawRequestJson: rawRequestJson,
             Status: raw.Status,
             IncompleteReason: parsed.IncompleteReason,
-            IsSuccess: !parsed.IsError,
-            ErrorMessage: parsed.ErrorMessage,
+            IsSuccess: isSuccess,
+            ErrorMessage: errorMessage,
             Refusal: parsed.Refusal,
             CachedInputTokens: cachedTokens > 0 ? cachedTokens : null);
+    }
+
+    private static (bool IsSuccess, string? ErrorMessage) CheckFileSearchCallFailures(
+        OpenAiResponsesApiResponse raw,
+        ParsedResponsesApiOutput parsed)
+    {
+        var fileSearchCalls = raw.Output
+            .Where(o => o.Type == "file_search_call")
+            .ToList();
+
+        if (fileSearchCalls.Count == 0)
+            return (!parsed.IsError, parsed.ErrorMessage);
+
+        var failedSearches = fileSearchCalls
+            .Where(o => o.Status is not null && o.Status != "completed")
+            .ToList();
+
+        var isSuccess = !parsed.IsError && failedSearches.Count == 0;
+        var errorMessage = parsed.ErrorMessage;
+        if (failedSearches.Count > 0)
+        {
+            var failedIds = string.Join(", ",
+                failedSearches.Select(f => f.Id ?? "unknown"));
+            var detail = $"{failedSearches.Count} of {fileSearchCalls.Count} file search(es) failed (ids: {failedIds})";
+            errorMessage = errorMessage is null ? detail : $"{errorMessage}; {detail}";
+        }
+
+        return (isSuccess, errorMessage);
     }
 
     private static ChatCompletionResponse MapChatResponse(
@@ -849,11 +879,12 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
 
         var isSuccess = !parsed.IsError && failedSearches.Count == 0;
         var errorMessage = parsed.ErrorMessage;
-        if (failedSearches.Count > 0 && errorMessage is null)
+        if (failedSearches.Count > 0)
         {
             var failedIds = string.Join(", ",
                 failedSearches.Select(f => f.Id ?? "unknown"));
-            errorMessage = $"{failedSearches.Count} of {searchCalls.Count} web search(es) failed (ids: {failedIds})";
+            var detail = $"{failedSearches.Count} of {searchCalls.Count} web search(es) failed (ids: {failedIds})";
+            errorMessage = errorMessage is null ? detail : $"{errorMessage}; {detail}";
         }
 
         var chatCompletion = new ChatCompletionResponse(

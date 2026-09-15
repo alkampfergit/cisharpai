@@ -47,6 +47,14 @@ public sealed class OpenAiResponseOutput
 
     [JsonPropertyName("content")]
     public List<OpenAiResponseContent> Content { get; set; } = [];
+
+    [JsonPropertyName("queries")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<string>? Queries { get; set; }
+
+    [JsonPropertyName("results")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<OpenAiFileSearchResult>? Results { get; set; }
 }
 
 public sealed class OpenAiResponseContent
@@ -124,4 +132,23 @@ public sealed class OpenAiInputTokensDetails
 {
     [JsonPropertyName("cached_tokens")]
     public int CachedTokens { get; set; }
+}
+
+public sealed class OpenAiFileSearchResult
+{
+    [JsonPropertyName("file_id")]
+    public string FileId { get; set; } = string.Empty;
+
+    [JsonPropertyName("filename")]
+    public string Filename { get; set; } = string.Empty;
+
+    [JsonPropertyName("score")]
+    public double Score { get; set; }
+
+    [JsonPropertyName("text")]
+    public string Text { get; set; } = string.Empty;
+
+    [JsonPropertyName("attributes")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, object>? Attributes { get; set; }
 }

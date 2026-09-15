@@ -27,7 +27,7 @@ await foreach (var chunk in chunker.ChunkAsync(document))
 
 `ITextChunker.ChunkAsync` returns `IAsyncEnumerable<TextChunk>` to support chunkers that need network I/O (e.g. semantic chunking via an embedding client). `FixedSizeChunker` is synchronous internally but exposes the async-streaming shape.
 
-Size and overlap count **Unicode scalar values**, not UTF-16 code units, grapheme clusters, bytes, or tokens. A supplementary character such as an emoji counts as one scalar; combining sequences can span chunks. `StartOffset` and `EndOffset` are zero-based UTF-16 offsets that always delimit the original source span: `document.Text.Substring(chunk.StartOffset, chunk.EndOffset - chunk.StartOffset)` recovers the source slice for any chunker. For **verbatim** chunkers (all built-in chunkers), `Text` equals that source slice and `EndOffset == StartOffset + Text.Length`; callers may use `document.Text.Substring(chunk.StartOffset, chunk.Text.Length)` in that case. For **non-verbatim** chunkers (e.g. contextual retrieval that prefixes generated text), `Text` may differ from the source span and `Text.Length` does not equal the source span length — use `EndOffset - StartOffset` for the source range. `Metadata` is an `IReadOnlyDictionary<string, object?>` carrying chunker-specific data (e.g. boundary type, similarity score); it is defensively copied on construction, defaults to empty, and is never null. Valid surrogate pairs are never split. Built-in (verbatim) chunkers preserve text and whitespace exactly; non-verbatim chunkers may transform chunk text while preserving source offsets. Empty documents yield no chunks, and no redundant overlap-only final chunk is produced. IDs must be nonblank, text must be nonnull, and callers own ID uniqueness. Chunk indices start at zero for each document.
+Size and overlap count **Unicode scalar values**, not UTF-16 code units, grapheme clusters, bytes, or tokens. A supplementary character such as an emoji counts as one scalar; combining sequences can span chunks. For locally-chunked text, `StartOffset` and `EndOffset` are zero-based UTF-16 offsets that delimit the original source span: `document.Text.Substring(chunk.StartOffset, chunk.EndOffset - chunk.StartOffset)` recovers the source slice for any chunker. **For hosted retrieval** (e.g. OpenAI `file_search`), offsets are passage-relative — `StartOffset` is `0` and `EndOffset` is `Text.Length` — because the provider chunked the file and returns a passage whose position in the original document is unknown. Do not assume offsets from different retrieval sources are comparable. For **verbatim** chunkers (all built-in chunkers), `Text` equals that source slice and `EndOffset == StartOffset + Text.Length`; callers may use `document.Text.Substring(chunk.StartOffset, chunk.Text.Length)` in that case. For **non-verbatim** chunkers (e.g. contextual retrieval that prefixes generated text), `Text` may differ from the source span and `Text.Length` does not equal the source span length — use `EndOffset - StartOffset` for the source range. `Metadata` is an `IReadOnlyDictionary<string, object?>` carrying chunker-specific data (e.g. boundary type, similarity score); it is defensively copied on construction, defaults to empty, and is never null. Valid surrogate pairs are never split. Built-in (verbatim) chunkers preserve text and whitespace exactly; non-verbatim chunkers may transform chunk text while preserving source offsets. Empty documents yield no chunks, and no redundant overlap-only final chunk is produced. IDs must be nonblank, text must be nonnull, and callers own ID uniqueness. Chunk indices start at zero for each document.
 
 ## Direct pipeline and bulk embedding
 
@@ -700,6 +700,84 @@ public class Bm25Retriever : IRetriever
 }
 ```
 
+### Hosted retrieval (OpenAI file_search)
+
+`IHostedRetrievalFeature` is a factory that returns an `IRetriever` bound to a specific provider-hosted vector store. The provider manages chunking, embedding, and search — the caller supplies only a store identifier and a query.
+
+**Install `Cisharpai.Rag.OpenAi`** to use hosted retrieval — it is a separate bridge package that connects `Cisharpai.OpenAi` with `Cisharpai.Rag`. The `Cisharpai.OpenAi` package itself does not depend on `Cisharpai.Rag`, so users who only need chat completions are not burdened with the RAG dependency.
+
+```csharp
+using Cisharpai.OpenAi;
+using Cisharpai.Rag;
+using Cisharpai.Rag.OpenAi;
+
+var client = new OpenAiChatCompletionClient(httpClient, options);
+
+// Create the hosted retrieval feature and inject it into the client's feature collection
+var feature = new OpenAiHostedRetrievalFeature(httpClient, options);
+client.Features.Set<IHostedRetrievalFeature>(feature);
+
+// Discovery now works
+var resolved = client.Features.Get<IHostedRetrievalFeature>()!;
+IRetriever retriever = resolved.ForStore("vs_my_store_id");
+IReadOnlyList<ScoredChunk> results = await retriever.RetrieveAsync("What is the refund policy?", topK: 5);
+```
+
+Each `ForStore` call creates an independent retriever with no shared mutable state — two concurrent retrievals against different stores do not interfere. Consumers that only need retrieval depend on `IRetriever`, never on the hosted feature directly. DI registration:
+
+```csharp
+// Register OpenAI chat client first
+services.AddOpenAiClient(options => { options.ApiKey = "..."; options.DefaultModel = "gpt-5-0"; });
+
+// Then add hosted retrieval — injects IHostedRetrievalFeature into the client's features
+services.AddOpenAiHostedRetrieval(options => { options.ApiKey = "..."; options.DefaultModel = "gpt-5-0"; });
+
+// Bind a single store as a plain IRetriever
+services.AddSingleton<IRetriever>(sp =>
+    sp.GetRequiredService<IHostedRetrievalFeature>().ForStore(storeId));
+```
+
+**TextChunk mapping for hosted results:**
+
+| Field | Value | Rationale |
+|-------|-------|-----------|
+| `DocumentId` | OpenAI file id | Truthful provenance |
+| `Index` | Per-file passage ordinal (`0, 1, 2, …`) | Assigned in provider return order per `file_id`, before any sorting. Required for `RankFusion` identity: `(DocumentId, Index)` must be unique per passage so per-list dedup does not collapse distinct results from the same file |
+| `StartOffset` | `0` | Passage-relative (provider-chunked, source offset unknown) |
+| `EndOffset` | `Text.Length` | Passage-relative |
+| `Metadata` | `file_id`, `filename`, provider attributes | Nothing lost |
+
+**Error handling:** a failed `file_search_call` on the `IRetriever` path returns an empty list and logs the failure — it does not throw. On the chat path (`GetChatCompletionAsync`), a failed `file_search_call` sets `IsSuccess=false` with content preserved and `ErrorMessage` naming the failed call IDs, matching `IWebSearchFeature` semantics.
+
+### Vector store management (OpenAI)
+
+`OpenAiVectorStoreClient` wraps the OpenAI Vector Stores and Files APIs for store and file lifecycle management. This is a provider-specific client, not a generic storage abstraction.
+
+```csharp
+using Cisharpai.OpenAi;
+using Cisharpai.OpenAi.Models;
+
+var vsClient = OpenAiVectorStoreClient.Create(options);
+
+// Create a store
+var store = await vsClient.CreateStoreAsync(new OpenAiVectorStoreCreateRequest { Name = "My Docs" });
+
+// Upload a file
+using var stream = File.OpenRead("document.pdf");
+var file = await vsClient.UploadFileAsync(stream, "document.pdf");
+
+// Add the file to the store and poll until processed
+await vsClient.AddFileToStoreAsync(store.Value!.Id, file.Value!.Id);
+var processed = await vsClient.PollFileUntilProcessedAsync(
+    store.Value.Id, file.Value.Id,
+    timeout: TimeSpan.FromMinutes(5));
+
+if (processed.Value?.Status == "failed")
+    Console.WriteLine($"Processing failed: {processed.Value.LastError?.Message}");
+```
+
+**Scope boundary:** this client wraps provider-hosted file and store APIs. Local file management, document parsing, and storage abstractions over third-party stores are out of scope.
+
 ## Offline tests
 
-Reuse `FakeEmbeddingClient` with one vector per submitted chunk, `FakeTokenCounter` for token counting (including with `ContextPacker`), and `FakeRetriever` for retrieval. See [Testing](testing.md#rag-ingestion-tests) for a complete example and test commands.
+Reuse `FakeEmbeddingClient` with one vector per submitted chunk, `FakeTokenCounter` for token counting (including with `ContextPacker`), `FakeRetriever` for retrieval, and `FakeHostedRetrievalFeature` for hosted retrieval. See [Testing](testing.md#rag-ingestion-tests) for a complete example and test commands.

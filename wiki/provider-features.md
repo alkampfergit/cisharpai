@@ -18,6 +18,7 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Multimodal Embeddings | `IMultimodalEmbeddingFeature` | Embed mixed text + image inputs in a single request |
 | Grounded Chat (RAG) | `IGroundedChatFeature` | Chat with document grounding and citations |
 | Web Search | `IWebSearchFeature` | Provider-hosted server-side web search with cited answers |
+| Hosted Retrieval | `IHostedRetrievalFeature` | Provider-hosted vector store retrieval via `IRetriever` factory |
 | Tool Calling | `IToolCallingFeature` | Function calling / tool use in chat completions |
 | Vision (Image Input) | `LlmMessage.ContentParts` | Send images inline in chat messages for visual understanding |
 | Streaming | `IStreamingChatFeature` | Stream chat completions token-by-token via SSE |
@@ -42,6 +43,7 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Responses API (GPT-5) | Yes | Yes | -- | -- | -- |
 | Grounded Chat (RAG) | Yes (native) | Yes (native) | Yes (fallback) | Yes (native) | Yes (native) |
 | Web Search | Yes (GPT-5) | -- | -- | Yes | -- |
+| Hosted Retrieval | Yes | -- | -- | -- | -- |
 | Tool Calling | Yes | Yes | Yes | Yes | Yes |
 | Vision (Image Input) | Yes | Yes | Yes | Yes | Partial* |
 | Streaming | Yes | Yes | Yes | Yes | Yes |
