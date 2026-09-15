@@ -397,5 +397,47 @@ public sealed class OpenAiVectorStoreClientAdditionalTests
         });
     }
 
+    [Test]
+    public async Task CreateStore_MalformedJson2xx_CarriesRawPayloads()
+    {
+        const string malformedBody = "{ not valid json at all }}}";
+        string? capturedRequest = null;
+
+        var client = CreateClient(async (req, _) =>
+        {
+            capturedRequest = await req.Content!.ReadAsStringAsync(CancellationToken.None);
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(malformedBody, System.Text.Encoding.UTF8, "application/json")
+            };
+        });
+
+        var result = await client.CreateStoreAsync(new OpenAiVectorStoreCreateRequest { Name = "test" });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.IsSuccess, Is.False);
+            Assert.That(result.ErrorMessage, Does.Contain("Deserialization failed"));
+            Assert.That(result.RawResponseJson, Is.EqualTo(malformedBody));
+            Assert.That(result.RawRequestJson, Is.Not.Null);
+        });
+    }
+
+    [Test]
+    public async Task GetStore_MalformedJson2xx_CarriesRawResponseJson()
+    {
+        const string malformedBody = "<<<not json>>>";
+        var client = CreateClient(malformedBody);
+
+        var result = await client.GetStoreAsync("vs_abc123");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.IsSuccess, Is.False);
+            Assert.That(result.ErrorMessage, Does.Contain("Deserialization failed"));
+            Assert.That(result.RawResponseJson, Is.EqualTo(malformedBody));
+        });
+    }
+
     #endregion
 }

@@ -43,7 +43,7 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Responses API (GPT-5) | Yes | Yes | -- | -- | -- |
 | Grounded Chat (RAG) | Yes (native) | Yes (native) | Yes (fallback) | Yes (native) | Yes (native) |
 | Web Search | Yes (GPT-5) | -- | -- | Yes | -- |
-| Hosted Retrieval | Yes (GPT-5) | -- | -- | -- | -- |
+| Hosted Retrieval | Yes | -- | -- | -- | -- |
 | Tool Calling | Yes | Yes | Yes | Yes | Yes |
 | Vision (Image Input) | Yes | Yes | Yes | Yes | Partial* |
 | Streaming | Yes | Yes | Yes | Yes | Yes |

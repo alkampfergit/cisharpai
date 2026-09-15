@@ -76,7 +76,7 @@ internal sealed class OpenAiFileSearchRetriever : IRetriever
             };
 
             var response = await _client.PostAsync<OpenAiResponsesApiRequest, OpenAiResponsesApiResponse>(
-                "responses", request, cancellationToken: cancellationToken);
+                "responses", request, cancellationToken: cancellationToken).ConfigureAwait(false);
 
             return MapFileSearchResults(response, topK);
         }
@@ -119,14 +119,23 @@ internal sealed class OpenAiFileSearchRetriever : IRetriever
         var results = fileSearchCalls
             .Where(o => o.Status == "completed" && o.Results is not null)
             .SelectMany(o => o.Results!)
-            .Select(MapToScoredChunk)
-            .Take(topK)
             .ToList();
 
-        return results;
+        var perFileOrdinals = new Dictionary<string, int>();
+        var scored = new List<ScoredChunk>(results.Count);
+        foreach (var r in results)
+        {
+            perFileOrdinals.TryGetValue(r.FileId, out var ordinal);
+            scored.Add(MapToScoredChunk(r, ordinal));
+            perFileOrdinals[r.FileId] = ordinal + 1;
+        }
+
+        scored.Sort((a, b) => b.Score.CompareTo(a.Score));
+
+        return scored.Count <= topK ? scored : scored.GetRange(0, topK);
     }
 
-    private static ScoredChunk MapToScoredChunk(OpenAiFileSearchResult result)
+    private static ScoredChunk MapToScoredChunk(OpenAiFileSearchResult result, int perFileOrdinal)
     {
         var metadata = new Dictionary<string, object?>
         {
@@ -142,7 +151,7 @@ internal sealed class OpenAiFileSearchRetriever : IRetriever
 
         var chunk = new TextChunk(
             DocumentId: result.FileId,
-            Index: 0,
+            Index: perFileOrdinal,
             StartOffset: 0,
             EndOffset: result.Text.Length,
             Text: result.Text,

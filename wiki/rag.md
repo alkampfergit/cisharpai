@@ -742,7 +742,7 @@ services.AddSingleton<IRetriever>(sp =>
 | Field | Value | Rationale |
 |-------|-------|-----------|
 | `DocumentId` | OpenAI file id | Truthful provenance |
-| `Index` | `0` | Rank carried by list order per `IRetriever` contract |
+| `Index` | Per-file passage ordinal (`0, 1, 2, …`) | Assigned in provider return order per `file_id`, before any sorting. Required for `RankFusion` identity: `(DocumentId, Index)` must be unique per passage so per-list dedup does not collapse distinct results from the same file |
 | `StartOffset` | `0` | Passage-relative (provider-chunked, source offset unknown) |
 | `EndOffset` | `Text.Length` | Passage-relative |
 | `Metadata` | `file_id`, `filename`, provider attributes | Nothing lost |

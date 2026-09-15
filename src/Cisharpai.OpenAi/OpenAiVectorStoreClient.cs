@@ -275,9 +275,19 @@ public sealed class OpenAiVectorStoreClient
                 rawResponseJson: body,
                 rawRequestJson: rawRequestJson);
 
-        var result = JsonSerializer.Deserialize<TResponse>(body, JsonOptions);
-        return result is not null
-            ? VectorStoreResult<TResponse>.Success(result, rawResponseJson: body, rawRequestJson: rawRequestJson)
-            : VectorStoreResult<TResponse>.Error("Failed to deserialize response.", rawResponseJson: body, rawRequestJson: rawRequestJson);
+        try
+        {
+            var result = JsonSerializer.Deserialize<TResponse>(body, JsonOptions);
+            return result is not null
+                ? VectorStoreResult<TResponse>.Success(result, rawResponseJson: body, rawRequestJson: rawRequestJson)
+                : VectorStoreResult<TResponse>.Error("Failed to deserialize response.", rawResponseJson: body, rawRequestJson: rawRequestJson);
+        }
+        catch (JsonException ex)
+        {
+            return VectorStoreResult<TResponse>.Error(
+                $"Deserialization failed: {ex.Message}",
+                rawResponseJson: body,
+                rawRequestJson: rawRequestJson);
+        }
     }
 }

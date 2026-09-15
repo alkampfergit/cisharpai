@@ -206,6 +206,108 @@ public sealed class OpenAiFileSearchRetrievalTests
         }
         """;
 
+    private const string FileSearchSameFileMultiplePassagesResponse = """
+        {
+            "id": "resp_fs_006",
+            "model": "gpt-5-0",
+            "status": "completed",
+            "output": [
+                {
+                    "type": "file_search_call",
+                    "id": "fs_call_006",
+                    "status": "completed",
+                    "queries": ["query"],
+                    "results": [
+                        {
+                            "file_id": "file-same",
+                            "filename": "big.pdf",
+                            "score": 0.95,
+                            "text": "First passage from the file."
+                        },
+                        {
+                            "file_id": "file-same",
+                            "filename": "big.pdf",
+                            "score": 0.80,
+                            "text": "Second passage from the file."
+                        },
+                        {
+                            "file_id": "file-same",
+                            "filename": "big.pdf",
+                            "score": 0.70,
+                            "text": "Third passage from the file."
+                        }
+                    ]
+                },
+                {
+                    "type": "message",
+                    "role": "assistant",
+                    "content": [
+                        { "type": "output_text", "text": "Answer." }
+                    ]
+                }
+            ],
+            "usage": { "input_tokens": 100, "output_tokens": 10 }
+        }
+        """;
+
+    private const string FileSearchMultiCallUnsortedResponse = """
+        {
+            "id": "resp_fs_007",
+            "model": "gpt-5-0",
+            "status": "completed",
+            "output": [
+                {
+                    "type": "file_search_call",
+                    "id": "fs_call_a",
+                    "status": "completed",
+                    "queries": ["query"],
+                    "results": [
+                        {
+                            "file_id": "file-a",
+                            "filename": "a.pdf",
+                            "score": 0.50,
+                            "text": "Low score from first call."
+                        },
+                        {
+                            "file_id": "file-a",
+                            "filename": "a.pdf",
+                            "score": 0.40,
+                            "text": "Even lower score from first call."
+                        }
+                    ]
+                },
+                {
+                    "type": "file_search_call",
+                    "id": "fs_call_b",
+                    "status": "completed",
+                    "queries": ["query"],
+                    "results": [
+                        {
+                            "file_id": "file-b",
+                            "filename": "b.pdf",
+                            "score": 0.99,
+                            "text": "Highest score from second call."
+                        },
+                        {
+                            "file_id": "file-b",
+                            "filename": "b.pdf",
+                            "score": 0.85,
+                            "text": "Second highest from second call."
+                        }
+                    ]
+                },
+                {
+                    "type": "message",
+                    "role": "assistant",
+                    "content": [
+                        { "type": "output_text", "text": "Answer." }
+                    ]
+                }
+            ],
+            "usage": { "input_tokens": 100, "output_tokens": 10 }
+        }
+        """;
+
     #endregion
 
     #region Helpers
@@ -409,14 +511,18 @@ public sealed class OpenAiFileSearchRetrievalTests
     }
 
     [Test]
-    public async Task Retrieve_MapsIndexToZero()
+    public async Task Retrieve_MapsIndex_PerFileOrdinal()
     {
         var (_, feature, _) = CreateClientWithFeature(FileSearchSuccessResponse);
         var retriever = feature.ForStore("vs_test");
 
         var results = await retriever.RetrieveAsync("query", 10);
 
-        Assert.That(results[0].Chunk.Index, Is.EqualTo(0));
+        Assert.Multiple(() =>
+        {
+            Assert.That(results[0].Chunk.Index, Is.EqualTo(0));
+            Assert.That(results[1].Chunk.Index, Is.EqualTo(0));
+        });
     }
 
     [Test]
@@ -533,6 +639,116 @@ public sealed class OpenAiFileSearchRetrievalTests
 
         Assert.ThrowsAsync<InvalidOperationException>(
             () => retriever.RetrieveAsync("query", 5));
+    }
+
+    #endregion
+
+    #region Per-File Ordinals and Sorting
+
+    [Test]
+    public async Task Retrieve_SameFile_AssignsDistinctPerFileOrdinals()
+    {
+        var (_, feature, _) = CreateClientWithFeature(FileSearchSameFileMultiplePassagesResponse);
+        var retriever = feature.ForStore("vs_test");
+
+        var results = await retriever.RetrieveAsync("query", 10);
+
+        Assert.That(results, Has.Count.EqualTo(3));
+        Assert.Multiple(() =>
+        {
+            Assert.That(results.Select(r => r.Chunk.Index).Distinct().Count(), Is.EqualTo(3));
+            Assert.That(results.All(r => r.Chunk.DocumentId == "file-same"), Is.True);
+        });
+    }
+
+    [Test]
+    public async Task Retrieve_SameFile_OrdinalsDerivedFromProviderOrder_NotSortOrder()
+    {
+        var (_, feature, _) = CreateClientWithFeature(FileSearchSameFileMultiplePassagesResponse);
+        var retriever = feature.ForStore("vs_test");
+
+        var results = await retriever.RetrieveAsync("query", 10);
+
+        // Provider order: score 0.95 (ordinal 0), 0.80 (ordinal 1), 0.70 (ordinal 2)
+        // After sort by score descending, ordinals should remain: 0, 1, 2
+        Assert.Multiple(() =>
+        {
+            Assert.That(results[0].Chunk.Index, Is.EqualTo(0));
+            Assert.That(results[0].Score, Is.EqualTo(0.95).Within(0.001));
+            Assert.That(results[1].Chunk.Index, Is.EqualTo(1));
+            Assert.That(results[1].Score, Is.EqualTo(0.80).Within(0.001));
+            Assert.That(results[2].Chunk.Index, Is.EqualTo(2));
+            Assert.That(results[2].Score, Is.EqualTo(0.70).Within(0.001));
+        });
+    }
+
+    [Test]
+    public async Task Retrieve_SameFile_SurvivesRankFusion_AsDistinctEntries()
+    {
+        var (_, feature, _) = CreateClientWithFeature(FileSearchSameFileMultiplePassagesResponse);
+        var retriever = feature.ForStore("vs_test");
+
+        var results = await retriever.RetrieveAsync("query", 10);
+
+        // Verify the precondition: all from same file
+        Assert.That(results.All(r => r.Chunk.DocumentId == "file-same"), Is.True);
+
+        // Feed through RankFusion as a single list — all three must survive dedup
+        var fused = RankFusion.ReciprocalRank(new[] { results });
+
+        Assert.That(fused, Has.Count.EqualTo(3),
+            "Three passages from the same file_id must survive RankFusion as distinct entries because their per-file ordinals give them distinct (DocumentId, Index) identities.");
+    }
+
+    [Test]
+    public async Task Retrieve_MultiCall_SortsByScoreDescending()
+    {
+        var (_, feature, _) = CreateClientWithFeature(FileSearchMultiCallUnsortedResponse);
+        var retriever = feature.ForStore("vs_test");
+
+        var results = await retriever.RetrieveAsync("query", 10);
+
+        Assert.That(results, Has.Count.EqualTo(4));
+        for (int i = 1; i < results.Count; i++)
+        {
+            Assert.That(results[i].Score, Is.LessThanOrEqualTo(results[i - 1].Score),
+                $"Result at index {i} (score {results[i].Score}) should not rank above index {i - 1} (score {results[i - 1].Score}).");
+        }
+    }
+
+    [Test]
+    public async Task Retrieve_MultiCall_TopKTruncatesAfterSorting()
+    {
+        var (_, feature, _) = CreateClientWithFeature(FileSearchMultiCallUnsortedResponse);
+        var retriever = feature.ForStore("vs_test");
+
+        // 4 results across two calls; topK=2 should keep the two highest-scoring
+        var results = await retriever.RetrieveAsync("query", 2);
+
+        Assert.That(results, Has.Count.EqualTo(2));
+        Assert.Multiple(() =>
+        {
+            Assert.That(results[0].Score, Is.EqualTo(0.99).Within(0.001), "Highest scoring result from second call should be first");
+            Assert.That(results[1].Score, Is.EqualTo(0.85).Within(0.001), "Second highest scoring result from second call should be second");
+        });
+    }
+
+    [Test]
+    public async Task Retrieve_MultiCall_PerFileOrdinalsArePerFile_NotGlobal()
+    {
+        var (_, feature, _) = CreateClientWithFeature(FileSearchMultiCallUnsortedResponse);
+        var retriever = feature.ForStore("vs_test");
+
+        var results = await retriever.RetrieveAsync("query", 10);
+
+        var fileAResults = results.Where(r => r.Chunk.DocumentId == "file-a").ToList();
+        var fileBResults = results.Where(r => r.Chunk.DocumentId == "file-b").ToList();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(fileAResults.Select(r => r.Chunk.Index), Is.EquivalentTo(new[] { 0, 1 }));
+            Assert.That(fileBResults.Select(r => r.Chunk.Index), Is.EquivalentTo(new[] { 0, 1 }));
+        });
     }
 
     #endregion
