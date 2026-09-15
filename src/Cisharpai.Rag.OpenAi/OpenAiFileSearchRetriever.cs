@@ -5,23 +5,23 @@ using Cisharpai.Rag.Models;
 using Cisharpai.Rag.Packing;
 using Microsoft.Extensions.Logging;
 
-namespace Cisharpai.OpenAi;
+namespace Cisharpai.Rag.OpenAi;
 
 /// <summary>
 /// An <see cref="IRetriever"/> that queries an OpenAI hosted vector store via the
 /// Responses API <c>file_search</c> tool. Created by
-/// <see cref="OpenAiChatCompletionClient.ForStore"/>.
+/// <see cref="OpenAiHostedRetrievalFeature.ForStore"/>.
 /// </summary>
 internal sealed class OpenAiFileSearchRetriever : IRetriever
 {
     private readonly LlmHttpClient _client;
-    private readonly OpenAiClientOptions _options;
+    private readonly Cisharpai.OpenAi.OpenAiClientOptions _options;
     private readonly string _vectorStoreId;
     private readonly ILogger? _logger;
 
     internal OpenAiFileSearchRetriever(
         LlmHttpClient client,
-        OpenAiClientOptions options,
+        Cisharpai.OpenAi.OpenAiClientOptions options,
         string vectorStoreId,
         ILogger? logger)
     {

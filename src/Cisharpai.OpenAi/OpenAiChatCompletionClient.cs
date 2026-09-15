@@ -5,13 +5,12 @@ using Cisharpai.Features.Chat;
 using Cisharpai.Helpers;
 using Cisharpai.Models;
 using Cisharpai.OpenAi.Models;
-using Cisharpai.Rag;
 using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.OpenAi;
 
-public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature, IStreamingChatFeature, IGroundedChatFeature, IWebSearchFeature, IHostedRetrievalFeature
+public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature, IStreamingChatFeature, IGroundedChatFeature, IWebSearchFeature
 {
     private const string ChatCompletionsEndpoint = "chat/completions";
     private const string ResponsesEndpoint = "responses";
@@ -39,7 +38,6 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         features.Set<IStreamingChatFeature>(this);
         features.Set<IGroundedChatFeature>(this);
         features.Set<IWebSearchFeature>(this);
-        features.Set<IHostedRetrievalFeature>(this);
         Features = features;
     }
 
@@ -960,16 +958,6 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
                     Type: a.Type);
             })
             .ToList();
-    }
-
-    public IRetriever ForStore(string vectorStoreId)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(vectorStoreId);
-        return new OpenAiFileSearchRetriever(
-            _client,
-            _options,
-            vectorStoreId,
-            _loggerFactory?.CreateLogger<OpenAiFileSearchRetriever>());
     }
 
     private string ResolveModel(string? model)

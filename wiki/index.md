@@ -6,7 +6,7 @@ Cisharpai is a unified .NET client library providing a single `IChatCompletionCl
 
 | Provider | Package | Chat | Embeddings | Reranking | Notes |
 |----------|---------|------|------------|-----------|-------|
-| OpenAI | `Cisharpai.OpenAi` | Yes | Yes | -- | Chat Completions, Responses API (GPT-5), reasoning models |
+| OpenAI | `Cisharpai.OpenAi` | Yes | Yes | -- | Chat Completions, Responses API (GPT-5), reasoning models. Hosted retrieval via `Cisharpai.Rag.OpenAi` bridge. |
 | Azure OpenAI | `Cisharpai.Azure` | Yes | Yes | -- | Deployment-based routing, Azure AD auth, Responses API (GPT-5) |
 | Azure AI Inference | `Cisharpai.Azure` | Yes | Yes | -- | Model catalog: Phi, Llama, Mistral; image embeddings |
 | Anthropic | `Cisharpai.Anthropic` | Yes | -- | -- | Claude model family, grounded chat (RAG) |

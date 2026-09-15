@@ -704,20 +704,35 @@ public class Bm25Retriever : IRetriever
 
 `IHostedRetrievalFeature` is a factory that returns an `IRetriever` bound to a specific provider-hosted vector store. The provider manages chunking, embedding, and search — the caller supplies only a store identifier and a query.
 
+**Install `Cisharpai.Rag.OpenAi`** to use hosted retrieval — it is a separate bridge package that connects `Cisharpai.OpenAi` with `Cisharpai.Rag`. The `Cisharpai.OpenAi` package itself does not depend on `Cisharpai.Rag`, so users who only need chat completions are not burdened with the RAG dependency.
+
 ```csharp
+using Cisharpai.OpenAi;
 using Cisharpai.Rag;
+using Cisharpai.Rag.OpenAi;
 
 var client = new OpenAiChatCompletionClient(httpClient, options);
-var feature = client.Features.Get<IHostedRetrievalFeature>()!;
 
-// Create a retriever for a specific vector store
-IRetriever retriever = feature.ForStore("vs_my_store_id");
+// Create the hosted retrieval feature and inject it into the client's feature collection
+var feature = new OpenAiHostedRetrievalFeature(httpClient, options);
+client.Features.Set<IHostedRetrievalFeature>(feature);
+
+// Discovery now works
+var resolved = client.Features.Get<IHostedRetrievalFeature>()!;
+IRetriever retriever = resolved.ForStore("vs_my_store_id");
 IReadOnlyList<ScoredChunk> results = await retriever.RetrieveAsync("What is the refund policy?", topK: 5);
 ```
 
-Each `ForStore` call creates an independent retriever with no shared mutable state — two concurrent retrievals against different stores do not interfere. Consumers that only need retrieval depend on `IRetriever`, never on the hosted feature directly. DI registration for a single store:
+Each `ForStore` call creates an independent retriever with no shared mutable state — two concurrent retrievals against different stores do not interfere. Consumers that only need retrieval depend on `IRetriever`, never on the hosted feature directly. DI registration:
 
 ```csharp
+// Register OpenAI chat client first
+services.AddOpenAiClient(options => { options.ApiKey = "..."; });
+
+// Then add hosted retrieval — injects IHostedRetrievalFeature into the client's features
+services.AddOpenAiHostedRetrieval(options => { options.ApiKey = "..."; });
+
+// Bind a single store as a plain IRetriever
 services.AddSingleton<IRetriever>(sp =>
     sp.GetRequiredService<IHostedRetrievalFeature>().ForStore(storeId));
 ```

@@ -52,9 +52,9 @@ The only dependency needed by consuming applications.
 ## Providers
 
 ### `src/Cisharpai.OpenAi/`
-- `OpenAiChatCompletionClient` — Implements chat + JSON output + tool calling + streaming + grounded chat (GPT-5 only via Responses API `input_file`) + web search (GPT-5 only via Responses API `web_search` tool) + hosted retrieval (`IHostedRetrievalFeature` via `ForStore` returning `OpenAiFileSearchRetriever`). Reports `CachedInputTokens` from `prompt_tokens_details.cached_tokens` (Chat Completions) and `input_tokens_details.cached_tokens` (Responses API). Routes by model: legacy (GPT-4), reasoning (o1/o3/o4), Responses API (GPT-5). Vision via data URI `image_url`. Static `Create(IHttpMessageHandlerFactory, options, ...)` for runtime construction.
+- `OpenAiChatCompletionClient` — Implements chat + JSON output + tool calling + streaming + grounded chat (GPT-5 only via Responses API `input_file`) + web search (GPT-5 only via Responses API `web_search` tool). Hosted retrieval support via `Cisharpai.Rag.OpenAi` bridge package (injected externally). Reports `CachedInputTokens` from `prompt_tokens_details.cached_tokens` (Chat Completions) and `input_tokens_details.cached_tokens` (Responses API). Routes by model: legacy (GPT-4), reasoning (o1/o3/o4), Responses API (GPT-5). Vision via data URI `image_url`. Static `Create(IHttpMessageHandlerFactory, options, ...)` for runtime construction.
 - `OpenAiEmbeddingClient` — Text embeddings. Static `Create(IHttpMessageHandlerFactory, options, ...)` for runtime construction.
-- `OpenAiFileSearchRetriever` — Internal `IRetriever` that queries an OpenAI hosted vector store via the Responses API `file_search` tool. Created by `OpenAiChatCompletionClient.ForStore`. Maps `OpenAiFileSearchResult` → `ScoredChunk` with passage-relative `TextChunk` offsets. Returns empty list on API errors (logs warning); config errors (`DefaultModel` missing) and cancellation propagate.
+- `OpenAiChatCompletionClient` no longer implements `IHostedRetrievalFeature` directly; the feature is injected externally by the `Cisharpai.Rag.OpenAi` bridge package via `Features.Set<IHostedRetrievalFeature>(...)`.
 - `OpenAiVectorStoreClient` — Provider-specific CRUD client for OpenAI Vector Stores and Files APIs. Create/get/list/delete stores, upload files (multipart), add/get/list/delete files in stores, delete files. `PollFileUntilProcessedAsync` with configurable timeout (default 5min) and poll interval (default 1s). Static `Create` factory and DI-friendly `HttpClient` constructor.
 - `VectorStoreResult<T>` — Generic result record for management operations: `IsSuccess`, `Value`, `ErrorMessage` with `Success`/`Error` factory methods.
 - `Models/OpenAiVectorStoreModels.cs` — DTOs: `OpenAiVectorStoreCreateRequest`, `OpenAiExpiresAfter`, `OpenAiVectorStore`, `OpenAiFileCounts`, `OpenAiVectorStoreListResponse`, `OpenAiVectorStoreFile`, `OpenAiLastError`, `OpenAiVectorStoreFileListResponse`, `OpenAiUploadedFile`, `OpenAiDeleteResponse`.
@@ -109,6 +109,13 @@ Consolidated package for all Azure AI services. Uses HttpClient directly (no SDK
 - No storage drivers (Qdrant, pgvector, Pinecone, Redis). Existing embedding fakes and `FakeRetriever` support offline tests without core interface changes.
 - Consumer guide: `wiki/rag.md`; unit tests: `src/Cisharpai.Tests/Rag/` — example-based per chunker, plus `ChunkerInvariantPropertyTests` running every chunker over a deterministic seeded corpus (ASCII, emoji, CJK, mixed scripts, whitespace-heavy, whitespace-free, surrogate-only, empty) across a sweep of size/overlap settings.
 
+## RAG OpenAI Bridge — `src/Cisharpai.Rag.OpenAi/`
+
+- Bridge package connecting `Cisharpai.OpenAi` hosted retrieval with `Cisharpai.Rag`'s `IRetriever` contract. Install this package only when using OpenAI `file_search` retrieval — `Cisharpai.OpenAi` alone does not depend on `Cisharpai.Rag`.
+- `OpenAiHostedRetrievalFeature` — `IHostedRetrievalFeature` implementation backed by OpenAI `file_search` on the Responses API. Each `ForStore(vectorStoreId)` call returns an independent `IRetriever`.
+- `OpenAiFileSearchRetriever` — Internal `IRetriever` that queries an OpenAI hosted vector store via the Responses API `file_search` tool. Maps `OpenAiFileSearchResult` → `ScoredChunk` with passage-relative `TextChunk` offsets. Returns empty list on API errors (logs warning); config errors (`DefaultModel` missing) and cancellation propagate.
+- `OpenAiRagServiceCollectionExtensions.AddOpenAiHostedRetrieval` — DI extension that registers `IHostedRetrievalFeature` and injects it into an existing `OpenAiChatCompletionClient`'s feature collection so `Features.Get<IHostedRetrievalFeature>()` resolves it.
+
 ## RAG Tokenizers — `src/Cisharpai.Rag.Tokenizers/`
 
 - Opt-in local token counting for RAG pipelines, separate from `Cisharpai.Rag` so consumers who only need bulk embeddings avoid the multi-megabyte tokenizer data files.
@@ -154,5 +161,5 @@ Pages: `index.md`, `getting-started.md`, `openai.md`, `embeddings.md`, `rag.md`,
 - `.github/workflows/ci.yml` — Build + unit tests + integration tests. .NET 8 & 10.
 - `.github/workflows/pipeline.yml` — Versioned build + NuGet publish on tags.
 - `.github/workflows/codeql.yml` — CodeQL security scanning.
-- `scripts/build.ps1` — PowerShell build script: restore, build, test, pack 8 projects.
+- `scripts/build.ps1` — PowerShell build script: restore, build, test, pack 9 projects.
 - `GitVersion.yml` — ContinuousDeployment mode.
