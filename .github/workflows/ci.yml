@@ -10,6 +10,7 @@ on:
     tags: ['v*']
   pull_request:
     branches: [main, master, develop]
+    types: [opened, synchronize, reopened, labeled]
   workflow_dispatch:
     inputs:
       publish_nuget:
@@ -254,13 +255,22 @@ jobs:
     if: >-
       startsWith(github.ref, 'refs/tags/v') ||
       (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop' || startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/hotfix/'))) ||
-      (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_nuget == 'true')
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.publish_nuget == 'true') ||
+      (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'run-publish'))
     permissions:
       contents: read
       id-token: write
       attestations: write
+      packages: write
+    environment: nuget-publish
 
     steps:
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+          dotnet-quality: 'ga'
+
       - name: Download NuGet packages
         uses: actions/download-artifact@v4
         with:
@@ -273,20 +283,32 @@ jobs:
           name: nuget-symbols
           path: ./nupkg
 
-      - name: Push to NuGet
-        env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+      - name: Login to NuGet (OIDC trusted publishing)
+        uses: NuGet/login@v1
+        id: nuget-login
+        with:
+          user: ${{ secrets.NUGET_USERNAME }}
+
+      - name: Push to NuGet (trusted publishing)
         run: >
           dotnet nuget push "./nupkg/*.nupkg"
-          --api-key "$NUGET_API_KEY"
+          --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}"
           --source https://api.nuget.org/v3/index.json
           --skip-duplicate
 
-      - name: Push symbols to NuGet
-        env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+      - name: Push symbols to NuGet (trusted publishing)
         run: >
           dotnet nuget push "./nupkg/*.snupkg"
-          --api-key "$NUGET_API_KEY"
+          --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}"
           --source https://api.nuget.org/v3/index.json
           --skip-duplicate
+
+      - name: Attest build provenance (nupkg)
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: './nupkg/*.nupkg'
+
+      - name: Attest build provenance (snupkg)
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: './nupkg/*.snupkg'
