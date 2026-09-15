@@ -58,6 +58,7 @@ public sealed class AnthropicClientFactoryProvider : IClientFactoryProvider
             ApiKey = config.ApiKey,
             BaseUrl = config.BaseUrl,
             ApiVersion = config.ApiVersion,
-            DefaultModel = config.DefaultModel
+            DefaultModel = config.DefaultModel,
+            WebSearchToolVersion = config.WebSearchToolVersion
         };
 }

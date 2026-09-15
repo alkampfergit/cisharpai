@@ -15,5 +15,11 @@ public enum GroundingKind
     /// Citations were synthesized via prompt injection and marker parsing.
     /// Reliability characteristics differ from native citations.
     /// </summary>
-    Synthesized
+    Synthesized,
+
+    /// <summary>
+    /// Citations were produced by a provider-hosted web search tool.
+    /// The model invoked the search server-side; results are cited in the response.
+    /// </summary>
+    WebSearch
 }

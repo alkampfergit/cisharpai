@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.OpenAi;
 
-public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature, IStreamingChatFeature, IGroundedChatFeature
+public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature, IStreamingChatFeature, IGroundedChatFeature, IWebSearchFeature
 {
     private const string ChatCompletionsEndpoint = "chat/completions";
     private const string ResponsesEndpoint = "responses";
@@ -35,6 +35,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         features.Set<IToolCallingFeature>(this);
         features.Set<IStreamingChatFeature>(this);
         features.Set<IGroundedChatFeature>(this);
+        features.Set<IWebSearchFeature>(this);
         Features = features;
     }
 
@@ -218,6 +219,64 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
             }
 
             return MapGroundedChatResponse(raw, groundedChatOptions.Documents, rawResponseJson, rawRequestJson);
+        }
+        catch (LlmHttpRequestException ex)
+        {
+            return GroundedChatCompletionResponse.Error(ex.Message, ex.ResponseBody);
+        }
+        catch (Exception ex)
+        {
+            return GroundedChatCompletionResponse.Error(ex.Message);
+        }
+    }
+
+    public async Task<GroundedChatCompletionResponse> GetChatCompletionWithWebSearchAsync(
+        ChatCompletionRequest request,
+        WebSearchOptions webSearchOptions,
+        CancellationToken cancellationToken = default)
+    {
+        var model = ResolveModel(request.Model);
+        request = request with { Model = model };
+
+        try
+        {
+            var modelType = DetectModelType(model);
+            if (modelType != OpenAiModelType.Gpt5)
+            {
+                return GroundedChatCompletionResponse.Error(
+                    $"Web search requires the Responses API (GPT-5 models). Model '{model}' uses the Chat Completions API which does not support server-side web search.");
+            }
+
+            var providerRequest = new OpenAiResponsesApiRequest
+            {
+                Model = model,
+                MaxOutputTokens = request.MaxTokens,
+                Input = new List<object>(await MapMessagesAsync(request.Messages, cancellationToken)),
+                Tools = webSearchOptions.Enabled ? [new OpenAiResponsesApiTool { Type = "web_search" }] : null,
+                Reasoning = (request.ReasoningEffort ?? _options.ReasoningEffort) is { } effort
+                    ? new OpenAiReasoningOption { Effort = effort }
+                    : null,
+                Text = _options.TextVerbosity is not null
+                    ? new OpenAiTextOption { Verbosity = _options.TextVerbosity }
+                    : null
+            };
+
+            string? rawResponseJson = null;
+            string? rawRequestJson = null;
+            OpenAiResponsesApiResponse raw;
+
+            if (request.IncludeRawResponse)
+            {
+                (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<OpenAiResponsesApiRequest, OpenAiResponsesApiResponse>(
+                    ResponsesEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
+            }
+            else
+            {
+                raw = await _client.PostAsync<OpenAiResponsesApiRequest, OpenAiResponsesApiResponse>(
+                    ResponsesEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
+            }
+
+            return MapWebSearchResponse(raw, rawResponseJson, rawRequestJson);
         }
         catch (LlmHttpRequestException ex)
         {
@@ -768,6 +827,106 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
                 Arguments = tc.Arguments.GetRawText()
             }
         }).ToList();
+    }
+
+    private static GroundedChatCompletionResponse MapWebSearchResponse(
+        OpenAiResponsesApiResponse raw,
+        string? rawResponseJson,
+        string? rawRequestJson)
+    {
+        var parsed = ParseResponsesApiOutput(raw);
+        var cachedTokens = raw.Usage.InputTokensDetails?.CachedTokens;
+
+        var searchCalls = raw.Output
+            .Where(o => o.Type == "web_search_call")
+            .ToList();
+
+        int? webSearchCount = searchCalls.Count > 0 ? searchCalls.Count : null;
+
+        var failedSearches = searchCalls
+            .Where(o => o.Status is not null && o.Status != "completed")
+            .ToList();
+
+        var isSuccess = !parsed.IsError && failedSearches.Count == 0;
+        var errorMessage = parsed.ErrorMessage;
+        if (failedSearches.Count > 0 && errorMessage is null)
+        {
+            var failedIds = string.Join(", ",
+                failedSearches.Select(f => f.Id ?? "unknown"));
+            errorMessage = $"{failedSearches.Count} of {searchCalls.Count} web search(es) failed (ids: {failedIds})";
+        }
+
+        var chatCompletion = new ChatCompletionResponse(
+            Content: parsed.Content,
+            Model: raw.Model,
+            PromptTokens: raw.Usage.InputTokens,
+            CompletionTokens: raw.Usage.OutputTokens,
+            RawResponseJson: rawResponseJson,
+            RawRequestJson: rawRequestJson,
+            Status: raw.Status,
+            IncompleteReason: parsed.IncompleteReason,
+            IsSuccess: isSuccess,
+            ErrorMessage: errorMessage,
+            Refusal: parsed.Refusal,
+            CachedInputTokens: cachedTokens > 0 ? cachedTokens : null)
+        {
+            WebSearchCount = webSearchCount
+        };
+
+        var annotations = raw.Output
+            .Where(o => o.Type == "message")
+            .SelectMany(o => o.Content)
+            .Where(c => c.Type == "output_text" && c.Annotations is not null)
+            .SelectMany(c => c.Annotations!)
+            .ToList();
+
+        var citations = MapWebSearchAnnotationsToCitations(annotations, parsed.Content);
+
+        return new GroundedChatCompletionResponse(chatCompletion, citations)
+        {
+            GroundingKind = GroundingKind.WebSearch
+        };
+    }
+
+    private static List<Citation> MapWebSearchAnnotationsToCitations(
+        List<OpenAiAnnotation> annotations,
+        string content)
+    {
+        return annotations
+            .Where(a => a.Type == "url_citation" && a.Url is not null)
+            .Select(a =>
+            {
+                int start;
+                int end;
+                string text;
+
+                if (a.StartIndex is { } s && a.EndIndex is { } e
+                    && s >= 0 && e > s && e <= content.Length)
+                {
+                    start = s;
+                    end = e;
+                    text = content[start..end];
+                }
+                else
+                {
+                    start = 0;
+                    end = 0;
+                    text = string.Empty;
+                }
+
+                IReadOnlyDictionary<string, string>? data = a.Title is not null
+                    ? new System.Collections.ObjectModel.ReadOnlyDictionary<string, string>(
+                        new Dictionary<string, string> { ["title"] = a.Title })
+                    : null;
+
+                return new Citation(
+                    Start: start,
+                    End: end,
+                    Text: text,
+                    Sources: [new CitationSource(Id: a.Url!, Data: data)],
+                    Type: a.Type);
+            })
+            .ToList();
     }
 
     private string ResolveModel(string? model)

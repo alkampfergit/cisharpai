@@ -60,4 +60,10 @@ public sealed class AnthropicCitationResult
     /// </summary>
     [JsonPropertyName("title")]
     public string? Title { get; set; }
+
+    /// <summary>
+    /// For <c>web_search_result_location</c> citations: the URL of the web search result.
+    /// </summary>
+    [JsonPropertyName("url")]
+    public string? Url { get; set; }
 }

@@ -17,6 +17,7 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Image Embeddings | `IImageEmbeddingFeature` | Generate vector embeddings from a single image |
 | Multimodal Embeddings | `IMultimodalEmbeddingFeature` | Embed mixed text + image inputs in a single request |
 | Grounded Chat (RAG) | `IGroundedChatFeature` | Chat with document grounding and citations |
+| Web Search | `IWebSearchFeature` | Provider-hosted server-side web search with cited answers |
 | Tool Calling | `IToolCallingFeature` | Function calling / tool use in chat completions |
 | Vision (Image Input) | `LlmMessage.ContentParts` | Send images inline in chat messages for visual understanding |
 | Streaming | `IStreamingChatFeature` | Stream chat completions token-by-token via SSE |
@@ -40,6 +41,7 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Reasoning Models | Yes | Yes | Yes | -- | -- |
 | Responses API (GPT-5) | Yes | Yes | -- | -- | -- |
 | Grounded Chat (RAG) | Yes (native) | Yes (native) | Yes (fallback) | Yes (native) | Yes (native) |
+| Web Search | Yes (GPT-5) | -- | -- | Yes | -- |
 | Tool Calling | Yes | Yes | Yes | Yes | Yes |
 | Vision (Image Input) | Yes | Yes | Yes | Yes | Partial* |
 | Streaming | Yes | Yes | Yes | Yes | Yes |
@@ -71,6 +73,7 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Tool Calling | All models; `ToolChoice` supports Auto, None, Required, Specific (function name) |
 | Vision | Send images via `LlmMessage.WithImage()` or `LlmMessage.WithBase64Image()`; images are sent as data URIs (`data:image/{mime};base64,...`) |
 | Grounded Chat (RAG) | `IGroundedChatFeature`; GPT-5 models only (Responses API); documents sent as `input_file` items with base64 data; annotations mapped to `Citation`/`CitationSource`; returns `IsSuccess=false` for non-GPT-5 models |
+| Web Search | `IWebSearchFeature`; GPT-5 models only (Responses API `web_search` tool); `url_citation` annotations mapped to `Citation`/`CitationSource` (`Id` = URL, `Data["title"]` = page title); `WebSearchCount` from `web_search_call` output items; returns `IsSuccess=false` for non-GPT-5 models. **Cost:** per-search charge on top of token costs. |
 | Prompt Caching | Automatic — `CachedInputTokens` reported from `prompt_tokens_details.cached_tokens` (Chat Completions) and `input_tokens_details.cached_tokens` (Responses API); no control feature |
 | Streaming | `IStreamingChatFeature`; legacy Chat Completions API and Responses API (GPT-5); `[DONE]` terminates the stream |
 
@@ -126,6 +129,7 @@ Azure OpenAI truncation is surfaced as a failed unified response when the provid
 | JSON Mode | Implemented via system-message injection; auto-strips markdown fences |
 | Structured Outputs | Via native `output_config.format` parameter; refusal via `stop_reason: "refusal"` |
 | Grounded Chat (RAG) | Document grounding via `document` content blocks with `citations: {enabled: true}`; text documents use `text` source type, key-value documents use `custom_content` source type; `CitationMode.Fast`/`Accurate` treated as `Enabled` (Anthropic citations are binary: on/off) with a logged warning. `CitationMode.SearchResult` emits `search_result` blocks instead, producing `search_result_location` citations with pass-through `Source`/`Title` (requires `DocumentChunk.Source`; returns `IsSuccess=false` if missing) |
+| Web Search | `IWebSearchFeature`; Anthropic's `web_search` server-side tool (version configurable via `AnthropicClientOptions.WebSearchToolVersion`, default `web_search_20260209`); `web_search_result_location` citations mapped to `Citation`/`CitationSource` (`Id` = URL, `Data["title"]` = page title); `WebSearchCount` from `usage.server_tool_use.web_search_requests`; `GroundingKind.WebSearch`. **Cost:** ~$10 per 1,000 searches on top of token costs. |
 | Tool Calling | All Claude models; `ToolChoice` maps Auto->auto, Required->any, Specific->{type:tool,name}, None is omitted |
 | Vision | Images sent as raw base64 (NOT data URIs) via `source.type: "base64"` in content blocks |
 | Prompt Caching | Explicit breakpoints via `IPromptCachingFeature`; `CachedInputTokens` from `cache_read_input_tokens`, `CacheCreationInputTokens` from `cache_creation_input_tokens`; system, message, and tool breakpoints |

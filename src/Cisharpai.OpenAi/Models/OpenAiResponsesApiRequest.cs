@@ -15,8 +15,16 @@ public sealed class OpenAiResponsesApiRequest
 
     public OpenAiTextOption? Text { get; set; }
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<OpenAiResponsesApiTool>? Tools { get; set; }
+
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool Stream { get; set; }
+}
+
+public sealed class OpenAiResponsesApiTool
+{
+    public string Type { get; set; } = string.Empty;
 }
 
 public sealed class OpenAiReasoningOption

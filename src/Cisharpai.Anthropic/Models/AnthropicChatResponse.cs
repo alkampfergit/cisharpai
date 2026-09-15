@@ -78,6 +78,15 @@ public sealed class AnthropicUsage
 
     [JsonPropertyName("cache_read_input_tokens")]
     public int? CacheReadInputTokens { get; set; }
+
+    [JsonPropertyName("server_tool_use")]
+    public AnthropicServerToolUse? ServerToolUse { get; set; }
+}
+
+public sealed class AnthropicServerToolUse
+{
+    [JsonPropertyName("web_search_requests")]
+    public int WebSearchRequests { get; set; }
 }
 
 public sealed class AnthropicChatResponse

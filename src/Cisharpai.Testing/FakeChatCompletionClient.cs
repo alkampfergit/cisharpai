@@ -16,7 +16,8 @@ public sealed class FakeChatCompletionClient :
     IToolCallingFeature,
     IJsonOutputFeature,
     IGroundedChatFeature,
-    IPromptCachingFeature
+    IPromptCachingFeature,
+    IWebSearchFeature
 {
     private readonly Queue<ChatCompletionResponse> _responses = new();
     private readonly Queue<ToolCallingResponse> _toolCallingResponses = new();
@@ -26,6 +27,7 @@ public sealed class FakeChatCompletionClient :
     private readonly Queue<ChatCompletionResponse> _promptCachingResponses = new();
     private readonly Queue<GroundedChatCompletionResponse> _groundedCachingResponses = new();
     private readonly Queue<ToolCallingResponse> _toolCachingResponses = new();
+    private readonly Queue<GroundedChatCompletionResponse> _webSearchResponses = new();
 
     private readonly List<ChatCompletionRequest> _receivedRequests = new();
     private readonly List<(ChatCompletionRequest Request, ToolCallingOptions Options)> _receivedToolCallingRequests = new();
@@ -35,6 +37,7 @@ public sealed class FakeChatCompletionClient :
     private readonly List<(ChatCompletionRequest Request, PromptCachingOptions Options)> _receivedPromptCachingRequests = new();
     private readonly List<(ChatCompletionRequest Request, GroundedChatOptions GroundedOptions, PromptCachingOptions CachingOptions)> _receivedGroundedCachingRequests = new();
     private readonly List<(ChatCompletionRequest Request, ToolCallingOptions ToolOptions, PromptCachingOptions CachingOptions)> _receivedToolCachingRequests = new();
+    private readonly List<(ChatCompletionRequest Request, WebSearchOptions Options)> _receivedWebSearchRequests = new();
 
     public FakeChatCompletionClient(FakeChatFeatures enabledFeatures = FakeChatFeatures.All)
     {
@@ -50,6 +53,8 @@ public sealed class FakeChatCompletionClient :
             Features.Set<IGroundedChatFeature>(this);
         if (enabledFeatures.HasFlag(FakeChatFeatures.PromptCaching))
             Features.Set<IPromptCachingFeature>(this);
+        if (enabledFeatures.HasFlag(FakeChatFeatures.WebSearch))
+            Features.Set<IWebSearchFeature>(this);
     }
 
     public IFeatureCollection Features { get; }
@@ -68,6 +73,7 @@ public sealed class FakeChatCompletionClient :
     public ChatCompletionResponse? DefaultPromptCachingResponse { get; set; }
     public GroundedChatCompletionResponse? DefaultGroundedCachingResponse { get; set; }
     public ToolCallingResponse? DefaultToolCachingResponse { get; set; }
+    public GroundedChatCompletionResponse? DefaultWebSearchResponse { get; set; }
 
     /// <summary>Enqueues a response to be returned by the next call.</summary>
     public void EnqueueResponse(ChatCompletionResponse response) => _responses.Enqueue(response);
@@ -93,6 +99,9 @@ public sealed class FakeChatCompletionClient :
     /// <summary>Enqueues a tool calling + caching response.</summary>
     public void EnqueueToolCachingResponse(ToolCallingResponse response) => _toolCachingResponses.Enqueue(response);
 
+    /// <summary>Enqueues a web search response.</summary>
+    public void EnqueueWebSearchResponse(GroundedChatCompletionResponse response) => _webSearchResponses.Enqueue(response);
+
     // --- Request capture ---
 
     public IReadOnlyList<ChatCompletionRequest> ReceivedRequests => _receivedRequests;
@@ -103,12 +112,14 @@ public sealed class FakeChatCompletionClient :
     public IReadOnlyList<(ChatCompletionRequest Request, PromptCachingOptions Options)> ReceivedPromptCachingRequests => _receivedPromptCachingRequests;
     public IReadOnlyList<(ChatCompletionRequest Request, GroundedChatOptions GroundedOptions, PromptCachingOptions CachingOptions)> ReceivedGroundedCachingRequests => _receivedGroundedCachingRequests;
     public IReadOnlyList<(ChatCompletionRequest Request, ToolCallingOptions ToolOptions, PromptCachingOptions CachingOptions)> ReceivedToolCachingRequests => _receivedToolCachingRequests;
+    public IReadOnlyList<(ChatCompletionRequest Request, WebSearchOptions Options)> ReceivedWebSearchRequests => _receivedWebSearchRequests;
 
     /// <summary>Total number of calls across all methods.</summary>
     public int CallCount => _receivedRequests.Count + _receivedToolCallingRequests.Count +
                             _receivedJsonOutputRequests.Count + _receivedGroundedChatRequests.Count +
                             _receivedStreamingRequests.Count + _receivedPromptCachingRequests.Count +
-                            _receivedGroundedCachingRequests.Count + _receivedToolCachingRequests.Count;
+                            _receivedGroundedCachingRequests.Count + _receivedToolCachingRequests.Count +
+                            _receivedWebSearchRequests.Count;
 
     /// <summary>Clears all queued responses and captured requests.</summary>
     public void Reset()
@@ -129,6 +140,8 @@ public sealed class FakeChatCompletionClient :
         _receivedGroundedCachingRequests.Clear();
         _toolCachingResponses.Clear();
         _receivedToolCachingRequests.Clear();
+        _webSearchResponses.Clear();
+        _receivedWebSearchRequests.Clear();
     }
 
     // --- Interface implementations ---
@@ -195,6 +208,15 @@ public sealed class FakeChatCompletionClient :
     {
         _receivedToolCachingRequests.Add((request, toolOptions, cachingOptions));
         return Task.FromResult(Dequeue(_toolCachingResponses, DefaultToolCachingResponse ?? DefaultToolCallingResponse));
+    }
+
+    public Task<GroundedChatCompletionResponse> GetChatCompletionWithWebSearchAsync(
+        ChatCompletionRequest request,
+        WebSearchOptions webSearchOptions,
+        CancellationToken cancellationToken = default)
+    {
+        _receivedWebSearchRequests.Add((request, webSearchOptions));
+        return Task.FromResult(Dequeue(_webSearchResponses, DefaultWebSearchResponse));
     }
 
     public async IAsyncEnumerable<ChatCompletionChunk> GetChatCompletionStreamAsync(

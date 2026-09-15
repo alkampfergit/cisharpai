@@ -17,6 +17,7 @@
 | Tool Calling | Yes | Yes | Yes | Yes | Yes |
 | Vision | Yes | Yes | Varies | Yes | Partial |
 | Streaming | Yes | Yes | Yes | Yes | Yes |
+| Web Search | GPT-5 only | -- | -- | Yes | -- |
 
 ## Feature Discovery Pattern
 
@@ -38,6 +39,7 @@ if (feature is not null)
 | `IStreamingChatFeature` | Token-by-token streaming |
 | `IGroundedChatFeature` | Document-grounded RAG with citations |
 | `IPromptCachingFeature` | Explicit cache breakpoints (Anthropic only) |
+| `IWebSearchFeature` | Provider-hosted server-side web search with cited answers |
 | `IImageEmbeddingFeature` | Single image embedding |
 | `IMultimodalEmbeddingFeature` | Mixed text + image embedding |
 
