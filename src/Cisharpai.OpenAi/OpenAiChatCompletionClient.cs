@@ -252,7 +252,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
                 Model = model,
                 MaxOutputTokens = request.MaxTokens,
                 Input = new List<object>(await MapMessagesAsync(request.Messages, cancellationToken)),
-                Tools = [new OpenAiResponsesApiTool { Type = "web_search" }],
+                Tools = webSearchOptions.Enabled ? [new OpenAiResponsesApiTool { Type = "web_search" }] : null,
                 Reasoning = (request.ReasoningEffort ?? _options.ReasoningEffort) is { } effort
                     ? new OpenAiReasoningOption { Effort = effort }
                     : null,
@@ -882,9 +882,18 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
             {
                 var start = a.StartIndex ?? 0;
                 var end = a.EndIndex ?? content.Length;
-                var text = start >= 0 && end <= content.Length && start < end
-                    ? content[start..end]
-                    : content;
+                string text;
+
+                if (start >= 0 && end > start && end <= content.Length)
+                {
+                    text = content[start..end];
+                }
+                else
+                {
+                    text = string.Empty;
+                    start = 0;
+                    end = 0;
+                }
 
                 IReadOnlyDictionary<string, string>? data = a.Title is not null
                     ? new System.Collections.ObjectModel.ReadOnlyDictionary<string, string>(

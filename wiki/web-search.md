@@ -32,9 +32,10 @@ if (client.Features.Get<IWebSearchFeature>() is { } webSearch)
         // Citations reference the web pages used
         foreach (var citation in response.Citations)
         {
-            var url = citation.Source.Id;                 // page URL
-            var title = citation.Source.Data["title"];     // page title
-            var citedText = citation.Source.CitedText;     // quoted excerpt
+            var source = citation.Sources[0];
+            var url = source.Id;                                   // page URL
+            var title = source.Data?["title"];                     // page title (nullable)
+            var citedText = source.CitedText;                      // quoted excerpt (Anthropic only)
             Console.WriteLine($"  [{title}]({url})");
         }
 
@@ -47,10 +48,13 @@ if (client.Features.Get<IWebSearchFeature>() is { } webSearch)
 ## WebSearchOptions
 
 ```csharp
-public record WebSearchOptions(bool Enabled = true);
+public sealed record WebSearchOptions
+{
+    public bool Enabled { get; init; } = true;
+}
 ```
 
-The `Enabled` property defaults to `true`. The options object exists for future extensibility (e.g., search region, result count limits).
+The `Enabled` property defaults to `true`. When set to `false`, no server-side web search tool is injected — no search is performed and no billing occurs. The options object exists for future extensibility (e.g., search region, result count limits).
 
 ## Response Structure
 
@@ -69,7 +73,7 @@ Citations from both providers follow the same unified structure:
 | `CitationSource.Id` | Page URL |
 | `CitationSource.Data["title"]` | Page title |
 | `CitationSource.CitedText` | Quoted text excerpt (Anthropic only) |
-| `Citation.StartCharOffset` / `EndCharOffset` | Position in the response content |
+| `Citation.Start` / `End` | Character offset (inclusive / exclusive) in the response content |
 
 ### WebSearchCount
 

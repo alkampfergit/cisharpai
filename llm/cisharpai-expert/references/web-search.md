@@ -24,7 +24,10 @@ public interface IWebSearchFeature
 ## WebSearchOptions
 
 ```csharp
-public record WebSearchOptions(bool Enabled = true);
+public sealed record WebSearchOptions
+{
+    public bool Enabled { get; init; } = true;
+}
 ```
 
 ## Usage
@@ -45,8 +48,9 @@ if (client.Features.Get<IWebSearchFeature>() is { } webSearch)
 
         foreach (var citation in response.Citations)
         {
-            var url = citation.Source.Id;
-            var title = citation.Source.Data["title"];
+            var source = citation.Sources[0];
+            var url = source.Id;
+            var title = source.Data?["title"];
             Console.WriteLine($"  [{title}]({url})");
         }
 
@@ -60,7 +64,7 @@ if (client.Features.Get<IWebSearchFeature>() is { } webSearch)
 Returns `GroundedChatCompletionResponse` (same type as `IGroundedChatFeature`):
 
 - `ChatCompletion` — standard response with `Content`, `IsSuccess`, `WebSearchCount`
-- `Citations` — web page references with `Source.Id` = URL, `Source.Data["title"]` = page title
+- `Citations` — web page references with `Sources[0].Id` = URL, `Sources[0].Data?["title"]` = page title
 - `GroundingKind` — `GroundingKind.WebSearch`
 
 ### WebSearchCount

@@ -201,7 +201,8 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         try
         {
             var providerRequest = await BuildRequestAsync(request, cancellationToken);
-            InjectWebSearchTool(providerRequest);
+            if (webSearchOptions.Enabled)
+                InjectWebSearchTool(providerRequest);
 
             var (raw, rawResponseJson, rawRequestJson) = await PostRequestAsync(providerRequest, request, cancellationToken);
 

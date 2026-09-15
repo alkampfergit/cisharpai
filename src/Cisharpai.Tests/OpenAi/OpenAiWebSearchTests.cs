@@ -130,7 +130,8 @@ public sealed class OpenAiWebSearchTests
 
     private static async Task<(GroundedChatCompletionResponse response, string? capturedBody)> ExecuteWebSearch(
         string responseJson,
-        ChatCompletionRequest? request = null)
+        ChatCompletionRequest? request = null,
+        WebSearchOptions? webSearchOptions = null)
     {
         string? capturedBody = null;
         var handler = new MockHttpMessageHandler(async (req, _) =>
@@ -147,7 +148,7 @@ public sealed class OpenAiWebSearchTests
 
         var response = await client.GetChatCompletionWithWebSearchAsync(
             request ?? CreateGpt5Request(),
-            new WebSearchOptions());
+            webSearchOptions ?? new WebSearchOptions());
 
         return (response, capturedBody);
     }
@@ -166,6 +167,22 @@ public sealed class OpenAiWebSearchTests
 
         var tool = tools[0];
         Assert.That(tool.GetProperty("type").GetString(), Is.EqualTo("web_search"));
+    }
+
+    [Test]
+    public async Task WebSearch_EnabledFalse_DoesNotInjectWebSearchTool()
+    {
+        var (_, capturedBody) = await ExecuteWebSearch(
+            WebSearchResponseNoCitations,
+            webSearchOptions: new WebSearchOptions { Enabled = false });
+
+        Assert.That(capturedBody, Is.Not.Null);
+        var doc = JsonDocument.Parse(capturedBody!);
+        var hasTools = doc.RootElement.TryGetProperty("tools", out var tools)
+            && tools.ValueKind == JsonValueKind.Array
+            && tools.GetArrayLength() > 0;
+        Assert.That(hasTools, Is.False,
+            "tools should be null/absent when Enabled = false");
     }
 
     [Test]
@@ -340,6 +357,55 @@ public sealed class OpenAiWebSearchTests
             Assert.That(citation.Start, Is.EqualTo(0));
             Assert.That(citation.End, Is.EqualTo(30));
             Assert.That(citation.Text, Is.EqualTo(expected[..30]));
+        });
+    }
+
+    [Test]
+    public async Task WebSearch_InvalidAnnotationOffsets_NormalizesToEmptySpan()
+    {
+        const string responseWithInvalidOffsets = """
+            {
+                "id": "resp_invalid",
+                "model": "gpt-5-0",
+                "status": "completed",
+                "output": [
+                    {
+                        "type": "web_search_call",
+                        "id": "ws_1",
+                        "status": "completed"
+                    },
+                    {
+                        "type": "message",
+                        "role": "assistant",
+                        "content": [
+                            {
+                                "type": "output_text",
+                                "text": "Short.",
+                                "annotations": [
+                                    {
+                                        "type": "url_citation",
+                                        "url": "https://example.com",
+                                        "title": "Example",
+                                        "start_index": 0,
+                                        "end_index": 999
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ],
+                "usage": { "input_tokens": 10, "output_tokens": 5 }
+            }
+            """;
+
+        var (response, _) = await ExecuteWebSearch(responseWithInvalidOffsets);
+
+        var citation = response.Citations[0];
+        Assert.Multiple(() =>
+        {
+            Assert.That(citation.Start, Is.EqualTo(0));
+            Assert.That(citation.End, Is.EqualTo(0));
+            Assert.That(citation.Text, Is.EqualTo(string.Empty));
         });
     }
 

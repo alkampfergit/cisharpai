@@ -124,7 +124,8 @@ public sealed class AnthropicWebSearchTests
     private static async Task<(GroundedChatCompletionResponse response, string? capturedBody)> ExecuteWebSearch(
         string responseJson,
         ChatCompletionRequest? request = null,
-        AnthropicClientOptions? options = null)
+        AnthropicClientOptions? options = null,
+        WebSearchOptions? webSearchOptions = null)
     {
         string? capturedBody = null;
         var handler = new MockHttpMessageHandler(async (req, _) =>
@@ -141,7 +142,7 @@ public sealed class AnthropicWebSearchTests
 
         var response = await client.GetChatCompletionWithWebSearchAsync(
             request ?? CreateRequest(),
-            new WebSearchOptions());
+            webSearchOptions ?? new WebSearchOptions());
 
         return (response, capturedBody);
     }
@@ -180,6 +181,22 @@ public sealed class AnthropicWebSearchTests
         var tools = doc.RootElement.GetProperty("tools");
         var tool = tools[0];
         Assert.That(tool.GetProperty("type").GetString(), Is.EqualTo("web_search_20270101"));
+    }
+
+    [Test]
+    public async Task WebSearch_EnabledFalse_DoesNotInjectWebSearchTool()
+    {
+        var (_, capturedBody) = await ExecuteWebSearch(
+            WebSearchResponseNoCitations,
+            webSearchOptions: new WebSearchOptions { Enabled = false });
+
+        Assert.That(capturedBody, Is.Not.Null);
+        var doc = JsonDocument.Parse(capturedBody!);
+        Assert.That(doc.RootElement.TryGetProperty("tools", out var tools) && tools.GetArrayLength() > 0
+            ? tools.EnumerateArray().Any(t => t.GetProperty("name").GetString() == "web_search")
+            : false,
+            Is.False,
+            "web_search tool should not be injected when Enabled = false");
     }
 
     [Test]
