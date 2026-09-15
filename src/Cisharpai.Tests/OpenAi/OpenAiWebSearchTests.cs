@@ -456,6 +456,62 @@ public sealed class OpenAiWebSearchTests
         });
     }
 
+    [Test]
+    public async Task WebSearch_FailedSearchCall_ReportsFailure()
+    {
+        const string responseWithFailedSearch = """
+            {
+                "id": "resp_mixed",
+                "model": "gpt-5-0",
+                "status": "completed",
+                "output": [
+                    {
+                        "type": "web_search_call",
+                        "id": "ws_ok",
+                        "status": "completed"
+                    },
+                    {
+                        "type": "web_search_call",
+                        "id": "ws_fail",
+                        "status": "failed"
+                    },
+                    {
+                        "type": "message",
+                        "role": "assistant",
+                        "content": [
+                            {
+                                "type": "output_text",
+                                "text": "Partial answer from the successful search.",
+                                "annotations": [
+                                    {
+                                        "type": "url_citation",
+                                        "url": "https://example.com/ok",
+                                        "title": "OK Result",
+                                        "start_index": 0,
+                                        "end_index": 14
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ],
+                "usage": { "input_tokens": 50, "output_tokens": 15 }
+            }
+            """;
+
+        var (response, _) = await ExecuteWebSearch(responseWithFailedSearch);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(response.IsSuccess, Is.False);
+            Assert.That(response.ErrorMessage, Does.Contain("1 of 2"));
+            Assert.That(response.ErrorMessage, Does.Contain("ws_fail"));
+            Assert.That(response.ChatCompletion.WebSearchCount, Is.EqualTo(2));
+            Assert.That(response.Content, Is.EqualTo("Partial answer from the successful search."));
+            Assert.That(response.Citations, Has.Count.EqualTo(1));
+        });
+    }
+
     #endregion
 
     #region Error Handling Tests

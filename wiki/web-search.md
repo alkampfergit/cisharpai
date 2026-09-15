@@ -54,7 +54,7 @@ public sealed record WebSearchOptions
 }
 ```
 
-The `Enabled` property defaults to `true`. When set to `false`, no server-side web search tool is injected — no search is performed and no billing occurs. The options object exists for future extensibility (e.g., search region, result count limits).
+The `Enabled` property defaults to `true`. When set to `false`, no server-side web search tool is injected — no search is performed and the per-search charge is avoided (normal token costs still apply). The options object exists for future extensibility (e.g., search region, result count limits).
 
 ## Response Structure
 
@@ -77,7 +77,13 @@ Citations from both providers follow the same unified structure:
 
 ### WebSearchCount
 
-`ChatCompletionResponse.WebSearchCount` reports the number of billable web searches performed:
+`ChatCompletionResponse.WebSearchCount` reports the number of web searches performed:
+
+- `null` — the provider reported no web-search usage field at all (web search was not involved in the request).
+- `0` — the provider explicitly reported zero searches (the search tool was present but the model chose not to search).
+- `> 0` — the number of searches performed. Each is billed separately from tokens.
+
+Provider mapping:
 
 - **Anthropic**: from `usage.server_tool_use.web_search_requests`
 - **OpenAI**: count of `web_search_call` output items

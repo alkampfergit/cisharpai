@@ -530,42 +530,6 @@ public sealed class AnthropicWebSearchTests
 
     #endregion
 
-    #region Factory Path Tests
-
-    [Test]
-    public async Task WebSearch_FactoryPath_ConfiguredVersionReachesEmittedJson()
-    {
-        var config = new AnthropicClientConfiguration
-        {
-            ApiKey = "test-key",
-            WebSearchToolVersion = "web_search_20270101"
-        };
-
-        var options = MapConfigToOptions(config);
-
-        var (_, capturedBody) = await ExecuteWebSearch(
-            WebSearchResponseWithCitations,
-            options: options);
-
-        var doc = JsonDocument.Parse(capturedBody!);
-        var tool = doc.RootElement.GetProperty("tools")[0];
-        Assert.That(tool.GetProperty("type").GetString(), Is.EqualTo("web_search_20270101"));
-    }
-
-    private static AnthropicClientOptions MapConfigToOptions(AnthropicClientConfiguration config)
-    {
-        return new AnthropicClientOptions
-        {
-            ApiKey = config.ApiKey,
-            BaseUrl = config.BaseUrl,
-            ApiVersion = config.ApiVersion,
-            DefaultModel = config.DefaultModel,
-            WebSearchToolVersion = config.WebSearchToolVersion
-        };
-    }
-
-    #endregion
-
     #region Feature Discovery Tests
 
     [Test]

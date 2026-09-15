@@ -837,8 +837,24 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         var parsed = ParseResponsesApiOutput(raw);
         var cachedTokens = raw.Usage.InputTokensDetails?.CachedTokens;
 
-        var webSearchCount = raw.Output
-            .Count(o => o.Type == "web_search_call");
+        var searchCalls = raw.Output
+            .Where(o => o.Type == "web_search_call")
+            .ToList();
+
+        int? webSearchCount = searchCalls.Count > 0 ? searchCalls.Count : null;
+
+        var failedSearches = searchCalls
+            .Where(o => o.Status is not null && o.Status != "completed")
+            .ToList();
+
+        var isSuccess = !parsed.IsError && failedSearches.Count == 0;
+        var errorMessage = parsed.ErrorMessage;
+        if (failedSearches.Count > 0 && errorMessage is null)
+        {
+            var failedIds = string.Join(", ",
+                failedSearches.Select(f => f.Id ?? "unknown"));
+            errorMessage = $"{failedSearches.Count} of {searchCalls.Count} web search(es) failed (ids: {failedIds})";
+        }
 
         var chatCompletion = new ChatCompletionResponse(
             Content: parsed.Content,
@@ -849,12 +865,12 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
             RawRequestJson: rawRequestJson,
             Status: raw.Status,
             IncompleteReason: parsed.IncompleteReason,
-            IsSuccess: !parsed.IsError,
-            ErrorMessage: parsed.ErrorMessage,
+            IsSuccess: isSuccess,
+            ErrorMessage: errorMessage,
             Refusal: parsed.Refusal,
             CachedInputTokens: cachedTokens > 0 ? cachedTokens : null)
         {
-            WebSearchCount = webSearchCount > 0 ? webSearchCount : null
+            WebSearchCount = webSearchCount
         };
 
         var annotations = raw.Output

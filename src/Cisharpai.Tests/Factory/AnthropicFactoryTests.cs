@@ -1,4 +1,8 @@
+using System.Net;
+using System.Text.Json;
 using Cisharpai.Anthropic;
+using Cisharpai.Features.Chat;
+using Cisharpai.Models;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Cisharpai.Tests.Factory;
@@ -7,13 +11,34 @@ public sealed class AnthropicFactoryTests
 {
     private ICisharpaiClientFactory _factory = null!;
     private ServiceProvider _provider = null!;
+    private string? _capturedRequestBody;
+
+    private const string MinimalWebSearchResponse = """
+        {
+            "model": "claude-sonnet-4-20250514",
+            "content": [{ "type": "text", "text": "Answer." }],
+            "usage": { "input_tokens": 10, "output_tokens": 5, "server_tool_use": { "web_search_requests": 1 } },
+            "stop_reason": "end_turn"
+        }
+        """;
 
     [SetUp]
     public void SetUp()
     {
+        _capturedRequestBody = null;
         var services = new ServiceCollection();
         services.AddCisharpaiClientFactory()
             .AddAnthropicSupport();
+
+        services.AddHttpClient("CisharpaiFactory_Anthropic_Chat")
+            .ConfigurePrimaryHttpMessageHandler(() => new MockHttpMessageHandler(async (req, _) =>
+            {
+                _capturedRequestBody = await req.Content!.ReadAsStringAsync(CancellationToken.None);
+                return new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StringContent(MinimalWebSearchResponse, System.Text.Encoding.UTF8, "application/json")
+                };
+            }));
 
         _provider = services.BuildServiceProvider();
         _factory = _provider.GetRequiredService<ICisharpaiClientFactory>();
@@ -95,7 +120,7 @@ public sealed class AnthropicFactoryTests
     }
 
     [Test]
-    public void Configuration_WebSearchToolVersion_CopiedThroughFactory()
+    public async Task WebSearchToolVersion_FactoryPath_ConfiguredVersionReachesEmittedJson()
     {
         var config = new AnthropicClientConfiguration
         {
@@ -104,8 +129,20 @@ public sealed class AnthropicFactoryTests
         };
 
         var result = _factory.CreateChatCompletionClient(config);
-
         Assert.That(result.IsSuccess, Is.True);
-        Assert.That(result.Client, Is.InstanceOf<AnthropicChatCompletionClient>());
+
+        var webSearch = result.Client!.Features.Get<IWebSearchFeature>();
+        Assert.That(webSearch, Is.Not.Null);
+
+        await webSearch!.GetChatCompletionWithWebSearchAsync(
+            new ChatCompletionRequest(
+                Messages: [new LlmMessage(LlmRole.User, "test")],
+                Model: "claude-sonnet-4-20250514"),
+            new WebSearchOptions());
+
+        Assert.That(_capturedRequestBody, Is.Not.Null);
+        var doc = JsonDocument.Parse(_capturedRequestBody!);
+        var tool = doc.RootElement.GetProperty("tools")[0];
+        Assert.That(tool.GetProperty("type").GetString(), Is.EqualTo("web_search_20270101"));
     }
 }

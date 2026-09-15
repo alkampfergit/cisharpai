@@ -34,6 +34,14 @@ public sealed class OpenAiResponseOutput
     [JsonPropertyName("type")]
     public string Type { get; set; } = string.Empty;
 
+    [JsonPropertyName("id")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Id { get; set; }
+
+    [JsonPropertyName("status")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Status { get; set; }
+
     [JsonPropertyName("role")]
     public string Role { get; set; } = string.Empty;
 
