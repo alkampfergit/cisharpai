@@ -90,6 +90,22 @@ public sealed class AnthropicFactoryTests
             Assert.That(config.BaseUrl, Is.EqualTo("https://api.anthropic.com/v1/"));
             Assert.That(config.ApiVersion, Is.EqualTo("2023-06-01"));
             Assert.That(config.DefaultModel, Is.Null);
+            Assert.That(config.WebSearchToolVersion, Is.EqualTo("web_search_20260209"));
         });
+    }
+
+    [Test]
+    public void Configuration_WebSearchToolVersion_CopiedThroughFactory()
+    {
+        var config = new AnthropicClientConfiguration
+        {
+            ApiKey = "test-key",
+            WebSearchToolVersion = "web_search_20270101"
+        };
+
+        var result = _factory.CreateChatCompletionClient(config);
+
+        Assert.That(result.IsSuccess, Is.True);
+        Assert.That(result.Client, Is.InstanceOf<AnthropicChatCompletionClient>());
     }
 }

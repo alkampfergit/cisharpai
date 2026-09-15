@@ -880,19 +880,22 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
             .Where(a => a.Type == "url_citation" && a.Url is not null)
             .Select(a =>
             {
-                var start = a.StartIndex ?? 0;
-                var end = a.EndIndex ?? content.Length;
+                int start;
+                int end;
                 string text;
 
-                if (start >= 0 && end > start && end <= content.Length)
+                if (a.StartIndex is { } s && a.EndIndex is { } e
+                    && s >= 0 && e > s && e <= content.Length)
                 {
+                    start = s;
+                    end = e;
                     text = content[start..end];
                 }
                 else
                 {
-                    text = string.Empty;
                     start = 0;
                     end = 0;
+                    text = string.Empty;
                 }
 
                 IReadOnlyDictionary<string, string>? data = a.Title is not null

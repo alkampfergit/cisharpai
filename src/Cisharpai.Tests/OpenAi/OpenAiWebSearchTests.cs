@@ -409,6 +409,53 @@ public sealed class OpenAiWebSearchTests
         });
     }
 
+    [Test]
+    public async Task WebSearch_BothOffsetsNull_NormalizesToEmptySpan()
+    {
+        const string responseWithNullOffsets = """
+            {
+                "id": "resp_null_offsets",
+                "model": "gpt-5-0",
+                "status": "completed",
+                "output": [
+                    {
+                        "type": "web_search_call",
+                        "id": "ws_1",
+                        "status": "completed"
+                    },
+                    {
+                        "type": "message",
+                        "role": "assistant",
+                        "content": [
+                            {
+                                "type": "output_text",
+                                "text": "The capital of France is Paris.",
+                                "annotations": [
+                                    {
+                                        "type": "url_citation",
+                                        "url": "https://example.com",
+                                        "title": "Example"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ],
+                "usage": { "input_tokens": 10, "output_tokens": 5 }
+            }
+            """;
+
+        var (response, _) = await ExecuteWebSearch(responseWithNullOffsets);
+
+        var citation = response.Citations[0];
+        Assert.Multiple(() =>
+        {
+            Assert.That(citation.Start, Is.EqualTo(0));
+            Assert.That(citation.End, Is.EqualTo(0));
+            Assert.That(citation.Text, Is.EqualTo(string.Empty));
+        });
+    }
+
     #endregion
 
     #region Error Handling Tests
