@@ -260,6 +260,7 @@ jobs:
       contents: read
       id-token: write
       attestations: write
+      packages: write
     environment: nuget-publish
 
     steps:
@@ -287,6 +288,16 @@ jobs:
         with:
           user: ${{ secrets.NUGET_USERNAME }}
 
+      - name: Attest build provenance (nupkg)
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: './nupkg/*.nupkg'
+
+      - name: Attest build provenance (snupkg)
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: './nupkg/*.snupkg'
+
       - name: Push to NuGet (trusted publishing)
         run: >
           dotnet nuget push "./nupkg/*.nupkg"
@@ -300,13 +311,3 @@ jobs:
           --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}"
           --source https://api.nuget.org/v3/index.json
           --skip-duplicate
-
-      - name: Attest build provenance (nupkg)
-        uses: actions/attest-build-provenance@v2
-        with:
-          subject-path: './nupkg/*.nupkg'
-
-      - name: Attest build provenance (snupkg)
-        uses: actions/attest-build-provenance@v2
-        with:
-          subject-path: './nupkg/*.snupkg'
