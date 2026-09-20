@@ -35,6 +35,14 @@ FakeResponses.ToolCalls(("get_weather", """{"location":"Paris"}"""), ("get_time"
 FakeResponses.GroundedChat("Answer with citations")
 FakeResponses.GroundedChat("Answer", citations)
 
+// Web Search
+FakeResponses.WebSearch("The capital of France is Paris.")
+FakeResponses.WebSearch("answer", webSearchCount: 3)
+
+// Cached Chat
+FakeResponses.CachedChat("answer", cachedInputTokens: 500, cacheCreationInputTokens: 200)
+FakeResponses.CachedChat("first call", cacheCreationInputTokens: 1000) // cache-creation-only
+
 // Streaming
 FakeResponses.StreamingChunks("Hello", " ", "world", "!")
 
@@ -43,6 +51,11 @@ FakeResponses.Embedding()
 FakeResponses.Embedding(new float[] { 0.1f, 0.2f, 0.3f })
 FakeResponses.Embeddings(vector1, vector2)
 FakeResponses.EmbeddingError("Invalid input")
+
+// Reranking
+FakeResponses.Rerank((1, 0.99), (0, 0.42))   // explicit (index, score) pairs, ranked order
+FakeResponses.Rerank(documentCount: 3)        // N docs in original order, descending scores
+FakeResponses.RerankError("Invalid input")
 ```
 
 ## FakeChatCompletionClient
@@ -71,6 +84,8 @@ fake.EnqueueResponse(FakeResponses.ChatError("Oops"));
 fake.DefaultJsonOutputResponse = FakeResponses.Chat("""{"color":"blue"}""");
 fake.DefaultToolCallingResponse = FakeResponses.ToolCall("get_weather", "{}");
 fake.DefaultGroundedChatResponse = FakeResponses.GroundedChat("Grounded answer");
+fake.DefaultWebSearchResponse = FakeResponses.WebSearch("Web answer");
+fake.DefaultPromptCachingResponse = FakeResponses.CachedChat("Cached answer", cachedInputTokens: 100);
 fake.DefaultStreamingResponse = FakeResponses.StreamingChunks("Hello", " world");
 ```
 
@@ -86,6 +101,8 @@ Assert.Equal("Hello", fake.ReceivedRequests[0].Messages[0].Content);
 fake.ReceivedToolCallingRequests   // tool calling requests
 fake.ReceivedJsonOutputRequests    // JSON output requests
 fake.ReceivedGroundedChatRequests  // grounded chat requests
+fake.ReceivedWebSearchRequests     // web search requests (includes WebSearchOptions)
+fake.ReceivedPromptCachingRequests // prompt caching requests
 fake.ReceivedStreamingRequests     // streaming requests
 ```
 
@@ -128,7 +145,7 @@ var fake = new FakeChatCompletionClient(FakeChatFeatures.All);
 var fake = new FakeChatCompletionClient(FakeChatFeatures.None);
 ```
 
-**FakeChatFeatures:** `Streaming`, `ToolCalling`, `JsonOutput`, `GroundedChat`, `All`, `None`
+**FakeChatFeatures:** `Streaming`, `ToolCalling`, `JsonOutput`, `GroundedChat`, `PromptCaching`, `WebSearch`, `All`, `None`
 
 **FakeEmbeddingFeatures:** `ImageEmbedding`, `MultimodalEmbedding`, `All`, `None`
 
@@ -184,6 +201,31 @@ fake.EnqueueResponse(FakeResponses.Chat("First call"));
 fake.EnqueueResponse(FakeResponses.Chat("Second call"));
 fake.DefaultResponse = FakeResponses.Chat("All subsequent calls");
 ```
+
+## FakeRerankerClient
+
+Same queue/default/capture shape as the other fakes. `IRerankerClient` has no optional feature
+interfaces, so there are no feature flags.
+
+```csharp
+var fake = new FakeRerankerClient
+{
+    DefaultResponse = FakeResponses.Rerank((1, 0.99), (0, 0.42))
+};
+
+string[] documents = ["Nevada's capital is Carson City.", "Paris is the capital of France."];
+var response = await fake.RerankAsync(new RerankRequest("What is the capital of France?", documents));
+
+Assert.Equal(documents[1], documents[response.Results[0].Index]);
+Assert.Single(fake.ReceivedRequests);
+Assert.Equal("What is the capital of France?", fake.ReceivedRequests[0].Query);
+```
+
+Members: `DefaultResponse`, `EnqueueResponse(response)`, `ReceivedRequests`, `CallCount`,
+`Reset()`. DI helper: `services.AddFakeRerankerClient()`.
+
+Calling `RerankAsync` with neither a queued response nor a default throws
+`InvalidOperationException`.
 
 ## Request DTO Syntax
 

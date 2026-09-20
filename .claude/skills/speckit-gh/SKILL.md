@@ -230,7 +230,7 @@ at the end.
 
 Whenever work moves to a PR — whether this run opened it in step 8, or
 the skill is resuming against a PR that already exists (picked up in
-steps 12–13, or a `github-pr-fixer`-style follow-up) — the local working
+steps 12–13, or a `github-alk:github-pr-manager`-style follow-up) — the local working
 copy MUST be on the PR's head branch before ANY file edit, commit, or
 push.
 
@@ -289,7 +289,7 @@ After the PR is marked ready in step 11, `speckit-gh` keeps ownership:
   changes, re-runs CI, comments back with the commit hash.
 - Exits on `MERGED` / `CLOSED` / owner-directed stand-down.
 
-`github-pr-fixer` is NOT auto-invoked from here.
+`github-alk:github-pr-manager` is NOT auto-invoked from here.
 
 ## What this skill does NOT do
 
@@ -308,4 +308,4 @@ After the PR is marked ready in step 11, `speckit-gh` keeps ownership:
 
 - **[references/flow.md](references/flow.md)** — full per-step procedure with `gh` commands, commit messages, and comment bodies.
 - **[references/communication-protocol.md](references/communication-protocol.md)** — polling loop, watermark rule, re-fetch-before-post, owner-login filter.
-- `gh-cli-guide/SKILL.md` (sibling skill) — canonical `gh` command patterns.
+- `github-alk:gh-cli-guide` (plugin skill) — canonical `gh` command patterns.

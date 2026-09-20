@@ -1,3 +1,4 @@
+using Cisharpai.Rag;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Cisharpai.Testing;
@@ -30,6 +31,45 @@ public static class FakeServiceCollectionExtensions
     {
         var fake = new FakeEmbeddingClient(enabledFeatures);
         services.AddSingleton<IEmbeddingClient>(fake);
+        return fake;
+    }
+
+    /// <summary>
+    /// Registers a <see cref="FakeRerankerClient"/> as <see cref="IRerankerClient"/>.
+    /// Returns the fake instance for setup and assertions.
+    /// </summary>
+    public static FakeRerankerClient AddFakeRerankerClient(
+        this IServiceCollection services)
+    {
+        var fake = new FakeRerankerClient();
+        services.AddSingleton<IRerankerClient>(fake);
+        return fake;
+    }
+
+    /// <summary>
+    /// Registers a <see cref="FakeTokenCounter"/> as <see cref="ITokenCounter"/>.
+    /// Returns the fake instance for setup and assertions.
+    /// </summary>
+    public static FakeTokenCounter AddFakeTokenCounter(
+        this IServiceCollection services,
+        int? defaultCount = null)
+    {
+        var fake = new FakeTokenCounter();
+        if (defaultCount is not null)
+            fake.DefaultCount = defaultCount.Value;
+        services.AddSingleton<ITokenCounter>(fake);
+        return fake;
+    }
+
+    /// <summary>
+    /// Registers a <see cref="FakeRetriever"/> as <see cref="IRetriever"/>.
+    /// Returns the fake instance for setup and assertions.
+    /// </summary>
+    public static FakeRetriever AddFakeRetriever(
+        this IServiceCollection services)
+    {
+        var fake = new FakeRetriever();
+        services.AddSingleton<IRetriever>(fake);
         return fake;
     }
 }

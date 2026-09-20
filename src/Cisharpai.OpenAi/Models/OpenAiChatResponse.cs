@@ -9,6 +9,15 @@ public sealed class OpenAiUsage
 
     [JsonPropertyName("completion_tokens")]
     public int CompletionTokens { get; set; }
+
+    [JsonPropertyName("prompt_tokens_details")]
+    public OpenAiPromptTokensDetails? PromptTokensDetails { get; set; }
+}
+
+public sealed class OpenAiPromptTokensDetails
+{
+    [JsonPropertyName("cached_tokens")]
+    public int CachedTokens { get; set; }
 }
 
 public sealed class OpenAiChatChoice

@@ -29,6 +29,7 @@ services.AddAnthropicClient(options =>
 - `IJsonOutputFeature` — JSON Mode via `output_config.format`
 - `IToolCallingFeature` — `tool_use` / `tool_result` content blocks
 - `IStreamingChatFeature` — Event-based SSE (no `[DONE]`)
+- `IGroundedChatFeature` — Document grounding via `document` content blocks with native citations; `CitationMode.SearchResult` emits `search_result` blocks with pass-through `Source`/`Title`
 - Vision — Raw base64 (NOT data URIs)
 
 ## Important: Image Handling

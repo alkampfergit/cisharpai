@@ -10,9 +10,10 @@ using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.Anthropic;
 
-public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature, IStreamingChatFeature
+public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature, IStreamingChatFeature, IGroundedChatFeature, IPromptCachingFeature, IWebSearchFeature
 {
     private const string MessagesEndpoint = "messages";
+    private const string EphemeralCacheType = "ephemeral";
 
     private static readonly JsonSerializerOptions StreamJsonOptions = new()
     {
@@ -21,6 +22,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
 
     private readonly LlmHttpClient _client;
     private readonly AnthropicClientOptions _options;
+    private readonly ILogger<AnthropicChatCompletionClient>? _logger;
 
     public IFeatureCollection Features { get; }
 
@@ -28,11 +30,15 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
     {
         _client = new LlmHttpClient(httpClient, logger: loggerFactory?.CreateLogger<LlmHttpClient>());
         _options = options;
+        _logger = loggerFactory?.CreateLogger<AnthropicChatCompletionClient>();
 
         var features = new FeatureCollection();
         features.Set<IJsonOutputFeature>(this);
         features.Set<IToolCallingFeature>(this);
         features.Set<IStreamingChatFeature>(this);
+        features.Set<IGroundedChatFeature>(this);
+        features.Set<IPromptCachingFeature>(this);
+        features.Set<IWebSearchFeature>(this);
         Features = features;
     }
 
@@ -110,47 +116,11 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         }
     }
 
-    public async Task<ToolCallingResponse> GetChatCompletionWithToolsAsync(
+    public Task<ToolCallingResponse> GetChatCompletionWithToolsAsync(
         ChatCompletionRequest request,
         ToolCallingOptions toolOptions,
         CancellationToken cancellationToken = default)
-    {
-        request = request with { Model = ResolveModel(request.Model) };
-
-        try
-        {
-            toolOptions.Validate();
-
-            var providerRequest = await BuildRequestAsync(request, cancellationToken);
-            providerRequest.Tools = MapToolDefinitions(toolOptions.Tools);
-            providerRequest.ToolChoice = MapToolChoice(toolOptions.ToolChoice);
-
-            string? rawResponseJson = null;
-            string? rawRequestJson = null;
-            AnthropicChatResponse raw;
-
-            if (request.IncludeRawResponse)
-            {
-                (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<AnthropicChatRequest, AnthropicChatResponse>(
-                    MessagesEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
-            }
-            else
-            {
-                raw = await _client.PostAsync<AnthropicChatRequest, AnthropicChatResponse>(
-                    MessagesEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
-            }
-
-            return MapToolCallingResponse(raw, rawResponseJson, rawRequestJson);
-        }
-        catch (LlmHttpRequestException ex)
-        {
-            return ToolCallingResponse.Error(ex.Message, ex.ResponseBody);
-        }
-        catch (Exception ex)
-        {
-            return ToolCallingResponse.Error(ex.Message);
-        }
-    }
+        => ExecuteToolCallingCoreAsync(request, toolOptions, cachingOptions: null, cancellationToken);
 
     public async IAsyncEnumerable<ChatCompletionChunk> GetChatCompletionStreamAsync(
         ChatCompletionRequest request,
@@ -163,6 +133,8 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
 
         string? model = null;
         int? inputTokens = null;
+        int? cacheReadInputTokens = null;
+        int? cacheCreationInputTokens = null;
 
         await foreach (var json in _client.PostStreamAsync(MessagesEndpoint, providerRequest, request.ExtraParameters, cancellationToken))
         {
@@ -183,6 +155,8 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
                 case "message_start":
                     model = evt.Message?.Model;
                     inputTokens = evt.Message?.Usage?.InputTokens;
+                    cacheReadInputTokens = evt.Message?.Usage?.CacheReadInputTokens;
+                    cacheCreationInputTokens = evt.Message?.Usage?.CacheCreationInputTokens;
                     break;
 
                 case "content_block_delta":
@@ -195,18 +169,525 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
                     break;
 
                 case "message_delta":
-                    // Contains stop_reason and output_tokens
+                    var totalInputTokens = inputTokens.HasValue
+                        ? inputTokens.Value + (cacheReadInputTokens ?? 0) + (cacheCreationInputTokens ?? 0)
+                        : (int?)null;
                     yield return new ChatCompletionChunk(
                         Content: string.Empty,
                         FinishReason: evt.Delta?.StopReason,
                         Model: model,
-                        PromptTokens: inputTokens,
-                        CompletionTokens: evt.Usage?.OutputTokens);
+                        PromptTokens: totalInputTokens,
+                        CompletionTokens: evt.Usage?.OutputTokens,
+                        CachedInputTokens: cacheReadInputTokens,
+                        CacheCreationInputTokens: cacheCreationInputTokens);
                     break;
-
-                // Ignore: ping, content_block_start, content_block_stop, message_stop
             }
         }
+    }
+
+    public Task<GroundedChatCompletionResponse> GetGroundedChatCompletionAsync(
+        ChatCompletionRequest request,
+        GroundedChatOptions groundedChatOptions,
+        CancellationToken cancellationToken = default)
+        => ExecuteGroundedChatCoreAsync(request, groundedChatOptions, cachingOptions: null, cancellationToken);
+
+    public async Task<GroundedChatCompletionResponse> GetChatCompletionWithWebSearchAsync(
+        ChatCompletionRequest request,
+        WebSearchOptions webSearchOptions,
+        CancellationToken cancellationToken = default)
+    {
+        request = request with { Model = ResolveModel(request.Model) };
+
+        try
+        {
+            var providerRequest = await BuildRequestAsync(request, cancellationToken);
+            if (webSearchOptions.Enabled)
+                InjectWebSearchTool(providerRequest);
+
+            var (raw, rawResponseJson, rawRequestJson) = await PostRequestAsync(providerRequest, request, cancellationToken);
+
+            return BuildWebSearchResponse(raw, rawResponseJson, rawRequestJson);
+        }
+        catch (LlmHttpRequestException ex)
+        {
+            return GroundedChatCompletionResponse.Error(ex.Message, ex.ResponseBody);
+        }
+        catch (Exception ex)
+        {
+            return GroundedChatCompletionResponse.Error(ex.Message);
+        }
+    }
+
+    public async Task<ChatCompletionResponse> GetChatCompletionWithCachingAsync(
+        ChatCompletionRequest request,
+        PromptCachingOptions cachingOptions,
+        CancellationToken cancellationToken = default)
+    {
+        request = request with { Model = ResolveModel(request.Model) };
+
+        try
+        {
+            var providerRequest = await BuildRequestAsync(request, cancellationToken);
+            ApplyCacheBreakpoints(providerRequest, cachingOptions);
+
+            return await ExecuteAsync(providerRequest, request, cancellationToken);
+        }
+        catch (LlmHttpRequestException ex)
+        {
+            return ChatCompletionResponse.Error(ex.Message, ex.ResponseBody);
+        }
+        catch (Exception ex)
+        {
+            return ChatCompletionResponse.Error(ex.Message);
+        }
+    }
+
+    public Task<GroundedChatCompletionResponse> GetGroundedChatCompletionWithCachingAsync(
+        ChatCompletionRequest request,
+        GroundedChatOptions groundedChatOptions,
+        PromptCachingOptions cachingOptions,
+        CancellationToken cancellationToken = default)
+        => ExecuteGroundedChatCoreAsync(request, groundedChatOptions, cachingOptions, cancellationToken);
+
+    public Task<ToolCallingResponse> GetChatCompletionWithToolsAndCachingAsync(
+        ChatCompletionRequest request,
+        ToolCallingOptions toolOptions,
+        PromptCachingOptions cachingOptions,
+        CancellationToken cancellationToken = default)
+        => ExecuteToolCallingCoreAsync(request, toolOptions, cachingOptions, cancellationToken);
+
+    private async Task<GroundedChatCompletionResponse> ExecuteGroundedChatCoreAsync(
+        ChatCompletionRequest request,
+        GroundedChatOptions groundedChatOptions,
+        PromptCachingOptions? cachingOptions,
+        CancellationToken cancellationToken)
+    {
+        request = request with { Model = ResolveModel(request.Model) };
+
+        try
+        {
+            ValidateGroundedChatOptions(groundedChatOptions);
+
+            if (groundedChatOptions.CitationMode == CitationMode.SearchResult)
+            {
+                for (var i = 0; i < groundedChatOptions.Documents.Count; i++)
+                {
+                    var doc = groundedChatOptions.Documents[i];
+                    if (string.IsNullOrWhiteSpace(doc.Source))
+                    {
+                        var chunkName = string.IsNullOrWhiteSpace(doc.Id) ? $"at index {i}" : doc.Id;
+                        return GroundedChatCompletionResponse.Error(
+                            $"DocumentChunk '{chunkName}' is missing a required Source for CitationMode.SearchResult.");
+                    }
+                }
+            }
+
+            var providerRequest = await BuildRequestAsync(request, cancellationToken);
+            InjectDocumentBlocks(providerRequest, groundedChatOptions.Documents, groundedChatOptions.CitationMode);
+
+            if (cachingOptions is not null)
+                ApplyCacheBreakpoints(providerRequest, cachingOptions);
+
+            var (raw, rawResponseJson, rawRequestJson) = await PostRequestAsync(providerRequest, request, cancellationToken);
+
+            return BuildGroundedResponse(raw, rawResponseJson, rawRequestJson, groundedChatOptions.Documents);
+        }
+        catch (LlmHttpRequestException ex)
+        {
+            return GroundedChatCompletionResponse.Error(ex.Message, ex.ResponseBody);
+        }
+        catch (Exception ex)
+        {
+            return GroundedChatCompletionResponse.Error(ex.Message);
+        }
+    }
+
+    private async Task<ToolCallingResponse> ExecuteToolCallingCoreAsync(
+        ChatCompletionRequest request,
+        ToolCallingOptions toolOptions,
+        PromptCachingOptions? cachingOptions,
+        CancellationToken cancellationToken)
+    {
+        request = request with { Model = ResolveModel(request.Model) };
+
+        try
+        {
+            toolOptions.Validate();
+
+            var providerRequest = await BuildRequestAsync(request, cancellationToken);
+            providerRequest.Tools = MapToolDefinitions(toolOptions.Tools);
+            providerRequest.ToolChoice = MapToolChoice(toolOptions.ToolChoice);
+
+            if (cachingOptions is not null)
+                ApplyCacheBreakpoints(providerRequest, cachingOptions);
+
+            var (raw, rawResponseJson, rawRequestJson) = await PostRequestAsync(providerRequest, request, cancellationToken);
+
+            return MapToolCallingResponse(raw, rawResponseJson, rawRequestJson);
+        }
+        catch (LlmHttpRequestException ex)
+        {
+            return ToolCallingResponse.Error(ex.Message, ex.ResponseBody);
+        }
+        catch (Exception ex)
+        {
+            return ToolCallingResponse.Error(ex.Message);
+        }
+    }
+
+    private static void ApplyCacheBreakpoints(
+        AnthropicChatRequest providerRequest,
+        PromptCachingOptions cachingOptions)
+    {
+        if (cachingOptions.CacheSystemMessage && providerRequest.System is string systemText)
+        {
+            providerRequest.System = new List<AnthropicSystemBlock>
+            {
+                new()
+                {
+                    Type = "text",
+                    Text = systemText,
+                    CacheControl = new AnthropicCacheControl { Type = EphemeralCacheType }
+                }
+            };
+        }
+
+        foreach (var index in cachingOptions.MessageBreakpoints)
+        {
+            if (index >= 0 && index < providerRequest.Messages.Count)
+                ApplyCacheControlToMessage(providerRequest.Messages[index]);
+        }
+
+        ApplyCacheControlToTools(providerRequest.Tools, cachingOptions.ToolBreakpoints);
+    }
+
+    private static void ApplyCacheControlToMessage(AnthropicMessage msg)
+    {
+        if (msg.Content is string text)
+        {
+            msg.Content = new List<AnthropicContentBlock>
+            {
+                new()
+                {
+                    Type = "text",
+                    Text = text,
+                    CacheControl = new AnthropicCacheControl { Type = EphemeralCacheType }
+                }
+            };
+        }
+        else if (msg.Content is List<AnthropicContentBlock> blocks && blocks.Count > 0)
+        {
+            blocks[^1].CacheControl = new AnthropicCacheControl { Type = EphemeralCacheType };
+        }
+        else if (msg.Content is IList<object> mixedBlocks && mixedBlocks.Count > 0)
+        {
+            for (var i = mixedBlocks.Count - 1; i >= 0; i--)
+            {
+                if (mixedBlocks[i] is IAnthropicDocumentContentBlock docContentBlock)
+                {
+                    docContentBlock.CacheControl = new AnthropicCacheControl { Type = EphemeralCacheType };
+                    return;
+                }
+            }
+
+            if (mixedBlocks[^1] is AnthropicContentBlock lastBlock)
+                lastBlock.CacheControl = new AnthropicCacheControl { Type = EphemeralCacheType };
+        }
+    }
+
+    private static void ApplyCacheControlToTools(
+        List<AnthropicToolDefinition>? tools,
+        IReadOnlyList<int> toolBreakpoints)
+    {
+        if (tools is null)
+            return;
+
+        foreach (var index in toolBreakpoints)
+        {
+            if (index >= 0 && index < tools.Count)
+                tools[index].CacheControl = new AnthropicCacheControl { Type = EphemeralCacheType };
+        }
+    }
+
+    private static void InjectDocumentBlocks(
+        AnthropicChatRequest providerRequest,
+        IReadOnlyList<DocumentChunk> documents,
+        CitationMode citationMode)
+    {
+        var lastUserMessage = providerRequest.Messages.LastOrDefault(m => m.Role == "user");
+        if (lastUserMessage is null)
+            return;
+
+        var documentBlocks = documents.Select(d => MapDocumentChunk(d, citationMode)).ToList<object>();
+
+        if (lastUserMessage.Content is List<AnthropicContentBlock> existingBlocks)
+        {
+            var mixed = new List<object>();
+            mixed.AddRange(documentBlocks);
+            mixed.AddRange(existingBlocks);
+            lastUserMessage.Content = mixed;
+        }
+        else if (lastUserMessage.Content is string textContent)
+        {
+            var mixed = new List<object>();
+            mixed.AddRange(documentBlocks);
+            mixed.Add(new AnthropicContentBlock { Type = "text", Text = textContent });
+            lastUserMessage.Content = mixed;
+        }
+    }
+
+    private static IAnthropicDocumentContentBlock MapDocumentChunk(DocumentChunk chunk, CitationMode citationMode)
+    {
+        if (citationMode == CitationMode.SearchResult)
+        {
+            var contentBlocks = new List<AnthropicCustomContentBlock>();
+
+            if (chunk.Data is not null)
+            {
+                contentBlocks.AddRange(chunk.Data.Select(kvp => new AnthropicCustomContentBlock
+                {
+                    Type = "text",
+                    Text = $"{kvp.Key}: {kvp.Value}"
+                }));
+            }
+            else
+            {
+                contentBlocks.Add(new AnthropicCustomContentBlock
+                {
+                    Type = "text",
+                    Text = chunk.Text!
+                });
+            }
+
+            return new AnthropicSearchResultBlock
+            {
+                Source = chunk.Source!,
+                Title = chunk.Title,
+                Content = contentBlocks,
+                Citations = new AnthropicCitationConfig { Enabled = true }
+            };
+        }
+
+        AnthropicDocumentSource source;
+
+        if (chunk.Data is not null)
+        {
+            source = new AnthropicDocumentSource
+            {
+                Type = "custom_content",
+                Content = chunk.Data.Select(kvp => new AnthropicCustomContentBlock
+                {
+                    Type = "text",
+                    Text = $"{kvp.Key}: {kvp.Value}"
+                }).ToList()
+            };
+        }
+        else
+        {
+            source = new AnthropicDocumentSource
+            {
+                Type = "text",
+                MediaType = "text/plain",
+                Data = chunk.Text!
+            };
+        }
+
+        return new AnthropicDocumentBlock
+        {
+            Source = source,
+            Title = chunk.Id,
+            Citations = new AnthropicCitationConfig { Enabled = true }
+        };
+    }
+
+    private (string content, List<Citation> citations) ExtractContentAndCitations(
+        List<AnthropicContentBlock> contentBlocks,
+        IReadOnlyList<DocumentChunk> documents)
+    {
+        var textBuilder = new System.Text.StringBuilder();
+        var citations = new List<Citation>();
+
+        foreach (var block in contentBlocks.Where(b => b.Type == "text"))
+        {
+            var blockStart = textBuilder.Length;
+            var blockText = block.Text ?? string.Empty;
+            textBuilder.Append(blockText);
+
+            if (block.Citations is null || block.Citations.Count == 0)
+                continue;
+
+            foreach (var cite in block.Citations)
+            {
+                if (cite is null)
+                {
+                    _logger?.LogWarning("Skipping null citation entry in content block.");
+                    continue;
+                }
+
+                var citation = cite.Type == "search_result_location"
+                    ? MapSearchResultCitation(cite, blockStart, blockText)
+                    : MapDocumentCitation(cite, blockStart, blockText, documents);
+
+                if (citation is not null)
+                    citations.Add(citation);
+            }
+        }
+
+        return (textBuilder.ToString(), citations);
+    }
+
+    private Citation? MapSearchResultCitation(
+        AnthropicCitationResult cite, int blockStart, string blockText)
+    {
+        if (string.IsNullOrWhiteSpace(cite.Source))
+        {
+            _logger?.LogWarning(
+                "Skipping search_result_location citation with missing source.");
+            return null;
+        }
+
+        return new Citation(
+            Start: blockStart,
+            End: blockStart + blockText.Length,
+            Text: blockText,
+            Sources: [new CitationSource(
+                Id: cite.Source,
+                Data: BuildTitleData(cite.Title),
+                CitedText: cite.CitedText)],
+            Type: cite.Type);
+    }
+
+    private static Citation MapDocumentCitation(
+        AnthropicCitationResult cite, int blockStart, string blockText,
+        IReadOnlyList<DocumentChunk> documents)
+    {
+        string? sourceId = cite.DocumentTitle;
+        IReadOnlyDictionary<string, string>? sourceData = null;
+
+        if (cite.DocumentIndex is not null && cite.DocumentIndex.Value < documents.Count)
+        {
+            var doc = documents[cite.DocumentIndex.Value];
+            sourceId ??= doc.Id;
+            sourceData = doc.Data is not null
+                ? new System.Collections.ObjectModel.ReadOnlyDictionary<string, string>(
+                    new Dictionary<string, string>(doc.Data))
+                : null;
+        }
+
+        return new Citation(
+            Start: blockStart,
+            End: blockStart + blockText.Length,
+            Text: blockText,
+            Sources: [new CitationSource(
+                Id: sourceId ?? $"doc-{cite.DocumentIndex}",
+                Data: sourceData,
+                CitedText: cite.CitedText)],
+            Type: cite.Type);
+    }
+
+    private static System.Collections.ObjectModel.ReadOnlyDictionary<string, string>? BuildTitleData(string? title)
+    {
+        return title is not null
+            ? new System.Collections.ObjectModel.ReadOnlyDictionary<string, string>(
+                new Dictionary<string, string> { ["title"] = title })
+            : null;
+    }
+
+    private void InjectWebSearchTool(AnthropicChatRequest providerRequest)
+    {
+        providerRequest.Tools ??= [];
+        providerRequest.Tools.Add(new AnthropicToolDefinition
+        {
+            Name = "web_search",
+            Type = _options.WebSearchToolVersion
+        });
+    }
+
+    private GroundedChatCompletionResponse BuildWebSearchResponse(
+        AnthropicChatResponse raw,
+        string? rawResponseJson,
+        string? rawRequestJson)
+    {
+        var (content, citations) = ExtractWebSearchContentAndCitations(raw.Content);
+
+        var refusal = raw.StopReason == "refusal" ? content : null;
+        if (refusal is not null)
+            content = string.Empty;
+
+        var incompleteReason = raw.StopReason == "max_tokens" ? "max_tokens" : null;
+
+        var webSearchCount = raw.Usage.ServerToolUse?.WebSearchRequests;
+
+        var chatCompletion = new ChatCompletionResponse(
+            Content: content,
+            Model: raw.Model,
+            PromptTokens: ComputeTotalInputTokens(raw.Usage),
+            CompletionTokens: raw.Usage.OutputTokens,
+            RawResponseJson: rawResponseJson,
+            RawRequestJson: rawRequestJson,
+            Status: raw.StopReason,
+            IncompleteReason: incompleteReason,
+            Refusal: refusal,
+            CachedInputTokens: raw.Usage.CacheReadInputTokens,
+            CacheCreationInputTokens: raw.Usage.CacheCreationInputTokens)
+        {
+            WebSearchCount = webSearchCount
+        };
+
+        return new GroundedChatCompletionResponse(chatCompletion, citations)
+        {
+            GroundingKind = GroundingKind.WebSearch
+        };
+    }
+
+    private (string content, List<Citation> citations) ExtractWebSearchContentAndCitations(
+        List<AnthropicContentBlock> contentBlocks)
+    {
+        var textBuilder = new System.Text.StringBuilder();
+        var citations = new List<Citation>();
+
+        foreach (var block in contentBlocks.Where(b => b.Type == "text"))
+        {
+            var blockStart = textBuilder.Length;
+            var blockText = block.Text ?? string.Empty;
+            textBuilder.Append(blockText);
+
+            if (block.Citations is null || block.Citations.Count == 0)
+                continue;
+
+            foreach (var cite in block.Citations)
+            {
+                if (cite is null)
+                {
+                    _logger?.LogWarning("Skipping null citation entry in web search content block.");
+                    continue;
+                }
+
+                if (cite.Type != "web_search_result_location")
+                {
+                    _logger?.LogWarning("Skipping unexpected citation type '{Type}' in web search response.", cite.Type);
+                    continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(cite.Url))
+                {
+                    _logger?.LogWarning("Skipping web_search_result_location citation with missing URL.");
+                    continue;
+                }
+
+                citations.Add(new Citation(
+                    Start: blockStart,
+                    End: blockStart + blockText.Length,
+                    Text: blockText,
+                    Sources: [new CitationSource(
+                        Id: cite.Url!,
+                        Data: BuildTitleData(cite.Title),
+                        CitedText: cite.CitedText)],
+                    Type: cite.Type));
+            }
+        }
+
+        return (textBuilder.ToString(), citations);
     }
 
     private string ResolveModel(string? model)
@@ -240,25 +721,28 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         };
     }
 
+    private async Task<(AnthropicChatResponse Raw, string? RawResponseJson, string? RawRequestJson)> PostRequestAsync(
+        AnthropicChatRequest providerRequest,
+        ChatCompletionRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (request.IncludeRawResponse)
+        {
+            return await _client.PostWithRawAsync<AnthropicChatRequest, AnthropicChatResponse>(
+                MessagesEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
+        }
+
+        var raw = await _client.PostAsync<AnthropicChatRequest, AnthropicChatResponse>(
+            MessagesEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
+        return (raw, null, null);
+    }
+
     private async Task<ChatCompletionResponse> ExecuteAsync(
         AnthropicChatRequest providerRequest,
         ChatCompletionRequest request,
         CancellationToken cancellationToken)
     {
-        string? rawResponseJson = null;
-        string? rawRequestJson = null;
-        AnthropicChatResponse raw;
-
-        if (request.IncludeRawResponse)
-        {
-            (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<AnthropicChatRequest, AnthropicChatResponse>(
-                MessagesEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
-        }
-        else
-        {
-            raw = await _client.PostAsync<AnthropicChatRequest, AnthropicChatResponse>(
-                MessagesEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
-        }
+        var (raw, rawResponseJson, rawRequestJson) = await PostRequestAsync(providerRequest, request, cancellationToken);
 
         var content = string.Join("", raw.Content
             .Where(c => c.Type == "text")
@@ -273,13 +757,59 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         return new ChatCompletionResponse(
             Content: content,
             Model: raw.Model,
-            PromptTokens: raw.Usage.InputTokens,
+            PromptTokens: ComputeTotalInputTokens(raw.Usage),
             CompletionTokens: raw.Usage.OutputTokens,
             RawResponseJson: rawResponseJson,
             RawRequestJson: rawRequestJson,
             Status: raw.StopReason,
             IncompleteReason: incompleteReason,
-            Refusal: refusal);
+            Refusal: refusal,
+            CachedInputTokens: raw.Usage.CacheReadInputTokens,
+            CacheCreationInputTokens: raw.Usage.CacheCreationInputTokens);
+    }
+
+    private void ValidateGroundedChatOptions(GroundedChatOptions groundedChatOptions)
+    {
+        groundedChatOptions.Validate();
+        foreach (var doc in groundedChatOptions.Documents)
+            doc.Validate();
+
+        if (groundedChatOptions.CitationMode is CitationMode.Accurate or CitationMode.Fast)
+        {
+            _logger?.LogWarning(
+                "Anthropic does not distinguish citation modes; CitationMode.{Mode} is treated as Enabled.",
+                groundedChatOptions.CitationMode);
+        }
+    }
+
+    private GroundedChatCompletionResponse BuildGroundedResponse(
+        AnthropicChatResponse raw,
+        string? rawResponseJson,
+        string? rawRequestJson,
+        IReadOnlyList<DocumentChunk> documents)
+    {
+        var (content, citations) = ExtractContentAndCitations(raw.Content, documents);
+
+        var refusal = raw.StopReason == "refusal" ? content : null;
+        if (refusal is not null)
+            content = string.Empty;
+
+        var incompleteReason = raw.StopReason == "max_tokens" ? "max_tokens" : null;
+
+        var chatCompletion = new ChatCompletionResponse(
+            Content: content,
+            Model: raw.Model,
+            PromptTokens: ComputeTotalInputTokens(raw.Usage),
+            CompletionTokens: raw.Usage.OutputTokens,
+            RawResponseJson: rawResponseJson,
+            RawRequestJson: rawRequestJson,
+            Status: raw.StopReason,
+            IncompleteReason: incompleteReason,
+            Refusal: refusal,
+            CachedInputTokens: raw.Usage.CacheReadInputTokens,
+            CacheCreationInputTokens: raw.Usage.CacheCreationInputTokens);
+
+        return new GroundedChatCompletionResponse(chatCompletion, citations);
     }
 
     private static ToolCallingResponse MapToolCallingResponse(
@@ -294,11 +824,13 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         var chatCompletion = new ChatCompletionResponse(
             Content: content,
             Model: raw.Model,
-            PromptTokens: raw.Usage.InputTokens,
+            PromptTokens: ComputeTotalInputTokens(raw.Usage),
             CompletionTokens: raw.Usage.OutputTokens,
             RawResponseJson: rawResponseJson,
             RawRequestJson: rawRequestJson,
-            Status: raw.StopReason);
+            Status: raw.StopReason,
+            CachedInputTokens: raw.Usage.CacheReadInputTokens,
+            CacheCreationInputTokens: raw.Usage.CacheCreationInputTokens);
 
         var toolCalls = MapResponseToolCalls(raw.Content);
 
@@ -491,6 +1023,9 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         }
         return blocks;
     }
+
+    private static int ComputeTotalInputTokens(AnthropicUsage usage)
+        => usage.InputTokens + (usage.CacheReadInputTokens ?? 0) + (usage.CacheCreationInputTokens ?? 0);
 
     private static string MapRole(LlmRole role) => role switch
     {

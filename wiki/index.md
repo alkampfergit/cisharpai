@@ -4,13 +4,13 @@ Cisharpai is a unified .NET client library providing a single `IChatCompletionCl
 
 ## Supported Providers
 
-| Provider | Package | Chat | Embeddings | Notes |
-|----------|---------|------|------------|-------|
-| OpenAI | `Cisharpai.OpenAi` | Yes | Yes | Chat Completions, Responses API (GPT-5), reasoning models |
-| Azure OpenAI | `Cisharpai.Azure` | Yes | Yes | Deployment-based routing, Azure AD auth, Responses API (GPT-5) |
-| Azure AI Inference | `Cisharpai.Azure` | Yes | Yes | Model catalog: Phi, Llama, Mistral; image embeddings |
-| Anthropic | `Cisharpai.Anthropic` | Yes | -- | Claude model family |
-| Cohere | `Cisharpai.Cohere` | Yes | Yes | Grounded chat (RAG), multimodal embeddings |
+| Provider | Package | Chat | Embeddings | Reranking | Notes |
+|----------|---------|------|------------|-----------|-------|
+| OpenAI | `Cisharpai.OpenAi` | Yes | Yes | -- | Chat Completions, Responses API (GPT-5), reasoning models. Hosted retrieval via `Cisharpai.Rag.OpenAi` bridge. |
+| Azure OpenAI | `Cisharpai.Azure` | Yes | Yes | -- | Deployment-based routing, Azure AD auth, Responses API (GPT-5) |
+| Azure AI Inference | `Cisharpai.Azure` | Yes | Yes | -- | Model catalog: Phi, Llama, Mistral; image embeddings |
+| Anthropic | `Cisharpai.Anthropic` | Yes | -- | -- | Claude model family, grounded chat (RAG) |
+| Cohere | `Cisharpai.Cohere` | Yes | Yes | Yes | Grounded chat (RAG), multimodal embeddings, reranking |
 
 ## Key Design Principles
 
@@ -37,8 +37,12 @@ Cisharpai is a unified .NET client library providing a single `IChatCompletionCl
 - [Tool Calling](tool-calling.md) — function calling via `IToolCallingFeature`
 - [JSON Output](json-output.md) — JSON Mode and Structured Outputs via `IJsonOutputFeature`
 - [Vision](vision.md) — sending images in chat messages
+- [RAG](rag.md) — chunking, bulk embeddings, retrieval, hosted retrieval (OpenAI file_search), context packing, and configuration
 - [Embeddings](embeddings.md) — text, image, and multimodal embeddings
-- [Grounded Chat (RAG)](grounded-chat.md) — document grounding with citations via `IGroundedChatFeature` (Cohere)
+- [Reranking](reranking.md) — relevance reranking via `IRerankerClient` (Cohere)
+- [Grounded Chat (RAG)](grounded-chat.md) — document grounding with citations via `IGroundedChatFeature` (all providers)
+- [Web Search](web-search.md) — provider-hosted server-side web search with cited answers via `IWebSearchFeature` (Anthropic, OpenAI GPT-5)
+- [Prompt Caching](prompt-caching.md) — cache usage reporting (all providers) and explicit cache control via `IPromptCachingFeature` (Anthropic)
 
 ### Operations
 
@@ -49,3 +53,7 @@ Cisharpai is a unified .NET client library providing a single `IChatCompletionCl
 ### Testing
 
 - [Testing with Cisharpai](testing.md) — fake clients, response factories, request capture, DI helpers
+
+### Reference
+
+- [FAQ](qa.md) — frequently asked questions and verified answers

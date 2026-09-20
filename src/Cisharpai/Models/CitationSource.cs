@@ -12,4 +12,11 @@ public sealed record CitationSource(
     /// <summary>
     /// The source document data as key-value pairs (if the source was structured).
     /// </summary>
-    IReadOnlyDictionary<string, string>? Data = null);
+    IReadOnlyDictionary<string, string>? Data = null,
+
+    /// <summary>
+    /// The text from the source document that was cited.
+    /// Populated by providers that return source-level cited text (e.g. Anthropic).
+    /// Null when the provider does not surface this information (e.g. Cohere).
+    /// </summary>
+    string? CitedText = null);

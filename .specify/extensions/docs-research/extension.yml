@@ -1,0 +1,35 @@
+schema_version: "1.0"
+
+extension:
+  id: docs-research
+  name: "Documentation Research"
+  version: "1.0.0"
+  description: "Query Microsoft Learn and Context7 MCP servers for relevant documentation before specification and planning phases"
+  author: spec-kit-core
+  license: MIT
+
+requires:
+  speckit_version: ">=0.2.0"
+
+provides:
+  commands:
+    - name: speckit.docs.research
+      file: commands/speckit.docs.research.md
+      description: "Search Microsoft Learn and Context7 for relevant docs based on the feature description"
+
+hooks:
+  before_specify:
+    command: speckit.docs.research
+    optional: false
+    description: "Research relevant documentation before writing the specification"
+  before_plan:
+    command: speckit.docs.research
+    optional: false
+    description: "Research relevant documentation before implementation planning"
+
+tags:
+  - "documentation"
+  - "research"
+  - "mcp"
+  - "microsoft-learn"
+  - "context7"

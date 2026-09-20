@@ -51,6 +51,36 @@ public sealed class AzureOpenAiResponseContent
 
     [JsonPropertyName("refusal")]
     public string? Refusal { get; set; }
+
+    [JsonPropertyName("annotations")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<AzureOpenAiAnnotation>? Annotations { get; set; }
+}
+
+public sealed class AzureOpenAiAnnotation
+{
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = string.Empty;
+
+    [JsonPropertyName("file_id")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? FileId { get; set; }
+
+    [JsonPropertyName("filename")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Filename { get; set; }
+
+    [JsonPropertyName("index")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? Index { get; set; }
+
+    [JsonPropertyName("start_index")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? StartIndex { get; set; }
+
+    [JsonPropertyName("end_index")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? EndIndex { get; set; }
 }
 
 public sealed class AzureOpenAiResponsesUsage
@@ -63,10 +93,19 @@ public sealed class AzureOpenAiResponsesUsage
 
     [JsonPropertyName("output_tokens_details")]
     public AzureOpenAiOutputTokensDetails? OutputTokensDetails { get; set; }
+
+    [JsonPropertyName("input_tokens_details")]
+    public AzureOpenAiInputTokensDetails? InputTokensDetails { get; set; }
 }
 
 public sealed class AzureOpenAiOutputTokensDetails
 {
     [JsonPropertyName("reasoning_tokens")]
     public int ReasoningTokens { get; set; }
+}
+
+public sealed class AzureOpenAiInputTokensDetails
+{
+    [JsonPropertyName("cached_tokens")]
+    public int CachedTokens { get; set; }
 }

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Cisharpai.Models;
+using Cisharpai.Rag.Packing;
 
 namespace Cisharpai.Testing;
 
@@ -95,6 +96,23 @@ public static class FakeResponses
     }
 
     /// <summary>
+    /// Creates a chat completion response with cache usage information.
+    /// </summary>
+    public static ChatCompletionResponse CachedChat(
+        string content,
+        int? cachedInputTokens = null,
+        int? cacheCreationInputTokens = null,
+        string model = DefaultModel,
+        int? promptTokens = null,
+        int completionTokens = 5)
+    {
+        var effectivePromptTokens = promptTokens
+            ?? (cachedInputTokens ?? 0) + (cacheCreationInputTokens ?? 0) + 10;
+        return new(Content: content, Model: model, PromptTokens: effectivePromptTokens, CompletionTokens: completionTokens,
+            CachedInputTokens: cachedInputTokens, CacheCreationInputTokens: cacheCreationInputTokens);
+    }
+
+    /// <summary>
     /// Creates a successful embedding response.
     /// </summary>
     public static EmbeddingResponse Embedding(
@@ -125,4 +143,74 @@ public static class FakeResponses
     /// </summary>
     public static EmbeddingResponse EmbeddingError(string errorMessage) =>
         EmbeddingResponse.Error(errorMessage);
+
+    /// <summary>
+    /// Creates a successful rerank response from (index, score) pairs, in the order given.
+    /// </summary>
+    public static RerankResponse Rerank(
+        params (int Index, double RelevanceScore)[] results) =>
+        new(
+            Results: results.Select(r => new RerankResult(r.Index, r.RelevanceScore)).ToList(),
+            Model: DefaultModel,
+            SearchUnits: 1);
+
+    /// <summary>
+    /// Creates a successful rerank response that ranks the given number of documents in
+    /// their original order with descending scores.
+    /// </summary>
+    public static RerankResponse Rerank(
+        int documentCount,
+        string model = DefaultModel) =>
+        new(
+            Results: Enumerable.Range(0, documentCount)
+                .Select(i => new RerankResult(i, 1.0 - (i * 0.1)))
+                .ToList(),
+            Model: model,
+            SearchUnits: 1);
+
+    /// <summary>
+    /// Creates a rerank error response.
+    /// </summary>
+    public static RerankResponse RerankError(string errorMessage) =>
+        RerankResponse.Error(errorMessage);
+
+    /// <summary>
+    /// Creates a pre-configured <see cref="FakeTokenCounter"/> with a fixed default count.
+    /// </summary>
+    public static FakeTokenCounter TokenCounter(int defaultCount = 10) =>
+        new() { DefaultCount = defaultCount };
+
+    /// <summary>
+    /// Creates a pre-configured <see cref="FakeRetriever"/> with a fixed default response.
+    /// </summary>
+    public static FakeRetriever Retriever(IReadOnlyList<ScoredChunk> defaultResponse) =>
+        new() { DefaultResponse = defaultResponse };
+
+    /// <summary>
+    /// Creates a pre-configured <see cref="FakeRetriever"/> that returns no results.
+    /// </summary>
+    public static FakeRetriever Retriever() =>
+        new() { DefaultResponse = Array.Empty<ScoredChunk>() };
+
+    /// <summary>
+    /// Creates a grounded chat response representing a web search result with citations.
+    /// </summary>
+    public static GroundedChatCompletionResponse WebSearch(
+        string content,
+        IReadOnlyList<Citation>? citations = null,
+        int? webSearchCount = 1,
+        string model = DefaultModel) =>
+        new(
+            ChatCompletion: new ChatCompletionResponse(
+                Content: content,
+                Model: model,
+                PromptTokens: 10,
+                CompletionTokens: 5)
+            {
+                WebSearchCount = webSearchCount
+            },
+            Citations: citations ?? [])
+        {
+            GroundingKind = GroundingKind.WebSearch
+        };
 }

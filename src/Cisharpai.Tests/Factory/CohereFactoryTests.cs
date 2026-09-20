@@ -79,4 +79,40 @@ public sealed class CohereFactoryTests
     {
         Assert.That(_factory.GetRegisteredProviders(), Does.Contain(CisharpaiProvider.Cohere));
     }
+
+    [Test]
+    public void CreateRerankerClient_ReturnsCohereRerankerClient()
+    {
+        var config = new CohereClientConfiguration
+        {
+            ApiKey = "test-key",
+            DefaultModel = CohereModels.Rerank.RerankV3_5
+        };
+
+        var result = _factory.CreateRerankerClient(config);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.IsSuccess, Is.True);
+            Assert.That(result.Client, Is.InstanceOf<CohereRerankerClient>());
+        });
+    }
+
+    [Test]
+    public void CreateRerankerClient_WithWrongConfigurationType_Fails()
+    {
+        var result = new CohereClientFactoryProvider()
+            .CreateRerankerClient(_provider, new WrongConfiguration { ApiKey = "k" });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.IsSuccess, Is.False);
+            Assert.That(result.ErrorMessage, Does.Contain("CohereClientConfiguration"));
+        });
+    }
+
+    private sealed record WrongConfiguration : CisharpaiClientConfiguration
+    {
+        public override CisharpaiProvider Provider => CisharpaiProvider.Cohere;
+    }
 }

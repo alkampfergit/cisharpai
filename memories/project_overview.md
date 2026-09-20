@@ -8,26 +8,34 @@ The only dependency needed by consuming applications.
 
 - **`IChatCompletionClient.cs`** — Primary chat interface. Inherits `IHasFeatures`.
 - **`IEmbeddingClient.cs`** — Primary embedding interface. Inherits `IHasFeatures`.
+- **`IRerankerClient.cs`** — Primary reranking interface (`RerankAsync`). Inherits `IHasFeatures`. Cohere only.
+- **`ITokenCounter.cs`** — Token counting interface (`CountAsync`). One instance per model. Implementations: `TiktokenCounter` (local, in `Cisharpai.Rag.Tokenizers`), `CohereTokenCounter` (API-backed, in `Cisharpai.Cohere`).
 - **`Features/`** — Feature Collection Pattern for optional capabilities:
   - `IFeatureCollection.cs` / `FeatureCollection.cs` — Thread-safe `Get<T>()`/`Set<T>()` backed by `ConcurrentDictionary`.
   - `Chat/IJsonOutputFeature.cs` — JSON Mode + Structured Outputs.
   - `Chat/IToolCallingFeature.cs` — Tool/function calling.
   - `Chat/IStreamingChatFeature.cs` — Token-by-token streaming via `IAsyncEnumerable<ChatCompletionChunk>`.
-  - `Chat/IGroundedChatFeature.cs` — RAG with document citations.
+  - `Chat/IGroundedChatFeature.cs` — RAG with document citations (native or synthesized via prompt-injection fallback).
+  - `Chat/IPromptCachingFeature.cs` — Explicit cache breakpoints (Anthropic only).
+  - `Chat/IWebSearchFeature.cs` — Provider-hosted server-side web search with cited answers (Anthropic, OpenAI GPT-5).
   - `Embeddings/IImageEmbeddingFeature.cs` — Single image embedding.
   - `Embeddings/IMultimodalEmbeddingFeature.cs` — Mixed text+image embedding (Cohere Embed v4).
 - **`Models/`** — Unified DTOs (all immutable records):
   - `ChatCompletionRequest` (Messages, Model?, Temperature, MaxTokens, ExtraParameters)
-  - `ChatCompletionResponse` (Content, Usage, Status/IncompleteReason, IsSuccess/ErrorMessage, RawResponseJson/RawRequestJson, Refusal)
+  - `ChatCompletionResponse` (Content, Usage, Status/IncompleteReason, IsSuccess/ErrorMessage, RawResponseJson/RawRequestJson, Refusal, CachedInputTokens, CacheCreationInputTokens, WebSearchCount `init`)
   - `EmbeddingRequest` / `EmbeddingResponse`
+  - Reranking: `RerankRequest` (Query, Documents, Model?, TopN, MaxTokensPerDocument, ExtraParameters), `RerankResponse` (Results, Model, SearchUnits/InputTokens, IsSuccess/ErrorMessage, raw payloads), `RerankResult` (Index into the request documents, RelevanceScore)
   - `LlmMessage` (Role, Content, ContentParts, ToolCallId, ToolCalls) + factory methods `WithImage()`, `WithBase64Image()`
   - `MessageContentPart` hierarchy: `TextContentPart`, `ImageFileContentPart`, `ImageBase64ContentPart`
+  - `DocumentChunk(Id, Data, Text, Source, Title)` — `Source` and `Title` are optional, required for `CitationMode.SearchResult`
   - `ChatCompletionChunk` (streaming) with `ToolCallDelta`
   - Tool calling: `ToolDefinition`, `ToolCall`, `ToolResult`, `ToolChoice` (Auto/None/Required/Specific), `ToolCallingOptions`, `ToolCallingResponse`
   - JSON output: `JsonOutputMode`, `JsonOutputOptions`
-  - Grounded chat: `DocumentChunk`, `Citation`, `CitationSource`, `CitationMode`, `GroundedChatOptions`, `GroundedChatCompletionResponse`
+  - Grounded chat: `DocumentChunk`, `Citation`, `CitationSource`, `CitationMode` (Accurate, Fast, Enabled, SearchResult), `GroundingKind` (Native, Synthesized, WebSearch), `GroundedChatOptions`, `GroundedChatCompletionResponse`
+  - Web search: `WebSearchOptions` (Enabled)
+  - Prompt caching: `PromptCachingOptions` (CacheSystemMessage, MessageBreakpoints, ToolBreakpoints)
   - Multimodal: `MultimodalEmbeddingInput`, `EmbeddingContentPart`, `TextEmbeddingContent`, `ImageEmbeddingContent`
-- **`Helpers/`** — Shared utilities: `JsonOutputHelper`, `RoleMapper`, `ContentPartHelper`, `ToolCallingHelper`, `EmbeddingHelper`
+- **`Helpers/`** — Shared utilities: `JsonOutputHelper`, `RoleMapper`, `ContentPartHelper`, `ToolCallingHelper`, `EmbeddingHelper`, `GroundedChatHelper`, `GroundedChatFallbackHelper`
 - **`JsonDeepMerge.cs`** — Deep-merges ExtraParameters JSON into request payloads.
 - **`ImageDataUriHelper.cs`** — Converts image files to data URIs (PNG, JPEG, WebP, GIF).
 - **`LlmHttpClient.cs`** — Internal HTTP helper with deep merge, raw request/response capture, SSE streaming.
@@ -35,8 +43,8 @@ The only dependency needed by consuming applications.
   - `CisharpaiProvider.cs` — Enum identifying supported providers (OpenAi, AzureOpenAi, AzureAiInference, Anthropic, Cohere).
   - `CisharpaiClientConfiguration.cs` — Abstract base record (Provider + ApiKey); each provider defines a concrete subclass.
   - `CisharpaiClientFactoryResult<T>.cs` — Result wrapper (IsSuccess, Client, ErrorMessage) with static Success/Failure factories.
-  - `IClientFactoryProvider.cs` — Provider descriptor interface; implemented per provider.
-  - `ICisharpaiClientFactory.cs` — Consumer-facing factory interface (CreateChatCompletionClient, CreateEmbeddingClient, GetRegisteredProviders).
+  - `IClientFactoryProvider.cs` — Provider descriptor interface; implemented per provider. `SupportsReranking` / `CreateRerankerClient` are **default interface members** (false / failure result) so existing implementations stay source-compatible.
+  - `ICisharpaiClientFactory.cs` — Consumer-facing factory interface (CreateChatCompletionClient, CreateEmbeddingClient, CreateRerankerClient, GetRegisteredProviders).
   - `ICisharpaiClientFactoryBuilder.cs` — Fluent builder for registering providers.
   - `CisharpaiClientFactory.cs` — Default implementation; routes on Provider enum.
   - `CisharpaiClientFactoryExtensions.cs` — `services.AddCisharpaiClientFactory()` extension method.
@@ -44,8 +52,12 @@ The only dependency needed by consuming applications.
 ## Providers
 
 ### `src/Cisharpai.OpenAi/`
-- `OpenAiChatCompletionClient` — Implements chat + JSON output + tool calling + streaming. Routes by model: legacy (GPT-4), reasoning (o1/o3/o4), Responses API (GPT-5). Vision via data URI `image_url`. Static `Create(IHttpMessageHandlerFactory, options, ...)` for runtime construction.
+- `OpenAiChatCompletionClient` — Implements chat + JSON output + tool calling + streaming + grounded chat (GPT-5 only via Responses API `input_file`) + web search (GPT-5 only via Responses API `web_search` tool). Hosted retrieval support via `Cisharpai.Rag.OpenAi` bridge package (injected externally). Reports `CachedInputTokens` from `prompt_tokens_details.cached_tokens` (Chat Completions) and `input_tokens_details.cached_tokens` (Responses API). Routes by model: legacy (GPT-4), reasoning (o1/o3/o4), Responses API (GPT-5). Vision via data URI `image_url`. Static `Create(IHttpMessageHandlerFactory, options, ...)` for runtime construction.
 - `OpenAiEmbeddingClient` — Text embeddings. Static `Create(IHttpMessageHandlerFactory, options, ...)` for runtime construction.
+- `OpenAiChatCompletionClient` no longer implements `IHostedRetrievalFeature` directly; the feature is injected externally by the `Cisharpai.Rag.OpenAi` bridge package via `Features.Set<IHostedRetrievalFeature>(...)`.
+- `OpenAiVectorStoreClient` — Provider-specific CRUD client for OpenAI Vector Stores and Files APIs. Create/get/list/delete stores, upload files (multipart), add/get/list/delete files in stores, delete files. `PollFileUntilProcessedAsync` with configurable timeout (default 5min) and poll interval (default 1s). Static `Create` factory and DI-friendly `HttpClient` constructor.
+- `VectorStoreResult<T>` — Generic result record for management operations: `IsSuccess`, `Value`, `ErrorMessage` with `Success`/`Error` factory methods.
+- `Models/OpenAiVectorStoreModels.cs` — DTOs: `OpenAiVectorStoreCreateRequest`, `OpenAiExpiresAfter`, `OpenAiVectorStore`, `OpenAiFileCounts`, `OpenAiVectorStoreListResponse`, `OpenAiVectorStoreFile`, `OpenAiLastError`, `OpenAiVectorStoreFileListResponse`, `OpenAiUploadedFile`, `OpenAiDeleteResponse`.
 - `OpenAiModels` — Constants: `Chat.Gpt4_1`, `Chat.O3`, `Chat.O4Mini`, `Embedding.TextEmbedding3Small`, etc.
 - `OpenAiClientOptions` — BaseUrl, ApiKey, Organization, ReasoningEffort, TextVerbosity, DefaultModel.
 - `OpenAiClientConfiguration` — Factory config record (extends CisharpaiClientConfiguration).
@@ -55,32 +67,71 @@ The only dependency needed by consuming applications.
 Consolidated package for all Azure AI services. Uses HttpClient directly (no SDK deps except Azure.Identity).
 
 - **`Common/`** — `AzureClientOptionsBase`, `AzureAuthenticationHandler` (API key + Azure AD), `AzureErrorMapper`.
-- **`AzureOpenAi/`** — `AzureOpenAiChatCompletionClient` (chat + JSON + tools + streaming), `AzureOpenAiEmbeddingClient`. Endpoint: `openai/deployments/{deployment}/...`. Three-way model routing (Legacy / Reasoning / Gpt5): gpt-5 deployments use the Responses API at `.../responses?api-version=...`; o-series uses Chat Completions with `reasoning_effort`; everything else is standard Chat Completions. Options: `DeploymentName`, `DefaultModel`, `ReasoningEffort`, `TextVerbosity` (gpt-5 Responses API), `ModelName` (explicit routing hint when the deployment name is opaque). Learned route mismatches are cached in-process per `(Endpoint, DeploymentName, ApiVersion)` so new client instances reuse the discovered route. Both have static `Create(IHttpMessageHandlerFactory, options, TokenCredential?, ...)`.
-- **`AzureAiInference/`** — `AzureAiInferenceChatCompletionClient` (chat + JSON + tools + streaming), `AzureAiInferenceEmbeddingClient` (+ `IImageEmbeddingFeature`). Endpoint: `models/...`. Options: `ModelId`. Both have static `Create(IHttpMessageHandlerFactory, options, TokenCredential?, ...)`.
+- **`AzureOpenAi/`** — `AzureOpenAiChatCompletionClient` (chat + JSON + tools + streaming + grounded chat for GPT-5 deployments), `AzureOpenAiEmbeddingClient`. Endpoint: `openai/deployments/{deployment}/...`. Three-way model routing (Legacy / Reasoning / Gpt5): gpt-5 deployments use the Responses API at `.../responses?api-version=...`; o-series uses Chat Completions with `reasoning_effort`; everything else is standard Chat Completions. Options: `DeploymentName`, `DefaultModel`, `ReasoningEffort`, `TextVerbosity` (gpt-5 Responses API), `ModelName` (explicit routing hint when the deployment name is opaque). Learned route mismatches are cached in-process per `(Endpoint, DeploymentName, ApiVersion)` so new client instances reuse the discovered route. Both have static `Create(IHttpMessageHandlerFactory, options, TokenCredential?, ...)`.
+- **`AzureAiInference/`** — `AzureAiInferenceChatCompletionClient` (chat + JSON + tools + streaming + grounded chat via prompt-injection fallback), `AzureAiInferenceEmbeddingClient` (+ `IImageEmbeddingFeature`). Endpoint: `models/...`. Options: `ModelId`. Both have static `Create(IHttpMessageHandlerFactory, options, TokenCredential?, ...)`.
 - **`Extensions/`** — DI registration with keyed service overloads. `AzureFactoryBuilderExtensions` for factory support.
 - **Factory configs**: `AzureOpenAiClientConfiguration`, `AzureAiInferenceClientConfiguration` + corresponding factory providers.
 
 ### `src/Cisharpai.Anthropic/`
-- `AnthropicChatCompletionClient` — Chat + JSON output (via `output_config.format`) + tool calling (`tool_use`/`tool_result` blocks) + streaming (event-based SSE). Vision uses raw base64 (NOT data URIs). Static `Create(IHttpMessageHandlerFactory, options, ...)` for runtime construction.
+- `AnthropicChatCompletionClient` — Chat + JSON output (via `output_config.format`) + tool calling (`tool_use`/`tool_result` blocks) + streaming (event-based SSE) + grounded chat (RAG via `document` content blocks with native citations; `CitationMode.SearchResult` switches to `search_result` blocks with pass-through `Source`/`Title`) + web search (server-side `web_search` tool with configurable version). Vision uses raw base64 (NOT data URIs). Static `Create(IHttpMessageHandlerFactory, options, ...)` for runtime construction.
 - `AnthropicModels` — Constants: `Chat.ClaudeOpus4_5`, `Chat.ClaudeSonnet4_5`, `Chat.ClaudeHaiku4_5`, etc.
-- `AnthropicClientOptions` — BaseUrl, ApiKey, ApiVersion, DefaultModel.
+- `AnthropicClientOptions` — BaseUrl, ApiKey, ApiVersion, DefaultModel, WebSearchToolVersion (default `web_search_20260209`).
 - `AnthropicClientConfiguration` — Factory config record (chat only, no embedding).
 - `AnthropicClientFactoryProvider` / `AnthropicFactoryBuilderExtensions` — Factory support.
 
 ### `src/Cisharpai.Cohere/`
 - `CohereChatCompletionClient` — Chat + JSON + grounded chat (RAG) + tool calling + streaming. Vision: image parts silently skipped. Static `Create(IHttpMessageHandlerFactory, options, ...)` for runtime construction.
 - `CohereEmbeddingClient` — Text + image + multimodal (Embed v4) embeddings. Images sent as data URIs. Static `Create(IHttpMessageHandlerFactory, options, ...)` for runtime construction.
-- `CohereModels` — Constants: `Chat.CommandA`, `Embedding.EmbedV4`, etc.
+- `CohereRerankerClient` — Reranking via `POST {BaseUrl}rerank`. Model from request or `DefaultModel` (throws if neither). `priority` reachable through `ExtraParameters`. Static `Create(IHttpMessageHandlerFactory, options, ...)` for runtime construction.
+- `CohereTokenCounter` — Token counting via `POST /v1/tokenize`. Constructed for one model. Chunk-and-sum for text over 65,536 characters (upper-bound approximation, splits on whitespace). Static `Create(IHttpMessageHandlerFactory, options, model, ...)` for runtime construction.
+- `CohereModels` — Constants: `Chat.CommandA`, `Embedding.EmbedV4`, `Rerank.RerankV3_5`, etc.
 - `CohereClientOptions` — BaseUrl, ApiKey, DefaultModel.
 - `CohereClientConfiguration` — Factory config record.
 - `CohereClientFactoryProvider` / `CohereFactoryBuilderExtensions` — Factory support.
 - `CohereServiceCollectionExtensions` — DI with keyed overloads.
 
+## RAG Ingestion — `src/Cisharpai.Rag/`
+
+- Independently consumable library targeting .NET 8 and .NET 10; depends on core abstractions, not a specific provider.
+- `Models/` — `RagDocument`, `TextChunk(DocumentId, Index, StartOffset, EndOffset, Text, Metadata)`, `ChunkEmbedding`, `EmbeddingBatchResult`; chunk identities, UTF-16 source offsets (start and exclusive end), and chunker-specific metadata survive embedding.
+- `Chunking/` — `ITextChunker` (async-streaming: `ChunkAsync` returns `IAsyncEnumerable<TextChunk>`), `FixedSizeChunker`, `FixedSizeChunkerOptions`; lazy scalar-aware chunks (size 1024, overlap 128). `SemanticChunker`, `SemanticChunkerOptions`, `SemanticThresholdStrategy` — similarity-based chunking with percentile/absolute threshold modes, size and sentence backstops. `RecursiveChunker`, `RecursiveChunkerOptions` — structure-aware recursive chunking with a configurable separator ladder (paragraph → line → sentence → word → hard cut), character-based (default) or token-based sizing via `ITokenCounter`, and overlap in the same unit as the size measure. `ISentenceSplitter`, `RegexSentenceSplitter` — pluggable sentence splitting for the semantic chunker. All chunkers are covered by `src/Cisharpai.Tests/Rag/ChunkerInvariantPropertyTests.cs`, which enforces four invariants: verbatim text, gap-free coverage of `[0, Text.Length)`, size bound in the chunker's own unit, and sane contiguous offsets. Documented exceptions: `SemanticChunker` emits zero chunks for non-empty documents when the sentence splitter finds no sentences (whitespace-only input); `RecursiveChunker` configurations without the terminal empty separator may emit oversized chunks, but only genuinely unsplittable atomic units (verified per-chunk). A new chunker joins the suite by adding one entry to its scenario table.
+- `Embeddings/` — `IBulkEmbeddingProcessor`, `BulkEmbeddingProcessor`, `BulkEmbeddingOptions`, `EmbeddingProviderProfile`; dual-constraint batching (item count + token budget) with per-provider presets via `ForProvider`/`ApplyProfile`, bounded concurrency (1–32 parallel requests with ordered output) and a bounded reordering window (`MaxPendingBatches`, default `MaxConcurrency * 2`) so read-ahead never grows with corpus size, transient failure retry (429 and the full 5xx range) with exponential backoff, `IProgress<BulkEmbeddingProgress>` observability, and continue-on-failure semantics.
+- `VectorMath` — Static brute-force vector operations: `CosineSimilarity`, `DotProduct`, `Normalize` (pure, returns new array), `NormalizeInPlace` (mutates `Span<float>`), `TopK` (returns index+score pairs). `ReadOnlySpan<float>` primary API with `float[]`/`IReadOnlyList<float>` overloads. Mismatched dimensions throw; zero-vector normalization returns zero vector unchanged.
+- `.Packing`: `IContextPacker` / `ContextPacker` — selects and orders ranked `ScoredChunk`(s) within a token budget. Constructor-injects `ITokenCounter`; greedy selection with `OverflowStrategy` (SkipAndContinue default, StopAtFirstMisfit); lost-in-the-middle ordering (on by default); per-call validated `ContextPackingOptions`; `ContextPackingResult` with `Selected`, `Dropped` (with `DropReason`), `TotalTokensUsed`, `BudgetRemaining`.
+- `IRetriever` — backend-agnostic retrieval contract: `RetrieveAsync(string query, int topK)` returns ranked `ScoredChunk` results. No vector vocabulary — implementations may use dense embeddings, BM25/lexical search, hybrid fusion, SQL, or hosted stores. No filter parameter.
+- `InMemoryRetriever` — brute-force cosine-similarity demo/testing retriever. Takes `IEmbeddingClient` + pre-loaded `(TextChunk, float[])` pairs. Not for production.
+- `RankFusion.ReciprocalRank()` — fuses multiple ranked `ScoredChunk` lists into one via `1/(k+rank)` scoring. Enables hybrid retrieval without the library implementing either search strategy.
+- `IHostedRetrievalFeature` — Factory interface returning `IRetriever` per vector store via `ForStore(string vectorStoreId)`. Lives in `Cisharpai.Rag` (not core) to avoid circular dependency since it references `IRetriever`.
+- `Models/BulkEmbeddingProgress` — progress record: `CompletedBatches`, `TotalChunksProcessed`, `FailedBatches`.
+- `IRagIngestionPipeline` / `RagIngestionPipeline` — compose document chunking with bulk embedding; collection and async-stream overloads, cancellation, progress pass-through, and partial batch results.
+- `RagOptions` and `AddCisharpaiRag` — validated option snapshots, callback configuration and embedding-client factory for keyed DI; scoped processors/pipelines.
+- Token estimation uses a pluggable `Func<string, int>` seam (default: `s.Length / 4`); real counting available via `TiktokenCounter.ToTokenEstimator()` from the separate `Cisharpai.Rag.Tokenizers` package.
+- No storage drivers (Qdrant, pgvector, Pinecone, Redis). Existing embedding fakes and `FakeRetriever` support offline tests without core interface changes.
+- Consumer guide: `wiki/rag.md`; unit tests: `src/Cisharpai.Tests/Rag/` — example-based per chunker, plus `ChunkerInvariantPropertyTests` running every chunker over a deterministic seeded corpus (ASCII, emoji, CJK, mixed scripts, whitespace-heavy, whitespace-free, surrogate-only, empty) across a sweep of size/overlap settings.
+
+## RAG OpenAI Bridge — `src/Cisharpai.Rag.OpenAi/`
+
+- Bridge package connecting `Cisharpai.OpenAi` hosted retrieval with `Cisharpai.Rag`'s `IRetriever` contract. Install this package only when using OpenAI `file_search` retrieval — `Cisharpai.OpenAi` alone does not depend on `Cisharpai.Rag`.
+- `OpenAiHostedRetrievalFeature` — `IHostedRetrievalFeature` implementation backed by OpenAI `file_search` on the Responses API. Each `ForStore(vectorStoreId)` call returns an independent `IRetriever`.
+- `OpenAiFileSearchRetriever` — Internal `IRetriever` that queries an OpenAI hosted vector store via the Responses API `file_search` tool. Maps `OpenAiFileSearchResult` → `ScoredChunk` with passage-relative `TextChunk` offsets. Returns empty list on API errors (logs warning); config errors (`DefaultModel` missing) and cancellation propagate.
+- `OpenAiRagServiceCollectionExtensions.AddOpenAiHostedRetrieval` — DI extension that registers `IHostedRetrievalFeature` and injects it into an existing `OpenAiChatCompletionClient`'s feature collection so `Features.Get<IHostedRetrievalFeature>()` resolves it.
+
+## RAG Tokenizers — `src/Cisharpai.Rag.Tokenizers/`
+
+- Opt-in local token counting for RAG pipelines, separate from `Cisharpai.Rag` so consumers who only need bulk embeddings avoid the multi-megabyte tokenizer data files.
+- `Tokenization/TiktokenCounter` — local, synchronous, `Microsoft.ML.Tokenizers`-backed, supports o200k_base (gpt-4o) and cl100k_base (gpt-4, gpt-3.5-turbo). OpenAI-compatible tokenizers only. Also provides `GetIndexByTokenCount` / `GetIndexByTokenCountFromEnd` for O(n) single-pass token-boundary slicing.
+- `Tokenization/TokenCounterExtensions` — `ToTokenEstimator()` returns `Func<string, int>` for `BulkEmbeddingOptions.TokenEstimator`. `ToTokenSlicerFromStart()` / `ToTokenSlicerFromEnd()` return `Func<string, int, int>` for `RecursiveChunkerOptions`. All defined on `TiktokenCounter` (not `ITokenCounter`) to prevent blocking on async/remote counters.
+- References `Microsoft.ML.Tokenizers`, `Microsoft.ML.Tokenizers.Data.O200kBase`, `Microsoft.ML.Tokenizers.Data.Cl100kBase`.
+
 ## Testing Package — `src/Cisharpai.Testing/`
 
 - `FakeChatCompletionClient` — Fake for `IChatCompletionClient` + all chat features. Response queues, defaults, request capture.
 - `FakeEmbeddingClient` — Fake for `IEmbeddingClient` + embedding features.
-- `FakeResponses` — Static factories: `Chat`, `ChatError`, `ToolCall`, `ToolCalls`, `GroundedChat`, `StreamingChunks`, `Embedding`, etc.
+- `FakeRerankerClient` — Fake for `IRerankerClient`. Response queue, default, request capture, `Reset()`. No feature flags (no optional rerank features exist).
+- `FakeTokenCounter` — Fake for `ITokenCounter`. Count queue, default, text capture, `Reset()`. No feature flags.
+- `FakeRetriever` — Fake for `IRetriever`. Response queue, default, query capture, `Reset()`. No feature flags.
+- `FakeHostedRetrievalFeature` — Fake for `IHostedRetrievalFeature`. Per-store `FakeRetriever` dictionary; `AddStore`, `ForStore`, `GetRetriever`, `StoreIds`, `Reset`.
+- `FakeResponses` — Static factories: `Chat`, `ChatError`, `ToolCall`, `ToolCalls`, `GroundedChat`, `StreamingChunks`, `Embedding`, `Rerank`, `RerankError`, `TokenCounter`, `Retriever`, etc.
 - `FakeChatFeatures` / `FakeEmbeddingFeatures` — `[Flags]` enums for selective feature registration.
 - `FakeServiceCollectionExtensions` — DI helpers.
 
@@ -92,7 +143,7 @@ Interactive Spectre.Console demo with scenarios for each provider/capability. En
 
 ### `src/Cisharpai.Tests/` (Unit)
 Organized by provider folder: `OpenAi/`, `Anthropic/`, `Cohere/`, `Azure/AzureOpenAi/`, `Azure/AzureAiInference/`, `Azure/Common/`.
-Also: `Models/`, `Features/`, `DependencyInjection/`, `Core/`, `Testing/`.
+Also: `Models/`, `Features/`, `DependencyInjection/`, `Core/`, `Testing/`, `Rag/`.
 
 ### `src/Cisharpai.Tests.Common/`
 - `DotEnvLoader` — Loads `.env` files.
@@ -103,12 +154,12 @@ Real API tests organized by provider folder. `EnvironmentConfigurationTests` val
 
 ## Wiki — `wiki/`
 
-Pages: `index.md`, `getting-started.md`, `openai.md`, `embeddings.md`, `feature-extensions.md`, `json-output.md`, `grounded-chat.md`, `provider-features.md`, `tool-calling.md`, `vision.md`, `streaming.md`, `testing.md`.
+Pages: `index.md`, `getting-started.md`, `openai.md`, `embeddings.md`, `rag.md`, `feature-extensions.md`, `json-output.md`, `grounded-chat.md`, `provider-features.md`, `tool-calling.md`, `vision.md`, `streaming.md`, `testing.md`.
 
 ## CI/CD
 
 - `.github/workflows/ci.yml` — Build + unit tests + integration tests. .NET 8 & 10.
 - `.github/workflows/pipeline.yml` — Versioned build + NuGet publish on tags.
 - `.github/workflows/codeql.yml` — CodeQL security scanning.
-- `scripts/build.ps1` — PowerShell build script: restore, build, test, pack 6 projects.
+- `scripts/build.ps1` — PowerShell build script: restore, build, test, pack 9 projects.
 - `GitVersion.yml` — ContinuousDeployment mode.

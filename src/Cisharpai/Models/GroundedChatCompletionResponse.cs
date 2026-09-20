@@ -15,6 +15,13 @@ public sealed record GroundedChatCompletionResponse(
     IReadOnlyList<Citation> Citations)
 {
     /// <summary>
+    /// Indicates whether citations were produced natively by the provider or synthesized
+    /// via prompt injection. Defaults to <see cref="GroundingKind.Native"/> for backward
+    /// compatibility with providers that have native citation support.
+    /// </summary>
+    public GroundingKind GroundingKind { get; init; } = GroundingKind.Native;
+
+    /// <summary>
     /// Convenience: delegates to <see cref="ChatCompletionResponse.IsSuccess"/>.
     /// </summary>
     public bool IsSuccess => ChatCompletion.IsSuccess;

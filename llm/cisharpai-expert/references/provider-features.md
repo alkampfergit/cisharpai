@@ -6,14 +6,18 @@
 |---------|--------|--------------|-------------------|-----------|--------|
 | Chat Completions | Yes | Yes | Yes | Yes | Yes |
 | Text Embeddings | Yes | Yes | Yes | -- | Yes |
+| Reranking | -- | -- | -- | -- | Yes |
+| Token Counting | Local* | Local* | -- | -- | API only |
 | JSON Mode | Yes | Yes | Yes | Yes | Yes |
 | Structured Outputs | Yes | Yes | Varies | Yes | Yes |
 | Image Embeddings | -- | -- | Yes | -- | Yes |
 | Multimodal Embeddings | -- | -- | -- | -- | Yes |
-| Grounded Chat (RAG) | -- | -- | -- | -- | Yes |
+| Grounded Chat (RAG) | Yes (GPT-5) | Yes (GPT-5) | Yes (fallback) | Yes | Yes |
+| Prompt Caching | Report-only (automatic) | Report-only (automatic) | -- | Yes (explicit control) | -- |
 | Tool Calling | Yes | Yes | Yes | Yes | Yes |
 | Vision | Yes | Yes | Varies | Yes | Partial |
 | Streaming | Yes | Yes | Yes | Yes | Yes |
+| Web Search | GPT-5 only | -- | -- | Yes | -- |
 
 ## Feature Discovery Pattern
 
@@ -34,8 +38,13 @@ if (feature is not null)
 | `IToolCallingFeature` | Function/tool calling |
 | `IStreamingChatFeature` | Token-by-token streaming |
 | `IGroundedChatFeature` | Document-grounded RAG with citations |
+| `IPromptCachingFeature` | Explicit cache breakpoints (Anthropic only) |
+| `IWebSearchFeature` | Provider-hosted server-side web search with cited answers |
 | `IImageEmbeddingFeature` | Single image embedding |
 | `IMultimodalEmbeddingFeature` | Mixed text + image embedding |
+
+Reranking is not discovered through `Features` — it is the standalone `IRerankerClient`
+interface, implemented by Cohere only.
 
 ## Provider-Specific Notes
 
@@ -53,12 +62,13 @@ if (feature is not null)
 - Only provider with image embeddings (besides Cohere)
 
 ### Anthropic
+- Grounded chat via `document` content blocks (default) or `search_result` blocks (`CitationMode.SearchResult`) with native citations; `CitedText` on `CitationSource`; `search_result` mode passes through `DocumentChunk.Source` as `CitationSource.Id` and `DocumentChunk.Title` as `CitationSource.Data["title"]`
 - Event-based SSE streaming (not `[DONE]` based)
 - Raw base64 images (not data URIs)
 - Claude model family only
 
 ### Cohere
-- Most feature-rich: grounded chat, image/multimodal embeddings
+- Most feature-rich: grounded chat, image/multimodal embeddings, reranking (`IRerankerClient`)
 - Vision is partial (image parts silently skipped in chat)
 - Uppercase ToolChoice values, `Specific` degrades to `REQUIRED`
 - Embedding InputType required for v3 models

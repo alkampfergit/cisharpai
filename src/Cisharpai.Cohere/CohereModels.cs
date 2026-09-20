@@ -22,4 +22,12 @@ public static class CohereModels
         public const string EmbedEnglishLightV3 = "embed-english-light-v3.0";
         public const string EmbedMultilingualLightV3 = "embed-multilingual-light-v3.0";
     }
+
+    /// <summary>Rerank models.</summary>
+    public static class Rerank
+    {
+        public const string RerankV3_5 = "rerank-v3.5";
+        public const string RerankEnglishV3 = "rerank-english-v3.0";
+        public const string RerankMultilingualV3 = "rerank-multilingual-v3.0";
+    }
 }

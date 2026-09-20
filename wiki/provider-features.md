@@ -6,30 +6,44 @@ This page lists every feature supported by each provider integration in Cisharpa
 
 | Feature | Interface | Description |
 |---------|-----------|-------------|
+| Prompt Caching Control | `IPromptCachingFeature` | Explicit cache breakpoints for providers that support them |
+| Prompt Caching Reporting | `ChatCompletionResponse` | Cached vs fresh input token counts on every response |
 | Chat Completions | `IChatCompletionClient` | Send messages and receive model-generated replies |
 | Text Embeddings | `IEmbeddingClient` | Generate vector embeddings from text |
+| Reranking | `IRerankerClient` | Reorder candidate documents by relevance to a query |
+| Token Counting | `ITokenCounter` | Count tokens in a string for a specific model's tokenizer |
+| RAG Ingestion | `IRagIngestionPipeline` (`Cisharpai.Rag`) | Fixed-size chunking and bulk float embeddings with per-provider batch ceilings, bounded concurrency and retry |
 | JSON Output | `IJsonOutputFeature` | Force JSON Mode or Structured Outputs on chat responses |
 | Image Embeddings | `IImageEmbeddingFeature` | Generate vector embeddings from a single image |
 | Multimodal Embeddings | `IMultimodalEmbeddingFeature` | Embed mixed text + image inputs in a single request |
 | Grounded Chat (RAG) | `IGroundedChatFeature` | Chat with document grounding and citations |
+| Web Search | `IWebSearchFeature` | Provider-hosted server-side web search with cited answers |
+| Hosted Retrieval | `IHostedRetrievalFeature` | Provider-hosted vector store retrieval via `IRetriever` factory |
 | Tool Calling | `IToolCallingFeature` | Function calling / tool use in chat completions |
 | Vision (Image Input) | `LlmMessage.ContentParts` | Send images inline in chat messages for visual understanding |
 | Streaming | `IStreamingChatFeature` | Stream chat completions token-by-token via SSE |
-| Client Factory | `ICisharpaiClientFactory` | Create chat/embedding clients at runtime from provider-agnostic configuration |
+| Client Factory | `ICisharpaiClientFactory` | Create chat/embedding/reranker clients at runtime from provider-agnostic configuration |
 
 ## Support Matrix
 
 | Feature | OpenAI | Azure OpenAI | Azure AI Inference | Anthropic | Cohere |
 |---------|--------|--------------|-------------------|-----------|--------|
+| Prompt Caching Control | -- | -- | -- | Yes | -- |
+| Prompt Caching Reporting | Yes | Yes | -- | Yes | -- |
 | Chat Completions | Yes | Yes | Yes | Yes | Yes |
 | Text Embeddings | Yes | Yes | Yes | -- | Yes |
+| Reranking | -- | -- | -- | -- | Yes |
+| Token Counting | Local* | Local* | -- | -- | API only |
+| RAG Ingestion | Yes | Yes | Yes | -- | Yes |
 | JSON Mode | Yes | Yes | Yes | Yes | Yes |
 | Structured Outputs | Yes | Yes | Yes | Yes | Yes |
 | Image Embeddings | -- | -- | Yes | -- | Yes |
 | Multimodal Embeddings | -- | -- | -- | -- | Yes |
 | Reasoning Models | Yes | Yes | Yes | -- | -- |
 | Responses API (GPT-5) | Yes | Yes | -- | -- | -- |
-| Grounded Chat (RAG) | -- | -- | -- | -- | Yes |
+| Grounded Chat (RAG) | Yes (native) | Yes (native) | Yes (fallback) | Yes (native) | Yes (native) |
+| Web Search | Yes (GPT-5) | -- | -- | Yes | -- |
+| Hosted Retrieval | Yes | -- | -- | -- | -- |
 | Tool Calling | Yes | Yes | Yes | Yes | Yes |
 | Vision (Image Input) | Yes | Yes | Yes | Yes | Partial* |
 | Streaming | Yes | Yes | Yes | Yes | Yes |
@@ -38,7 +52,11 @@ This page lists every feature supported by each provider integration in Cisharpa
 
 \* Cohere Vision: image content parts are silently skipped (only text extracted). Cohere chat API does not support visual inputs.
 
+\* Local Token Counting: `TiktokenCounter` in `Cisharpai.Rag.Tokenizers` provides offline counting via `Microsoft.ML.Tokenizers` for OpenAI-compatible tokenizers only (o200k_base, cl100k_base). It works with OpenAI and Azure OpenAI models; it does **not** produce correct counts for Anthropic, Azure AI Inference (non-OpenAI deployments), or other providers whose tokenizers differ. Cohere also has `CohereTokenCounter` which calls the `POST /v1/tokenize` API. See [RAG — Token counting](rag.md#token-counting).
+
 **Logging & Tracing:** every provider client routes through `LlmHttpClient`, which emits structured `ILogger` entries (EventIds 1000–1005) and `System.Diagnostics.Activity` spans from the `Cisharpai` source (constant: `Cisharpai.CisharpaiTelemetry.ActivitySourceName`). See [Logging](logging.md) for the property/tag set and subscription options.
+
+**RAG ingestion:** `Cisharpai.Rag` composes any `IEmbeddingClient`; it is a separate library, not a discovered provider feature. Provider model, dimensions and request limits still apply. It provides no vector storage or retrieval. See [RAG Ingestion](rag.md).
 
 ## Provider Details
 
@@ -56,6 +74,9 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Responses API | GPT-5 models — status and incomplete-reason tracking |
 | Tool Calling | All models; `ToolChoice` supports Auto, None, Required, Specific (function name) |
 | Vision | Send images via `LlmMessage.WithImage()` or `LlmMessage.WithBase64Image()`; images are sent as data URIs (`data:image/{mime};base64,...`) |
+| Grounded Chat (RAG) | `IGroundedChatFeature`; GPT-5 models only (Responses API); documents sent as `input_file` items with base64 data; annotations mapped to `Citation`/`CitationSource`; returns `IsSuccess=false` for non-GPT-5 models |
+| Web Search | `IWebSearchFeature`; GPT-5 models only (Responses API `web_search` tool); `url_citation` annotations mapped to `Citation`/`CitationSource` (`Id` = URL, `Data["title"]` = page title); `WebSearchCount` from `web_search_call` output items; returns `IsSuccess=false` for non-GPT-5 models. **Cost:** per-search charge on top of token costs. |
+| Prompt Caching | Automatic — `CachedInputTokens` reported from `prompt_tokens_details.cached_tokens` (Chat Completions) and `input_tokens_details.cached_tokens` (Responses API); no control feature |
 | Streaming | `IStreamingChatFeature`; legacy Chat Completions API and Responses API (GPT-5); `[DONE]` terminates the stream |
 
 ### Azure OpenAI
@@ -74,6 +95,8 @@ This page lists every feature supported by each provider integration in Cisharpa
 | Tool Calling | All deployments; identical JSON shape to OpenAI (`tools` array, `tool_choice` parameter); all `ToolChoice` variants supported. GPT-5 tool calling uses Chat Completions (matches OpenAI client). |
 | Vision | Same data URI format as OpenAI; images sent as content parts in messages |
 | Streaming | `IStreamingChatFeature`; supports legacy, reasoning, and Responses API streams; `[DONE]` terminates Chat Completions streams; gpt-5 uses `response.completed` |
+| Grounded Chat (RAG) | `IGroundedChatFeature`; GPT-5 deployments only (Responses API); documents sent as `input_file` items nested in user message content; uses `ExecuteGroundedWithRouteFallbackAsync` — returns `IsSuccess=false` if deployment falls back to Chat Completions |
+| Prompt Caching | Automatic — `CachedInputTokens` reported from `prompt_tokens_details.cached_tokens` (Chat Completions) and `input_tokens_details.cached_tokens` (Responses API); no control feature |
 | Authentication | API key (`api-key` header) or Azure AD (Bearer token) |
 
 `ReasoningEffort` is omitted for non-reasoning Azure OpenAI deployments to avoid unsupported-parameter errors. `TextVerbosity` is sent only when the model is detected as gpt-5. When Azure rejects `max_tokens` for a reasoning deployment, the client retries once with `max_completion_tokens`; when the initially selected endpoint is wrong, it retries the alternate endpoint once. Learned mismatches are cached in-process per `(Endpoint, DeploymentName, ApiVersion)` for future Azure OpenAI client instances. `ExtraParameters` still deep-merges into the final request and can override either typed option or add newer Azure/OpenAI parameters before the typed options are updated.
@@ -92,6 +115,7 @@ Azure OpenAI truncation is surfaced as a failed unified response when the provid
 | JSON Mode | Via `response_format`; availability varies by deployed model |
 | Structured Outputs | Via `response_format.json_schema`; availability varies by deployed model |
 | Reasoning Models | o1/o3/o4/gpt-5 detected automatically |
+| Grounded Chat (RAG) | `IGroundedChatFeature` via prompt-injection fallback; documents serialized into system message; model instructed to emit `«cite:N»…«/cite»` markers; markers parsed and stripped to produce `Citation` records with correct offsets; `GroundingKind.Synthesized`; all `CitationMode` values accepted (no server-side distinction); graceful degradation when model emits no markers |
 | Tool Calling | Model-dependent; uses OpenAI-compatible `tools` array and `tool_choice`; all `ToolChoice` variants supported |
 | Vision | Same data URI format as OpenAI; availability depends on deployed model |
 | Streaming | `IStreamingChatFeature`; supports both standard and reasoning request formats; `[DONE]` terminates the stream |
@@ -106,8 +130,11 @@ Azure OpenAI truncation is surfaced as a failed unified response when the provid
 | Chat Completions | Claude model family (claude-opus-4-5, claude-sonnet-4-5, claude-haiku-4-5) |
 | JSON Mode | Implemented via system-message injection; auto-strips markdown fences |
 | Structured Outputs | Via native `output_config.format` parameter; refusal via `stop_reason: "refusal"` |
+| Grounded Chat (RAG) | Document grounding via `document` content blocks with `citations: {enabled: true}`; text documents use `text` source type, key-value documents use `custom_content` source type; `CitationMode.Fast`/`Accurate` treated as `Enabled` (Anthropic citations are binary: on/off) with a logged warning. `CitationMode.SearchResult` emits `search_result` blocks instead, producing `search_result_location` citations with pass-through `Source`/`Title` (requires `DocumentChunk.Source`; returns `IsSuccess=false` if missing) |
+| Web Search | `IWebSearchFeature`; Anthropic's `web_search` server-side tool (version configurable via `AnthropicClientOptions.WebSearchToolVersion`, default `web_search_20260209`); `web_search_result_location` citations mapped to `Citation`/`CitationSource` (`Id` = URL, `Data["title"]` = page title); `WebSearchCount` from `usage.server_tool_use.web_search_requests`; `GroundingKind.WebSearch`. **Cost:** ~$10 per 1,000 searches on top of token costs. |
 | Tool Calling | All Claude models; `ToolChoice` maps Auto->auto, Required->any, Specific->{type:tool,name}, None is omitted |
 | Vision | Images sent as raw base64 (NOT data URIs) via `source.type: "base64"` in content blocks |
+| Prompt Caching | Explicit breakpoints via `IPromptCachingFeature`; `CachedInputTokens` from `cache_read_input_tokens`, `CacheCreationInputTokens` from `cache_creation_input_tokens`; system, message, and tool breakpoints |
 | Streaming | `IStreamingChatFeature`; event-based SSE (no `[DONE]` sentinel); `message_start`/`content_block_delta`/`message_delta` events |
 
 ### Cohere
@@ -118,6 +145,7 @@ Azure OpenAI truncation is surfaced as a failed unified response when the provid
 |------------|---------|
 | Chat Completions | Command family models (command-a-03-2025, command-r-plus-08-2024, command-r-08-2024) |
 | Text Embeddings | Embed v3 and v4 models |
+| Reranking | `IRerankerClient` via `POST {BaseUrl}rerank`; rerank-v3.5, rerank-english-v3.0, rerank-multilingual-v3.0; `TopN` and `MaxTokensPerDocument` supported; `priority` reachable via `ExtraParameters`; `BaseUrl` retargets to Azure AI Foundry or other hosts |
 | JSON Mode | Via `response_format` type `json_object` |
 | Structured Outputs | Via `response_format` with `json_schema` parameter |
 | Image Embeddings | Single image via data URI (`data:image/{mime};base64,...`) |

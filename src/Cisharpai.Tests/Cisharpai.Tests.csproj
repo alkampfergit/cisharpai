@@ -6,6 +6,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsPackable>false</IsPackable>
+    <NoWarn>$(NoWarn);CA1861</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -31,6 +32,9 @@
     <ProjectReference Include="..\Cisharpai.Cohere\Cisharpai.Cohere.csproj" />
     <ProjectReference Include="..\Cisharpai.Tests.Common\Cisharpai.Tests.Common.csproj" />
     <ProjectReference Include="..\Cisharpai.Testing\Cisharpai.Testing.csproj" />
+    <ProjectReference Include="..\Cisharpai.Rag\Cisharpai.Rag.csproj" />
+    <ProjectReference Include="..\Cisharpai.Rag.OpenAi\Cisharpai.Rag.OpenAi.csproj" />
+    <ProjectReference Include="..\Cisharpai.Rag.Tokenizers\Cisharpai.Rag.Tokenizers.csproj" />
   </ItemGroup>
 
 </Project>

@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.OpenAi;
 
-public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature, IStreamingChatFeature
+public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature, IStreamingChatFeature, IGroundedChatFeature, IWebSearchFeature
 {
     private const string ChatCompletionsEndpoint = "chat/completions";
     private const string ResponsesEndpoint = "responses";
@@ -34,6 +34,8 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         features.Set<IJsonOutputFeature>(this);
         features.Set<IToolCallingFeature>(this);
         features.Set<IStreamingChatFeature>(this);
+        features.Set<IGroundedChatFeature>(this);
+        features.Set<IWebSearchFeature>(this);
         Features = features;
     }
 
@@ -161,6 +163,131 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         }
     }
 
+    public async Task<GroundedChatCompletionResponse> GetGroundedChatCompletionAsync(
+        ChatCompletionRequest request,
+        GroundedChatOptions groundedChatOptions,
+        CancellationToken cancellationToken = default)
+    {
+        var model = ResolveModel(request.Model);
+        request = request with { Model = model };
+
+        try
+        {
+            groundedChatOptions.Validate();
+
+            var modelType = DetectModelType(model);
+            if (modelType != OpenAiModelType.Gpt5)
+            {
+                return GroundedChatCompletionResponse.Error(
+                    $"Grounded chat requires the Responses API (GPT-5 models). Model '{model}' uses the Chat Completions API which does not support native document grounding with citations. Use a GPT-5 model or consider the prompt-injection grounding approach.");
+            }
+
+            var messages = new List<object>(await MapMessagesAsync(request.Messages, cancellationToken));
+            var inputFiles = MapDocumentChunksToInputFiles(groundedChatOptions.Documents);
+            if (!EmbedInputFilesInUserMessage(messages, inputFiles))
+            {
+                return GroundedChatCompletionResponse.Error(
+                    "Grounded chat requires at least one user message to attach documents to.");
+            }
+
+            var providerRequest = new OpenAiResponsesApiRequest
+            {
+                Model = model,
+                MaxOutputTokens = request.MaxTokens,
+                Input = messages,
+                Reasoning = (request.ReasoningEffort ?? _options.ReasoningEffort) is { } effort
+                    ? new OpenAiReasoningOption { Effort = effort }
+                    : null,
+                Text = _options.TextVerbosity is not null
+                    ? new OpenAiTextOption { Verbosity = _options.TextVerbosity }
+                    : null
+            };
+
+            string? rawResponseJson = null;
+            string? rawRequestJson = null;
+            OpenAiResponsesApiResponse raw;
+
+            if (request.IncludeRawResponse)
+            {
+                (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<OpenAiResponsesApiRequest, OpenAiResponsesApiResponse>(
+                    ResponsesEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
+            }
+            else
+            {
+                raw = await _client.PostAsync<OpenAiResponsesApiRequest, OpenAiResponsesApiResponse>(
+                    ResponsesEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
+            }
+
+            return MapGroundedChatResponse(raw, groundedChatOptions.Documents, rawResponseJson, rawRequestJson);
+        }
+        catch (LlmHttpRequestException ex)
+        {
+            return GroundedChatCompletionResponse.Error(ex.Message, ex.ResponseBody);
+        }
+        catch (Exception ex)
+        {
+            return GroundedChatCompletionResponse.Error(ex.Message);
+        }
+    }
+
+    public async Task<GroundedChatCompletionResponse> GetChatCompletionWithWebSearchAsync(
+        ChatCompletionRequest request,
+        WebSearchOptions webSearchOptions,
+        CancellationToken cancellationToken = default)
+    {
+        var model = ResolveModel(request.Model);
+        request = request with { Model = model };
+
+        try
+        {
+            var modelType = DetectModelType(model);
+            if (modelType != OpenAiModelType.Gpt5)
+            {
+                return GroundedChatCompletionResponse.Error(
+                    $"Web search requires the Responses API (GPT-5 models). Model '{model}' uses the Chat Completions API which does not support server-side web search.");
+            }
+
+            var providerRequest = new OpenAiResponsesApiRequest
+            {
+                Model = model,
+                MaxOutputTokens = request.MaxTokens,
+                Input = new List<object>(await MapMessagesAsync(request.Messages, cancellationToken)),
+                Tools = webSearchOptions.Enabled ? [new OpenAiResponsesApiTool { Type = "web_search" }] : null,
+                Reasoning = (request.ReasoningEffort ?? _options.ReasoningEffort) is { } effort
+                    ? new OpenAiReasoningOption { Effort = effort }
+                    : null,
+                Text = _options.TextVerbosity is not null
+                    ? new OpenAiTextOption { Verbosity = _options.TextVerbosity }
+                    : null
+            };
+
+            string? rawResponseJson = null;
+            string? rawRequestJson = null;
+            OpenAiResponsesApiResponse raw;
+
+            if (request.IncludeRawResponse)
+            {
+                (raw, rawResponseJson, rawRequestJson) = await _client.PostWithRawAsync<OpenAiResponsesApiRequest, OpenAiResponsesApiResponse>(
+                    ResponsesEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
+            }
+            else
+            {
+                raw = await _client.PostAsync<OpenAiResponsesApiRequest, OpenAiResponsesApiResponse>(
+                    ResponsesEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
+            }
+
+            return MapWebSearchResponse(raw, rawResponseJson, rawRequestJson);
+        }
+        catch (LlmHttpRequestException ex)
+        {
+            return GroundedChatCompletionResponse.Error(ex.Message, ex.ResponseBody);
+        }
+        catch (Exception ex)
+        {
+            return GroundedChatCompletionResponse.Error(ex.Message);
+        }
+    }
+
     private async IAsyncEnumerable<ChatCompletionChunk> StreamLegacyChatAsync(
         ChatCompletionRequest request,
         [EnumeratorCancellation] CancellationToken cancellationToken)
@@ -195,21 +322,24 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
                 var toolDelta = ToolCallingHelper.MapStreamToolCallDelta(
                     choice.Delta?.ToolCalls,
                     tc => (tc.Index, tc.Id, tc.Function?.Name, tc.Function?.Arguments));
+                var streamCached = chunk.Usage?.PromptTokensDetails?.CachedTokens;
                 yield return new ChatCompletionChunk(
                     Content: choice.Delta?.Content ?? string.Empty,
                     FinishReason: choice.FinishReason,
                     Model: chunk.Model,
                     PromptTokens: chunk.Usage?.PromptTokens,
                     CompletionTokens: chunk.Usage?.CompletionTokens,
-                    ToolCallDelta: toolDelta);
+                    ToolCallDelta: toolDelta,
+                    CachedInputTokens: streamCached > 0 ? streamCached : null);
             }
             else if (chunk.Usage is not null)
             {
-                // Usage-only final chunk (when stream_options.include_usage is true)
+                var streamCached = chunk.Usage.PromptTokensDetails?.CachedTokens;
                 yield return new ChatCompletionChunk(
                     Content: string.Empty,
                     PromptTokens: chunk.Usage.PromptTokens,
-                    CompletionTokens: chunk.Usage.CompletionTokens);
+                    CompletionTokens: chunk.Usage.CompletionTokens,
+                    CachedInputTokens: streamCached > 0 ? streamCached : null);
             }
         }
     }
@@ -222,7 +352,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         {
             Model = request.Model!,
             MaxOutputTokens = request.MaxTokens,
-            Input = await MapMessagesAsync(request.Messages, cancellationToken),
+            Input = new List<object>(await MapMessagesAsync(request.Messages, cancellationToken)),
             Stream = true,
             Reasoning = (request.ReasoningEffort ?? _options.ReasoningEffort) is { } effort
                 ? new OpenAiReasoningOption { Effort = effort }
@@ -233,48 +363,54 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         };
 
         string? model = null;
-        int? promptTokens = null;
-        int? completionTokens = null;
 
         await foreach (var json in _client.PostStreamAsync(ResponsesEndpoint, providerRequest, request.ExtraParameters, cancellationToken))
         {
-            OpenAiResponsesStreamEvent? evt;
-            try
-            {
-                evt = JsonSerializer.Deserialize<OpenAiResponsesStreamEvent>(json, StreamJsonOptions);
-            }
-            catch
-            {
-                continue;
-            }
-
-            if (evt is null) continue;
-
-            switch (evt.Type)
-            {
-                case "response.output_text.delta":
-                    yield return new ChatCompletionChunk(
-                        Content: evt.Delta ?? string.Empty,
-                        Model: model);
-                    break;
-
-                case "response.completed":
-                    if (evt.Response is not null)
-                    {
-                        model = evt.Response.Model;
-                        promptTokens = evt.Response.Usage?.InputTokens;
-                        completionTokens = evt.Response.Usage?.OutputTokens;
-
-                        yield return new ChatCompletionChunk(
-                            Content: string.Empty,
-                            FinishReason: evt.Response.Status,
-                            Model: model,
-                            PromptTokens: promptTokens,
-                            CompletionTokens: completionTokens);
-                    }
-                    break;
-            }
+            var (mapped, evtModel) = ParseResponsesStreamEvent(json, model);
+            if (evtModel is not null) model = evtModel;
+            if (mapped is not null)
+                yield return mapped;
         }
+    }
+
+    private static (ChatCompletionChunk? Chunk, string? Model) ParseResponsesStreamEvent(string json, string? currentModel)
+    {
+        OpenAiResponsesStreamEvent? evt;
+        try
+        {
+            evt = JsonSerializer.Deserialize<OpenAiResponsesStreamEvent>(json, StreamJsonOptions);
+        }
+        catch
+        {
+            return (null, null);
+        }
+
+        if (evt is null) return (null, null);
+
+        return evt.Type switch
+        {
+            "response.output_text.delta" => (
+                new ChatCompletionChunk(Content: evt.Delta ?? string.Empty, Model: currentModel),
+                null),
+
+            "response.completed" when evt.Response is not null => MapCompletedResponseEvent(evt.Response),
+
+            _ => (null, null)
+        };
+    }
+
+    private static (ChatCompletionChunk Chunk, string? Model) MapCompletedResponseEvent(OpenAiResponsesApiResponse response)
+    {
+        var cached = response.Usage?.InputTokensDetails?.CachedTokens;
+        return (
+            new ChatCompletionChunk(
+                Content: string.Empty,
+                FinishReason: response.Status,
+                Model: response.Model,
+                PromptTokens: response.Usage?.InputTokens,
+                CompletionTokens: response.Usage?.OutputTokens,
+                CachedInputTokens: cached > 0 ? cached : null),
+            response.Model);
     }
 
     private async Task<ChatCompletionResponse> SendLegacyChatAsync(
@@ -460,7 +596,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         {
             Model = request.Model!,
             MaxOutputTokens = request.MaxTokens,
-            Input = await MapMessagesAsync(request.Messages, cancellationToken),
+            Input = new List<object>(await MapMessagesAsync(request.Messages, cancellationToken)),
             Reasoning = (request.ReasoningEffort ?? _options.ReasoningEffort) is { } effort
                 ? new OpenAiReasoningOption { Effort = effort }
                 : null,
@@ -489,7 +625,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         {
             Model = request.Model!,
             MaxOutputTokens = request.MaxTokens,
-            Input = await MapMessagesAsync(messages, cancellationToken),
+            Input = new List<object>(await MapMessagesAsync(messages, cancellationToken)),
             Reasoning = (request.ReasoningEffort ?? _options.ReasoningEffort) is { } effort
                 ? new OpenAiReasoningOption { Effort = effort }
                 : null,
@@ -519,37 +655,52 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
                 ResponsesEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
         }
 
-        var content = raw.Output
-            .Where(o => o.Type == "message")
-            .SelectMany(o => o.Content)
-            .Where(c => c.Type == "output_text")
-            .Select(c => c.Text)
-            .FirstOrDefault() ?? string.Empty;
+        var parsed = ParseResponsesApiOutput(raw);
+        var cachedTokens = raw.Usage.InputTokensDetails?.CachedTokens;
 
-        var refusal = raw.Output
-            .Where(o => o.Type == "message")
-            .SelectMany(o => o.Content)
-            .Where(c => c.Type == "refusal")
-            .Select(c => c.Refusal)
-            .FirstOrDefault();
-
-        var isError = raw.Status is "incomplete" or "failed";
-        var errorMessage = isError
-            ? (raw.IncompleteDetails?.Reason ?? $"Response status: {raw.Status}")
-            : null;
+        var (isSuccess, errorMessage) = CheckFileSearchCallFailures(raw, parsed);
 
         return new ChatCompletionResponse(
-            Content: content,
+            Content: parsed.Content,
             Model: raw.Model,
             PromptTokens: raw.Usage.InputTokens,
             CompletionTokens: raw.Usage.OutputTokens,
             RawResponseJson: rawResponseJson,
             RawRequestJson: rawRequestJson,
             Status: raw.Status,
-            IncompleteReason: raw.IncompleteDetails?.Reason,
-            IsSuccess: !isError,
+            IncompleteReason: parsed.IncompleteReason,
+            IsSuccess: isSuccess,
             ErrorMessage: errorMessage,
-            Refusal: refusal);
+            Refusal: parsed.Refusal,
+            CachedInputTokens: cachedTokens > 0 ? cachedTokens : null);
+    }
+
+    private static (bool IsSuccess, string? ErrorMessage) CheckFileSearchCallFailures(
+        OpenAiResponsesApiResponse raw,
+        ParsedResponsesApiOutput parsed)
+    {
+        var fileSearchCalls = raw.Output
+            .Where(o => o.Type == "file_search_call")
+            .ToList();
+
+        if (fileSearchCalls.Count == 0)
+            return (!parsed.IsError, parsed.ErrorMessage);
+
+        var failedSearches = fileSearchCalls
+            .Where(o => o.Status is not null && o.Status != "completed")
+            .ToList();
+
+        var isSuccess = !parsed.IsError && failedSearches.Count == 0;
+        var errorMessage = parsed.ErrorMessage;
+        if (failedSearches.Count > 0)
+        {
+            var failedIds = string.Join(", ",
+                failedSearches.Select(f => f.Id ?? "unknown"));
+            var detail = $"{failedSearches.Count} of {fileSearchCalls.Count} file search(es) failed (ids: {failedIds})";
+            errorMessage = errorMessage is null ? detail : $"{errorMessage}; {detail}";
+        }
+
+        return (isSuccess, errorMessage);
     }
 
     private static ChatCompletionResponse MapChatResponse(
@@ -559,6 +710,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
     {
         var choice = raw.Choices.FirstOrDefault();
         var refusal = choice?.Message.Refusal;
+        var cachedTokens = raw.Usage.PromptTokensDetails?.CachedTokens;
 
         return new ChatCompletionResponse(
             Content: ContentPartHelper.ExtractStringContent(choice?.Message.Content),
@@ -567,7 +719,8 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
             CompletionTokens: raw.Usage.CompletionTokens,
             RawResponseJson: rawResponseJson,
             RawRequestJson: rawRequestJson,
-            Refusal: refusal);
+            Refusal: refusal,
+            CachedInputTokens: cachedTokens > 0 ? cachedTokens : null);
     }
 
     private static ToolCallingResponse MapToolCallingResponse(
@@ -577,6 +730,7 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
     {
         var choice = raw.Choices.FirstOrDefault();
         var content = ContentPartHelper.ExtractStringContent(choice?.Message.Content);
+        var cachedTokens = raw.Usage.PromptTokensDetails?.CachedTokens;
 
         var chatCompletion = new ChatCompletionResponse(
             Content: content,
@@ -584,7 +738,8 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
             PromptTokens: raw.Usage.PromptTokens,
             CompletionTokens: raw.Usage.CompletionTokens,
             RawResponseJson: rawResponseJson,
-            RawRequestJson: rawRequestJson);
+            RawRequestJson: rawRequestJson,
+            CachedInputTokens: cachedTokens > 0 ? cachedTokens : null);
 
         var toolCalls = ToolCallingHelper.MapResponseToolCalls(
             choice?.Message.ToolCalls,
@@ -704,6 +859,107 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
         }).ToList();
     }
 
+    private static GroundedChatCompletionResponse MapWebSearchResponse(
+        OpenAiResponsesApiResponse raw,
+        string? rawResponseJson,
+        string? rawRequestJson)
+    {
+        var parsed = ParseResponsesApiOutput(raw);
+        var cachedTokens = raw.Usage.InputTokensDetails?.CachedTokens;
+
+        var searchCalls = raw.Output
+            .Where(o => o.Type == "web_search_call")
+            .ToList();
+
+        int? webSearchCount = searchCalls.Count > 0 ? searchCalls.Count : null;
+
+        var failedSearches = searchCalls
+            .Where(o => o.Status is not null && o.Status != "completed")
+            .ToList();
+
+        var isSuccess = !parsed.IsError && failedSearches.Count == 0;
+        var errorMessage = parsed.ErrorMessage;
+        if (failedSearches.Count > 0)
+        {
+            var failedIds = string.Join(", ",
+                failedSearches.Select(f => f.Id ?? "unknown"));
+            var detail = $"{failedSearches.Count} of {searchCalls.Count} web search(es) failed (ids: {failedIds})";
+            errorMessage = errorMessage is null ? detail : $"{errorMessage}; {detail}";
+        }
+
+        var chatCompletion = new ChatCompletionResponse(
+            Content: parsed.Content,
+            Model: raw.Model,
+            PromptTokens: raw.Usage.InputTokens,
+            CompletionTokens: raw.Usage.OutputTokens,
+            RawResponseJson: rawResponseJson,
+            RawRequestJson: rawRequestJson,
+            Status: raw.Status,
+            IncompleteReason: parsed.IncompleteReason,
+            IsSuccess: isSuccess,
+            ErrorMessage: errorMessage,
+            Refusal: parsed.Refusal,
+            CachedInputTokens: cachedTokens > 0 ? cachedTokens : null)
+        {
+            WebSearchCount = webSearchCount
+        };
+
+        var annotations = raw.Output
+            .Where(o => o.Type == "message")
+            .SelectMany(o => o.Content)
+            .Where(c => c.Type == "output_text" && c.Annotations is not null)
+            .SelectMany(c => c.Annotations!)
+            .ToList();
+
+        var citations = MapWebSearchAnnotationsToCitations(annotations, parsed.Content);
+
+        return new GroundedChatCompletionResponse(chatCompletion, citations)
+        {
+            GroundingKind = GroundingKind.WebSearch
+        };
+    }
+
+    private static List<Citation> MapWebSearchAnnotationsToCitations(
+        List<OpenAiAnnotation> annotations,
+        string content)
+    {
+        return annotations
+            .Where(a => a.Type == "url_citation" && a.Url is not null)
+            .Select(a =>
+            {
+                int start;
+                int end;
+                string text;
+
+                if (a.StartIndex is { } s && a.EndIndex is { } e
+                    && s >= 0 && e > s && e <= content.Length)
+                {
+                    start = s;
+                    end = e;
+                    text = content[start..end];
+                }
+                else
+                {
+                    start = 0;
+                    end = 0;
+                    text = string.Empty;
+                }
+
+                IReadOnlyDictionary<string, string>? data = a.Title is not null
+                    ? new System.Collections.ObjectModel.ReadOnlyDictionary<string, string>(
+                        new Dictionary<string, string> { ["title"] = a.Title })
+                    : null;
+
+                return new Citation(
+                    Start: start,
+                    End: end,
+                    Text: text,
+                    Sources: [new CitationSource(Id: a.Url!, Data: data)],
+                    Type: a.Type);
+            })
+            .ToList();
+    }
+
     private string ResolveModel(string? model)
     {
         return model
@@ -723,6 +979,114 @@ public sealed class OpenAiChatCompletionClient : IChatCompletionClient, IJsonOut
             return OpenAiModelType.Gpt5;
 
         return OpenAiModelType.Legacy;
+    }
+
+    private static List<OpenAiInputFile> MapDocumentChunksToInputFiles(IReadOnlyList<DocumentChunk> documents)
+    {
+        return documents.Select((doc, index) =>
+        {
+            var (filename, fileData) = GroundedChatHelper.EncodeDocumentChunk(doc, index);
+            return new OpenAiInputFile { Filename = filename, FileData = fileData };
+        }).ToList();
+    }
+
+    private static bool EmbedInputFilesInUserMessage(List<object> messages, List<OpenAiInputFile> inputFiles)
+    {
+        var lastUserMsg = messages.OfType<OpenAiChatMessage>().LastOrDefault(m => m.Role == "user");
+        if (lastUserMsg == null) return false;
+
+        var contentItems = new List<object>();
+        contentItems.AddRange(inputFiles);
+
+        switch (lastUserMsg.Content)
+        {
+            case string text:
+                contentItems.Add(new OpenAiContentPart { Type = "input_text", Text = text });
+                break;
+            case IEnumerable<object> parts:
+                foreach (var part in parts)
+                {
+                    contentItems.Add(part switch
+                    {
+                        OpenAiContentPart { Type: "text" } textPart =>
+                            new OpenAiContentPart { Type = "input_text", Text = textPart.Text },
+                        OpenAiContentPart { Type: "image_url", ImageUrl: { } img } =>
+                            (object)new Dictionary<string, string> { ["type"] = "input_image", ["image_url"] = img.Url },
+                        _ => part
+                    });
+                }
+                break;
+        }
+
+        lastUserMsg.Content = contentItems;
+        return true;
+    }
+
+    private static GroundedChatCompletionResponse MapGroundedChatResponse(
+        OpenAiResponsesApiResponse raw,
+        IReadOnlyList<DocumentChunk> documents,
+        string? rawResponseJson,
+        string? rawRequestJson)
+    {
+        var parsed = ParseResponsesApiOutput(raw);
+        var cachedTokens = raw.Usage.InputTokensDetails?.CachedTokens;
+
+        var chatCompletion = new ChatCompletionResponse(
+            Content: parsed.Content,
+            Model: raw.Model,
+            PromptTokens: raw.Usage.InputTokens,
+            CompletionTokens: raw.Usage.OutputTokens,
+            RawResponseJson: rawResponseJson,
+            RawRequestJson: rawRequestJson,
+            Status: raw.Status,
+            IncompleteReason: parsed.IncompleteReason,
+            IsSuccess: !parsed.IsError,
+            ErrorMessage: parsed.ErrorMessage,
+            Refusal: parsed.Refusal,
+            CachedInputTokens: cachedTokens > 0 ? cachedTokens : null);
+
+        var annotations = raw.Output
+            .Where(o => o.Type == "message")
+            .SelectMany(o => o.Content)
+            .Where(c => c.Type == "output_text" && c.Annotations is not null)
+            .SelectMany(c => c.Annotations!)
+            .ToList();
+
+        var citations = GroundedChatHelper.MapAnnotationsToCitations(
+            annotations, parsed.Content, documents,
+            a => (a.Type, a.FileId, a.Filename, a.Index, a.StartIndex, a.EndIndex));
+
+        return new GroundedChatCompletionResponse(chatCompletion, citations);
+    }
+
+    private readonly record struct ParsedResponsesApiOutput(
+        string Content,
+        string? Refusal,
+        bool IsError,
+        string? IncompleteReason,
+        string? ErrorMessage);
+
+    private static ParsedResponsesApiOutput ParseResponsesApiOutput(OpenAiResponsesApiResponse raw)
+    {
+        var messages = raw.Output.Where(o => o.Type == "message");
+
+        var content = string.Join("", messages
+            .SelectMany(o => o.Content)
+            .Where(c => c.Type == "output_text")
+            .Select(c => c.Text));
+
+        var refusal = messages
+            .SelectMany(o => o.Content)
+            .Where(c => c.Type == "refusal")
+            .Select(c => c.Refusal)
+            .FirstOrDefault();
+
+        var isError = raw.Status is "incomplete" or "failed";
+        var errorMessage = isError
+            ? (raw.IncompleteDetails?.Reason ?? $"Response status: {raw.Status}")
+            : null;
+
+        return new ParsedResponsesApiOutput(content, refusal, isError, raw.IncompleteDetails?.Reason, errorMessage);
     }
 
     internal enum OpenAiModelType

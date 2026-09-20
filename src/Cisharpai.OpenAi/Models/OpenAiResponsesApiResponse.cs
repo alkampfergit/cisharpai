@@ -34,11 +34,27 @@ public sealed class OpenAiResponseOutput
     [JsonPropertyName("type")]
     public string Type { get; set; } = string.Empty;
 
+    [JsonPropertyName("id")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Id { get; set; }
+
+    [JsonPropertyName("status")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Status { get; set; }
+
     [JsonPropertyName("role")]
     public string Role { get; set; } = string.Empty;
 
     [JsonPropertyName("content")]
     public List<OpenAiResponseContent> Content { get; set; } = [];
+
+    [JsonPropertyName("queries")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<string>? Queries { get; set; }
+
+    [JsonPropertyName("results")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<OpenAiFileSearchResult>? Results { get; set; }
 }
 
 public sealed class OpenAiResponseContent
@@ -51,6 +67,44 @@ public sealed class OpenAiResponseContent
 
     [JsonPropertyName("refusal")]
     public string? Refusal { get; set; }
+
+    [JsonPropertyName("annotations")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<OpenAiAnnotation>? Annotations { get; set; }
+}
+
+public sealed class OpenAiAnnotation
+{
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = string.Empty;
+
+    [JsonPropertyName("file_id")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? FileId { get; set; }
+
+    [JsonPropertyName("filename")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Filename { get; set; }
+
+    [JsonPropertyName("index")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? Index { get; set; }
+
+    [JsonPropertyName("start_index")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? StartIndex { get; set; }
+
+    [JsonPropertyName("end_index")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? EndIndex { get; set; }
+
+    [JsonPropertyName("url")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Url { get; set; }
+
+    [JsonPropertyName("title")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Title { get; set; }
 }
 
 public sealed class OpenAiResponsesUsage
@@ -63,10 +117,38 @@ public sealed class OpenAiResponsesUsage
 
     [JsonPropertyName("output_tokens_details")]
     public OpenAiOutputTokensDetails? OutputTokensDetails { get; set; }
+
+    [JsonPropertyName("input_tokens_details")]
+    public OpenAiInputTokensDetails? InputTokensDetails { get; set; }
 }
 
 public sealed class OpenAiOutputTokensDetails
 {
     [JsonPropertyName("reasoning_tokens")]
     public int ReasoningTokens { get; set; }
+}
+
+public sealed class OpenAiInputTokensDetails
+{
+    [JsonPropertyName("cached_tokens")]
+    public int CachedTokens { get; set; }
+}
+
+public sealed class OpenAiFileSearchResult
+{
+    [JsonPropertyName("file_id")]
+    public string FileId { get; set; } = string.Empty;
+
+    [JsonPropertyName("filename")]
+    public string Filename { get; set; } = string.Empty;
+
+    [JsonPropertyName("score")]
+    public double Score { get; set; }
+
+    [JsonPropertyName("text")]
+    public string Text { get; set; } = string.Empty;
+
+    [JsonPropertyName("attributes")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public Dictionary<string, object>? Attributes { get; set; }
 }

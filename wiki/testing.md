@@ -89,6 +89,35 @@ var citations = new List<Citation>
 FakeResponses.GroundedChat("The answer is 42.", citations);
 ```
 
+### Cached Chat Responses
+
+```csharp
+// Response with cache hit
+FakeResponses.CachedChat("cached answer", cachedInputTokens: 500);
+
+// Response with both cache read and creation
+FakeResponses.CachedChat("answer", cachedInputTokens: 500, cacheCreationInputTokens: 200);
+```
+
+### Web Search Responses
+
+```csharp
+// Default web search response (WebSearchCount = 1, GroundingKind.WebSearch)
+FakeResponses.WebSearch("The capital of France is Paris.");
+
+// With citations
+var citations = new List<Citation>
+{
+    new(0, 30, "The capital of France is Paris.",
+        [new CitationSource("https://example.com", Data: new Dictionary<string, string> { ["title"] = "Example" }.AsReadOnly())],
+        Type: "web_search_result_location")
+};
+FakeResponses.WebSearch("The capital of France is Paris.", citations, webSearchCount: 1);
+
+// Custom search count
+FakeResponses.WebSearch("answer", webSearchCount: 3);
+```
+
 ### Streaming Responses
 
 ```csharp
@@ -110,6 +139,19 @@ FakeResponses.Embeddings(new float[][] { [0.1f], [0.2f], [0.3f] });
 
 // Error
 FakeResponses.EmbeddingError("model not found");
+```
+
+### Rerank Responses
+
+```csharp
+// Explicit (index, score) pairs, in ranked order
+FakeResponses.Rerank((1, 0.99), (0, 0.42));
+
+// N documents ranked in their original order with descending scores
+FakeResponses.Rerank(documentCount: 3);
+
+// Error
+FakeResponses.RerankError("model not found");
 ```
 
 ## FakeChatCompletionClient
@@ -144,6 +186,8 @@ Each feature method has its own queue and default:
 | `GetChatCompletionWithToolsAsync` | `EnqueueToolCallingResponse()` | `DefaultToolCallingResponse` |
 | `GetGroundedChatCompletionAsync` | `EnqueueGroundedChatResponse()` | `DefaultGroundedChatResponse` |
 | `GetChatCompletionStreamAsync` | `EnqueueStreamingResponse()` | `DefaultStreamingResponse` |
+| `GetChatCompletionWithCachingAsync` | `EnqueuePromptCachingResponse()` | `DefaultPromptCachingResponse` |
+| `GetChatCompletionWithWebSearchAsync` | `EnqueueWebSearchResponse()` | `DefaultWebSearchResponse` |
 
 ### Request Capture
 
@@ -174,6 +218,8 @@ Available capture lists:
 | `ReceivedJsonOutputRequests` | `GetChatCompletionWithJsonOutputAsync` (includes `JsonOutputOptions`) |
 | `ReceivedGroundedChatRequests` | `GetGroundedChatCompletionAsync` (includes `GroundedChatOptions`) |
 | `ReceivedStreamingRequests` | `GetChatCompletionStreamAsync` |
+| `ReceivedPromptCachingRequests` | `GetChatCompletionWithCachingAsync` (includes `PromptCachingOptions`) |
+| `ReceivedWebSearchRequests` | `GetChatCompletionWithWebSearchAsync` (includes `WebSearchOptions`) |
 
 ### Reset
 
@@ -220,9 +266,131 @@ var mmResult = await fake.GetMultimodalEmbeddingsAsync(inputs, "model-v1");
 Assert.That(fake.ReceivedMultimodalRequests, Has.Count.EqualTo(1));
 ```
 
+## FakeRerankerClient
+
+Same queue/default/capture shape as the other fakes.
+
+```csharp
+var fake = new FakeRerankerClient
+{
+    DefaultResponse = FakeResponses.Rerank((1, 0.99), (0, 0.42))
+};
+
+string[] documents = ["Nevada's capital is Carson City.", "Paris is the capital of France."];
+var result = await fake.RerankAsync(new RerankRequest("What is the capital of France?", documents));
+
+// Index points back into the documents you passed in
+Assert.That(documents[result.Results[0].Index], Is.EqualTo(documents[1]));
+Assert.That(fake.ReceivedRequests[0].Query, Is.EqualTo("What is the capital of France?"));
+```
+
+Queue responses to drive a sequence of calls:
+
+```csharp
+var fake = new FakeRerankerClient();
+fake.EnqueueResponse(FakeResponses.Rerank((0, 0.9)));
+fake.EnqueueResponse(FakeResponses.RerankError("rate limited"));
+```
+
+`IRerankerClient` has no optional feature interfaces today, so `FakeRerankerClient` takes no
+feature flags -- its `Features` collection is empty.
+
+## FakeTokenCounter
+
+Same queue/default/capture shape as the other fakes.
+
+```csharp
+var fake = new FakeTokenCounter { DefaultCount = 10 };
+int count = await fake.CountAsync("Hello, world!"); // returns 10
+
+// Queue specific counts for a sequence of calls:
+fake.EnqueueCount(42);
+fake.EnqueueCount(7);
+
+// Inspect captured texts:
+Assert.That(fake.ReceivedTexts[0], Is.EqualTo("Hello, world!"));
+Assert.That(fake.CallCount, Is.EqualTo(1));
+```
+
+Or create one from `FakeResponses`:
+
+```csharp
+var fake = FakeResponses.TokenCounter(defaultCount: 25);
+```
+
+`ITokenCounter` has no optional feature interfaces, so `FakeTokenCounter` takes no feature flags.
+
+## FakeRetriever
+
+Same queue/default/capture shape as the other fakes.
+
+```csharp
+using Cisharpai.Rag.Models;
+using Cisharpai.Rag.Packing;
+using Cisharpai.Testing;
+
+var chunk = new TextChunk("doc", 0, 0, 5, "hello");
+var fake = new FakeRetriever
+{
+    DefaultResponse = new[] { new ScoredChunk(chunk, 0.95) }
+};
+
+var results = await fake.RetrieveAsync("query", 5);
+Assert.That(results, Has.Count.EqualTo(1));
+
+// Inspect captured queries:
+Assert.That(fake.ReceivedQueries[0], Is.EqualTo(("query", 5)));
+Assert.That(fake.CallCount, Is.EqualTo(1));
+```
+
+Or create one from `FakeResponses`:
+
+```csharp
+// Empty results by default
+var emptyRetriever = FakeResponses.Retriever();
+
+// With a default response
+var preloadedRetriever = FakeResponses.Retriever(scoredChunks);
+```
+
+Via DI:
+
+```csharp
+var fake = services.AddFakeRetriever();
+fake.DefaultResponse = myChunks;
+```
+
+`IRetriever` has no optional feature interfaces, so `FakeRetriever` takes no feature flags.
+
+## FakeHostedRetrievalFeature
+
+`FakeHostedRetrievalFeature` fakes `IHostedRetrievalFeature` — the factory that produces per-store `IRetriever` instances. Each store is backed by a `FakeRetriever` that can be pre-loaded with canned responses.
+
+```csharp
+var fake = new FakeHostedRetrievalFeature();
+
+// Register a store with canned results
+var fakeRetriever = fake.AddStore("vs_my_store");
+fakeRetriever.EnqueueResponse(new[] { new ScoredChunk(myChunk, 0.95) });
+
+// Use in application code
+IRetriever retriever = fake.ForStore("vs_my_store");
+var results = await retriever.RetrieveAsync("query", 5);
+// results[0].Score == 0.95
+
+// Unregistered stores return empty results by default
+var emptyRetriever = fake.ForStore("vs_unknown");
+var empty = await emptyRetriever.RetrieveAsync("query", 5);
+// empty.Count == 0
+
+// Assert which stores were accessed
+Assert.That(fake.StoreIds, Does.Contain("vs_my_store"));
+Assert.That(fake.GetRetriever("vs_my_store")!.CallCount, Is.EqualTo(1));
+```
+
 ## Feature Opt-Out
 
-Both fake clients register all feature interfaces by default. Use the flags enums to control which features are available -- useful for testing feature-detection code paths.
+Both fake chat and embedding clients register all feature interfaces by default. Use the flags enums to control which features are available -- useful for testing feature-detection code paths.
 
 ### FakeChatFeatures
 
@@ -242,7 +410,7 @@ var streaming = bare.Features.Get<IStreamingChatFeature>();
 Assert.That(streaming, Is.Null); // Feature not available
 ```
 
-Available flags: `Streaming`, `ToolCalling`, `JsonOutput`, `GroundedChat`, `All`, `None`.
+Available flags: `Streaming`, `ToolCalling`, `JsonOutput`, `GroundedChat`, `PromptCaching`, `WebSearch`, `All`, `None`.
 
 ### FakeEmbeddingFeatures
 
@@ -270,6 +438,13 @@ fakeChatClient.DefaultResponse = FakeResponses.Chat("mocked answer");
 // Register fake embedding client
 var fakeEmbeddingClient = services.AddFakeEmbeddingClient();
 fakeEmbeddingClient.DefaultResponse = FakeResponses.Embedding();
+
+// Register fake reranker client
+var fakeRerankerClient = services.AddFakeRerankerClient();
+fakeRerankerClient.DefaultResponse = FakeResponses.Rerank(3);
+
+// Register fake token counter
+var fakeTokenCounter = services.AddFakeTokenCounter(defaultCount: 10);
 
 var provider = services.BuildServiceProvider();
 
@@ -471,12 +646,18 @@ public async Task ConversationAgent_HandlesMultipleTurns()
 | `DefaultToolCallingResponse` | `ToolCallingResponse?` | Fallback for `GetChatCompletionWithToolsAsync` |
 | `DefaultGroundedChatResponse` | `GroundedChatCompletionResponse?` | Fallback for `GetGroundedChatCompletionAsync` |
 | `DefaultStreamingResponse` | `IReadOnlyList<ChatCompletionChunk>?` | Fallback for `GetChatCompletionStreamAsync` |
+| `DefaultPromptCachingResponse` | `ChatCompletionResponse?` | Fallback for `GetChatCompletionWithCachingAsync` (falls back to `DefaultResponse`) |
+| `DefaultGroundedCachingResponse` | `GroundedChatCompletionResponse?` | Fallback for `GetGroundedChatCompletionWithCachingAsync` (falls back to `DefaultGroundedChatResponse`) |
+| `DefaultToolCachingResponse` | `ToolCallingResponse?` | Fallback for `GetChatCompletionWithToolsAndCachingAsync` (falls back to `DefaultToolCallingResponse`) |
 | `CallCount` | `int` | Total calls across all methods |
 | `ReceivedRequests` | `IReadOnlyList<ChatCompletionRequest>` | Captured chat requests |
 | `ReceivedToolCallingRequests` | `IReadOnlyList<(Request, Options)>` | Captured tool calling requests |
 | `ReceivedJsonOutputRequests` | `IReadOnlyList<(Request, Options)>` | Captured JSON output requests |
 | `ReceivedGroundedChatRequests` | `IReadOnlyList<(Request, Options)>` | Captured grounded chat requests |
 | `ReceivedStreamingRequests` | `IReadOnlyList<ChatCompletionRequest>` | Captured streaming requests |
+| `ReceivedPromptCachingRequests` | `IReadOnlyList<(Request, Options)>` | Captured prompt caching requests |
+| `ReceivedGroundedCachingRequests` | `IReadOnlyList<(Request, GroundedOptions, CachingOptions)>` | Captured grounded + caching requests |
+| `ReceivedToolCachingRequests` | `IReadOnlyList<(Request, ToolOptions, CachingOptions)>` | Captured tool + caching requests |
 | `Reset()` | `void` | Clears all queues and captured requests |
 
 ### FakeEmbeddingClient
@@ -491,6 +672,36 @@ public async Task ConversationAgent_HandlesMultipleTurns()
 | `ReceivedImageRequests` | `IReadOnlyList<(ImagePath, Model)>` | Captured image embedding requests |
 | `ReceivedMultimodalRequests` | `IReadOnlyList<IReadOnlyList<MultimodalEmbeddingInput>>` | Captured multimodal requests |
 | `Reset()` | `void` | Clears all queues and captured requests |
+
+### FakeRerankerClient
+
+| Member | Type | Description |
+|--------|------|-------------|
+| `DefaultResponse` | `RerankResponse?` | Fallback used when the queue is empty |
+| `EnqueueResponse(response)` | `void` | Queue a response (FIFO) |
+| `CallCount` | `int` | Number of `RerankAsync` calls |
+| `ReceivedRequests` | `IReadOnlyList<RerankRequest>` | Captured rerank requests |
+| `Reset()` | `void` | Clears the queue and captured requests |
+
+### FakeTokenCounter
+
+| Member | Type | Description |
+|--------|------|-------------|
+| `DefaultCount` | `int?` | Fallback used when the queue is empty |
+| `EnqueueCount(count)` | `void` | Queue a count (FIFO) |
+| `CallCount` | `int` | Number of `CountAsync` calls |
+| `ReceivedTexts` | `IReadOnlyList<string>` | Captured input texts |
+| `Reset()` | `void` | Clears the queue and captured texts |
+
+### FakeRetriever
+
+| Member | Type | Description |
+|--------|------|-------------|
+| `DefaultResponse` | `IReadOnlyList<ScoredChunk>?` | Fallback used when the queue is empty |
+| `EnqueueResponse(response)` | `void` | Queue a response (FIFO) |
+| `CallCount` | `int` | Number of `RetrieveAsync` calls |
+| `ReceivedQueries` | `IReadOnlyList<(string Query, int TopK)>` | Captured retrieval queries |
+| `Reset()` | `void` | Clears the queue and captured queries |
 
 ### FakeClientFactoryProvider
 
@@ -530,3 +741,49 @@ services.AddCisharpaiClientFactory()
 | `EnqueueEmbeddingClient(client)` | `FakeClientFactoryProvider` | Queue an embedding client (FIFO) |
 | `WithDefaultChatClient(client)` | `FakeClientFactoryProvider` | Set default chat client (used when queue empty) |
 | `WithDefaultEmbeddingClient(client)` | `FakeClientFactoryProvider` | Set default embedding client (used when queue empty) |
+| `EnqueueRerankerClient(client)` | `FakeClientFactoryProvider` | Queue a reranker client (FIFO) |
+| `WithDefaultRerankerClient(client)` | `FakeClientFactoryProvider` | Set default reranker client (used when queue empty) |
+
+## RAG ingestion tests
+
+Reference `Cisharpai.Rag` and `Cisharpai.Testing` in your application test project. The existing `FakeEmbeddingClient` works with the chunker, processor, pipeline and DI; no new optional core feature needs faking. Queue one vector per expected chunk in each batch, because malformed successful output is rejected.
+
+```csharp
+using Cisharpai.Rag;
+using Cisharpai.Rag.Chunking;
+using Cisharpai.Rag.Embeddings;
+using Cisharpai.Rag.Models;
+using Cisharpai.Testing;
+using NUnit.Framework;
+
+var fake = new FakeEmbeddingClient();
+fake.EnqueueResponse(FakeResponses.Embeddings(new float[][]
+{
+    new float[] { 1, 0 },
+    new float[] { 0, 1 }
+}));
+var pipeline = new RagIngestionPipeline(
+    new FixedSizeChunker(new FixedSizeChunkerOptions { ChunkSize = 4, Overlap = 0 }),
+    new BulkEmbeddingProcessor(fake, new BulkEmbeddingOptions { MaxBatchItems = 2 }));
+
+var batches = new List<EmbeddingBatchResult>();
+await foreach (var batch in pipeline.IngestAsync(new[] { new RagDocument("doc", "abcdefgh") }))
+    batches.Add(batch);
+
+Assert.That(batches, Has.Count.EqualTo(1));
+Assert.That(batches[0].IsSuccess, Is.True);
+Assert.That(batches[0].Items[1].Chunk.StartOffset, Is.EqualTo(4));
+Assert.That(batches[0].Items[1].Vector, Is.EqualTo(new float[] { 0, 1 }));
+Assert.That(fake.ReceivedRequests[0].Input, Is.EqualTo(new[] { "abcd", "efgh" }));
+```
+
+For a failed provider batch, enqueue `FakeResponses.EmbeddingError("invalid input")`; assert `IsSuccess == false`, empty `Items`, and retained `Chunks`. Later batches still run, because a failed batch no longer stops the enumeration. A transient message such as `"rate limit exceeded"` or any `429`/`5xx` status is retried first, so set `MaxRetries = 0` (or `RetryBaseDelay` to something tiny) when asserting a transient failure, otherwise the fake's queue is drained by the retries. The fake's default response contains only one vector, so explicitly queue matching responses for multi-chunk batches. Cancellation is an exception, not an ordinary failed batch.
+
+Repository tests are in the existing `src/Cisharpai.Tests/Rag/` folder. They cover Unicode and overlap boundaries, option snapshots, lazy bulk processing, malformed vectors, partial failures, cancellation/disposal, pipeline composition and DI/keyed providers. Run them offline on both targets:
+
+```sh
+dotnet test src/Cisharpai.Tests/Cisharpai.Tests.csproj --framework net8.0 --filter FullyQualifiedName~Rag
+dotnet test src/Cisharpai.Tests/Cisharpai.Tests.csproj --framework net10.0 --filter FullyQualifiedName~Rag
+```
+
+See [RAG Ingestion](rag.md) for complete consumer configuration and streaming examples.

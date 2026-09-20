@@ -23,7 +23,7 @@
 
     "FEATURES — All optional capabilities (streaming, tool calling, JSON output, grounded chat, image embedding) are discovered at runtime via client.Features.Get<T>(). Always null-check the result before use — a null means that provider or configuration does not support the feature.",
 
-    "FEATURES — The full feature matrix: IJsonOutputFeature and IToolCallingFeature and IStreamingChatFeature are available on all 5 chat providers. IGroundedChatFeature is Cohere only. IImageEmbeddingFeature is Azure AI Inference and Cohere. IMultimodalEmbeddingFeature is Cohere only.",
+    "FEATURES — The full feature matrix: IJsonOutputFeature, IToolCallingFeature, IStreamingChatFeature, and IGroundedChatFeature are available on all 5 chat providers (grounded chat is native on Anthropic/Cohere/OpenAI/Azure OpenAI, prompt-injection fallback on Azure AI Inference). IImageEmbeddingFeature is Azure AI Inference and Cohere. IMultimodalEmbeddingFeature is Cohere only.",
 
     "ERROR HANDLING — Never wrap client calls in try/catch for API-level failures. Check response.IsSuccess and read response.ErrorMessage instead. Exceptions are only thrown for network and configuration errors, not for 4xx/5xx API responses.",
 

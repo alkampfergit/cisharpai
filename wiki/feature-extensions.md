@@ -47,7 +47,8 @@ The `is { }` pattern is the idiomatic way to null-check and bind in one step.
 | `IJsonOutputFeature` | JSON Mode and Structured Outputs | All 5 |
 | `IToolCallingFeature` | Function/tool calling | All 5 |
 | `IStreamingChatFeature` | Token-by-token streaming via `IAsyncEnumerable` | All 5 |
-| `IGroundedChatFeature` | RAG with document citations | Cohere only |
+| `IGroundedChatFeature` | RAG with document citations | OpenAI (GPT-5), Azure OpenAI (GPT-5), Azure AI Inference (fallback), Anthropic, Cohere |
+| `IPromptCachingFeature` | Explicit cache breakpoints (system, message, tool) | Anthropic only |
 
 ### Embedding Features (on `IEmbeddingClient`)
 
@@ -122,4 +123,5 @@ See [Testing with Cisharpai](testing.md) for the full fake client reference.
 - [Streaming](streaming.md) — `IStreamingChatFeature` guide
 - [JSON Output](json-output.md) — `IJsonOutputFeature` guide
 - [Grounded Chat (RAG)](grounded-chat.md) — `IGroundedChatFeature` guide
+- [Prompt Caching](prompt-caching.md) — `IPromptCachingFeature` guide
 - [Embeddings](embeddings.md) — `IImageEmbeddingFeature` and `IMultimodalEmbeddingFeature`

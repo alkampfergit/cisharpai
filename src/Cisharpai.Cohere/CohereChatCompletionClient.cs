@@ -493,13 +493,21 @@ public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOut
         )).ToList();
     }
 
-    private static string MapCitationMode(CitationMode mode) => mode switch
+    private string MapCitationMode(CitationMode mode) => mode switch
     {
         CitationMode.Accurate => "ACCURATE",
         CitationMode.Fast => "FAST",
         CitationMode.Enabled => "ENABLED",
+        CitationMode.SearchResult => MapSearchResultFallback(),
         _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, null)
     };
+
+    private string MapSearchResultFallback()
+    {
+        _logger?.LogWarning(
+            "CitationMode.SearchResult is not supported by Cohere; falling back to CitationMode.Enabled.");
+        return "ENABLED";
+    }
 
     private CitationMode ResolveCitationModeForModel(CitationMode requested, string? model)
     {

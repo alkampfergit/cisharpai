@@ -2,12 +2,16 @@ name: "CodeQL"
 
 on:
   push:
-    branches: [main, master, develop, 'feature/**', 'hotfix/**', 'release/**']
+    branches: [main, master, develop, 'hotfix/**', 'release/**']
   pull_request:
     types: [opened, synchronize, reopened]
   schedule:
     - cron: '23 4 * * 3'
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read

@@ -46,6 +46,42 @@ var response = await client.GetChatCompletionAsync(request);
 Console.WriteLine(response.Content);
 ```
 
+## Dynamic Provider Selection
+
+When you don't know the provider at startup — multi-tenant apps, user-configurable backends, or A/B testing across models — use the **Client Factory**:
+
+```csharp
+using Cisharpai;
+using Cisharpai.Anthropic;
+using Cisharpai.Azure;
+using Microsoft.Extensions.DependencyInjection;
+
+var services = new ServiceCollection();
+
+services.AddCisharpaiClientFactory()
+    .AddAnthropicSupport()
+    .AddAzureAiInferenceSupport();
+
+var sp = services.BuildServiceProvider();
+var factory = sp.GetRequiredService<ICisharpaiClientFactory>();
+
+// Create clients at runtime with provider-specific configuration
+var result = factory.CreateChatCompletionClient(new AnthropicClientConfiguration
+{
+    ApiKey = "sk-ant-...",
+    DefaultModel = "claude-sonnet-4-5-20250514"
+});
+
+if (result.IsSuccess)
+{
+    var response = await result.Client!.GetChatCompletionAsync(request);
+}
+```
+
+Each provider has a strongly-typed configuration record (`OpenAiClientConfiguration`, `AnthropicClientConfiguration`, `AzureOpenAiClientConfiguration`, `AzureAiInferenceClientConfiguration`, `CohereClientConfiguration`). The factory routes to the correct provider automatically.
+
+See the [Client Factory guide](wiki/factory.md) for the full configuration hierarchy, error handling, and embedding client support.
+
 ## Documentation
 
 Start here:
@@ -57,6 +93,7 @@ Start here:
 - [JSON Output](wiki/json-output.md) -- JSON Mode and Structured Outputs
 - [Tool Calling](wiki/tool-calling.md) -- function calling across providers
 - [Grounded Chat (RAG)](wiki/grounded-chat.md) -- document grounding with citations
+- [Client Factory](wiki/factory.md) -- runtime provider selection for multi-tenant / dynamic scenarios
 - [Feature Extensions](wiki/feature-extensions.md) -- Feature Collection pattern
 
 ## Samples
@@ -86,6 +123,41 @@ services.AddHttpClient("cisharpai")
 ```
 
 Streaming calls can run longer than the standard 60s/90s timeouts. For long-running streams, configure a streaming-specific HTTP client with `AddCisharpaiStreamingResilienceHandler()`, which removes those timeouts while keeping retry and circuit-breaker policies.
+
+## AI Agent Plugins
+
+This repository's agent tooling is distributed through the shared
+[agent-plugins-base](https://github.com/alkampfergit/agent-plugins-base) marketplace, which works with
+both Claude Code and Codex.
+
+### Claude Code
+
+```bash
+claude plugin marketplace add https://github.com/alkampfergit/agent-plugins-base.git
+claude plugin install github-alk@agent-plugins-base
+```
+
+Update later with `claude plugin marketplace update agent-plugins-base`.
+Adding the marketplace writes to your user settings, so it is available in every project;
+`plugin install` is scoped to the current project by default.
+
+### Codex
+
+```bash
+codex plugin marketplace add https://github.com/alkampfergit/agent-plugins-base.git
+codex plugin add github-alk@agent-plugins-base
+```
+
+Update later with `codex plugin marketplace upgrade`. The marketplace is recorded in
+`~/.codex/config.toml` under `[marketplaces.agent-plugins-base]`.
+
+Use `claude plugin list` / `codex plugin list` to verify what is installed and enabled.
+
+### Devcontainer
+
+`.devcontainer/postcreate.sh` already performs both registrations (and installs the
+`github-alk` plugin) after the container is created, so no manual step is needed when working
+inside the devcontainer.
 
 ## Building Locally
 
@@ -130,6 +202,16 @@ pwsh scripts/build.ps1 -nugetApiKey "YOUR_KEY" -nugetPublish $true
 ## Running Integration Tests
 
 Integration tests require environment variables to be set. Create a `.env` file in the repository root or set them in your environment.
+
+### Downloading secrets from Azure Key Vault
+
+If you have access to the team's Azure Key Vault, you can download the `.env` file with:
+
+```bash
+./scripts/get-secret.sh
+```
+
+This requires the [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) and the **Key Vault Secrets User** role on the `alk-agent-vault` vault. The script will prompt you to log in if needed.
 
 ### Environment Variables Format
 

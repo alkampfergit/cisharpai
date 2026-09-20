@@ -1,0 +1,7 @@
+[mcp_servers."microsoft-learn"]
+type = "url"
+url = "https://learn.microsoft.com/api/mcp"
+
+[mcp_servers."context7"]
+type = "url"
+url = "https://mcp.context7.com/mcp"

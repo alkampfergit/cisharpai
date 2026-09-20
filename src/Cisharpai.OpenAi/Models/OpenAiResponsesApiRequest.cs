@@ -6,7 +6,7 @@ public sealed class OpenAiResponsesApiRequest
 {
     public string Model { get; set; } = string.Empty;
 
-    public List<OpenAiChatMessage> Input { get; set; } = [];
+    public List<object> Input { get; set; } = [];
 
     [JsonPropertyName("max_output_tokens")]
     public int? MaxOutputTokens { get; set; }
@@ -15,8 +15,27 @@ public sealed class OpenAiResponsesApiRequest
 
     public OpenAiTextOption? Text { get; set; }
 
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<OpenAiResponsesApiTool>? Tools { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<string>? Include { get; set; }
+
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
     public bool Stream { get; set; }
+}
+
+public sealed class OpenAiResponsesApiTool
+{
+    public string Type { get; set; } = string.Empty;
+
+    [JsonPropertyName("vector_store_ids")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<string>? VectorStoreIds { get; set; }
+
+    [JsonPropertyName("max_num_results")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? MaxNumResults { get; set; }
 }
 
 public sealed class OpenAiReasoningOption

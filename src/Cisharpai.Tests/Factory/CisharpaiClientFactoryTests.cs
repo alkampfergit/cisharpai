@@ -159,4 +159,55 @@ public sealed class CisharpaiClientFactoryTests
         Assert.That(services.Count, Is.EqualTo(descriptorCountAfterFirstRegistration));
         Assert.That(factory.GetRegisteredProviders(), Has.Count.EqualTo(1));
     }
+
+    [Test]
+    public void CreateRerankerClient_UnregisteredProvider_ReturnsFailure()
+    {
+        var services = new ServiceCollection();
+        services.AddCisharpaiClientFactory()
+            .AddOpenAiSupport();
+
+        using var provider = services.BuildServiceProvider();
+        var factory = provider.GetRequiredService<ICisharpaiClientFactory>();
+
+        var config = new AnthropicClientConfiguration { ApiKey = "test" };
+        var result = factory.CreateRerankerClient(config);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.IsSuccess, Is.False);
+            Assert.That(result.ErrorMessage, Does.Contain("Anthropic"));
+            Assert.That(result.ErrorMessage, Does.Contain("not registered"));
+        });
+    }
+
+    [Test]
+    public void CreateRerankerClient_UnsupportedProvider_ReturnsFailure()
+    {
+        var services = new ServiceCollection();
+        services.AddCisharpaiClientFactory()
+            .AddOpenAiSupport();
+
+        using var provider = services.BuildServiceProvider();
+        var factory = provider.GetRequiredService<ICisharpaiClientFactory>();
+
+        var config = new OpenAiClientConfiguration { ApiKey = "test" };
+        var result = factory.CreateRerankerClient(config);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.IsSuccess, Is.False);
+            Assert.That(result.ErrorMessage, Does.Contain("does not support reranker"));
+        });
+    }
+
+    [Test]
+    public void SupportsReranking_DefaultsToFalseForProvidersWithoutRerankSupport()
+    {
+        Assert.Multiple(() =>
+        {
+            Assert.That(((IClientFactoryProvider)new OpenAiClientFactoryProvider()).SupportsReranking, Is.False);
+            Assert.That(((IClientFactoryProvider)new AnthropicClientFactoryProvider()).SupportsReranking, Is.False);
+        });
+    }
 }
