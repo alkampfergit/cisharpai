@@ -2,8 +2,9 @@ namespace Cisharpai.Rag.QueryTransformation;
 
 /// <summary>
 /// Generates N query variants from the original query. Each variant is retrieved independently
-/// and results are fused (e.g. via <see cref="RankFusion.ReciprocalRank"/>). Returns the
-/// original query plus the generated variants.
+/// and results are fused (e.g. via <see cref="RankFusion.ReciprocalRank"/>). When
+/// <c>includeOriginal</c> is <c>true</c> (the default), returns the original query followed
+/// by the generated variants; when <c>false</c>, returns only the generated variants.
 /// </summary>
 public sealed class MultiQueryExpander : QueryTransformerBase
 {
