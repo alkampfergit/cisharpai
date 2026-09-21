@@ -991,6 +991,83 @@ fake.DefaultStreamingResponse = FakeResponses.RagStreamingChunks("The ", "answer
 await foreach (var chunk in fake.AskStreamingAsync("test")) { /* ... */ }
 ```
 
+## RAG evaluation
+
+`Cisharpai.Rag` ships two families of evaluation tools for measuring RAG quality.
+
+### LLM-as-judge scorers
+
+Four scorers use any `IChatCompletionClient` with `IJsonOutputFeature` to evaluate a RAG interaction on a single dimension. Each returns an `EvaluationScore` with a normalized `[0, 1]` score and a short rationale.
+
+```csharp
+using Cisharpai.Rag.Evaluation;
+
+// Any client that supports IJsonOutputFeature
+IChatCompletionClient judgeClient = /* ... */;
+
+var groundedness = new GroundednessEvaluator(judgeClient);
+var relevance    = new AnswerRelevanceEvaluator(judgeClient);
+var precision    = new ContextPrecisionEvaluator(judgeClient);
+var recall       = new ContextRecallEvaluator(judgeClient);
+
+var score = await groundedness.EvaluateAsync(
+    question: "What is the refund policy?",
+    answer: "The refund policy is 30 days.",
+    contexts: new[] { "Our refund policy allows returns within 30 days." });
+
+Console.WriteLine($"Groundedness: {score.Score:F2} — {score.Rationale}");
+```
+
+| Scorer | What it measures |
+|--------|-----------------|
+| `GroundednessEvaluator` | Is every claim in the answer supported by the context? |
+| `AnswerRelevanceEvaluator` | Does the answer address the question asked? |
+| `ContextPrecisionEvaluator` | Are the retrieved chunks relevant to the question? |
+| `ContextRecallEvaluator` | Do the retrieved chunks cover the information needed to answer? |
+
+All scorers implement `IRagEvaluator`, so you can swap evaluation strategies or compose them:
+
+```csharp
+IRagEvaluator evaluator = new GroundednessEvaluator(client);
+var score = await evaluator.EvaluateAsync(question, answer, contexts);
+```
+
+### Ranking metrics
+
+Three pure-function metrics evaluate retrieval quality without model calls. They live in `RankingMetrics`, alongside `VectorMath`.
+
+```csharp
+using Cisharpai.Rag.Evaluation;
+
+var retrieved = new[] { "doc1", "doc3", "doc5", "doc2" };
+var relevant  = new HashSet<string> { "doc1", "doc2", "doc3" };
+
+double ndcg     = RankingMetrics.Ndcg(retrieved, relevant);        // ranking quality
+double mrr      = RankingMetrics.Mrr(retrieved, relevant);         // first relevant rank
+double recallAt3 = RankingMetrics.RecallAtK(retrieved, relevant, 3); // coverage in top-3
+```
+
+| Metric | Description |
+|--------|-------------|
+| `Ndcg` | Normalized Discounted Cumulative Gain — penalizes relevant items placed lower |
+| `Mrr` | Mean Reciprocal Rank — reciprocal of the first relevant item's rank |
+| `RecallAtK` | Fraction of relevant items in the top k results |
+
+### Testing evaluation code
+
+Use `FakeChatCompletionClient` to test judge scorers without real API calls:
+
+```csharp
+var fake = new FakeChatCompletionClient();
+fake.EnqueueJsonOutputResponse(new ChatCompletionResponse(
+    Content: "{\"score\": 0.85, \"rationale\": \"Well grounded\"}",
+    Model: "test", PromptTokens: 10, CompletionTokens: 10));
+
+var evaluator = new GroundednessEvaluator(fake);
+var result = await evaluator.EvaluateAsync("q", "a", new[] { "context" });
+Assert.That(result.Score, Is.EqualTo(0.85));
+```
+
 ## Offline tests
 
 Reuse `FakeEmbeddingClient` with one vector per submitted chunk, `FakeTokenCounter` for token counting (including with `ContextPacker`), `FakeRetriever` for retrieval, `FakeHostedRetrievalFeature` for hosted retrieval, and `FakeRagPipeline` / `FakeQueryTransformer` for pipeline testing. See [Testing](testing.md#rag-ingestion-tests) for a complete example and test commands.
