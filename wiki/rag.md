@@ -859,6 +859,138 @@ Assert.That(result[0], Is.EqualTo("clean query"));
 Assert.That(fake.ReceivedRequests, Has.Count.EqualTo(1));
 ```
 
+## RAG pipeline
+
+`IRagPipeline` is the composable orchestrator that wires the full RAG flow: query transformation → retrieval → rank fusion → reranking → context packing → grounded chat. Every stage is optional — degenerate pipelines (retrieve-only, chat with pre-packed context) are valid.
+
+### Building a pipeline
+
+```csharp
+using Cisharpai.Rag.Pipeline;
+
+var pipeline = new RagPipelineBuilder()
+    .WithConversationRewriter(new ConversationQueryRewriter(chatClient))
+    .WithQueryTransformer(new MultiQueryExpander(chatClient, variantCount: 3))
+    .WithRetriever(vectorRetriever)
+    .WithRetriever(bm25Retriever)
+    .WithRankFusionK(60)
+    .WithReranker(cohereReranker)
+    .WithContextPacker(packer)
+    .WithChatClient(chatClient)
+    .Build();
+```
+
+### Asking a question
+
+```csharp
+var result = await pipeline.AskAsync("What is the refund policy?", new RagPipelineOptions
+{
+    TopK = 10,
+    RerankerTopN = 5,
+    PackingOptions = new ContextPackingOptions { TokenBudget = 4096, ReservedTokens = 500 },
+    SystemPrompt = "You are a helpful assistant.",
+    Model = "gpt-4o",
+    Temperature = 0.3
+});
+
+Console.WriteLine(result.Answer);
+foreach (var citation in result.Citations)
+    Console.WriteLine($"  [{citation.Start}–{citation.End}]: {citation.Text}");
+
+// Debugging: inspect retrieved, packed, and dropped chunks
+Console.WriteLine($"Retrieved: {result.RetrievedChunks.Count}");
+Console.WriteLine($"Packed: {result.PackedChunks.Count}");
+Console.WriteLine($"Dropped: {result.DroppedChunks.Count}");
+```
+
+### Conversation-aware querying
+
+Pass conversation history for context-aware query rewriting. The `ConversationQueryRewriter` reformulates follow-up questions into standalone search queries.
+
+```csharp
+var options = new RagPipelineOptions
+{
+    ConversationHistory = new[]
+    {
+        new LlmMessage(LlmRole.User, "Tell me about France."),
+        new LlmMessage(LlmRole.Assistant, "France is a country in Western Europe.")
+    }
+};
+
+var result = await pipeline.AskAsync("What is its capital?", options);
+// ConversationQueryRewriter rewrites to "What is the capital of France?"
+Console.WriteLine(result.RewrittenQuery); // "What is the capital of France?"
+```
+
+### Streaming
+
+```csharp
+await foreach (var chunk in pipeline.AskStreamingAsync("What is the refund policy?"))
+{
+    if (chunk.ContentDelta is not null)
+        Console.Write(chunk.ContentDelta);
+
+    if (chunk.FinalResult is not null)
+    {
+        Console.WriteLine();
+        Console.WriteLine($"Total retrieved: {chunk.FinalResult.RetrievedChunks.Count}");
+    }
+}
+```
+
+If the chat client supports `IStreamingChatFeature`, chunks are streamed token-by-token. Otherwise, the pipeline falls back to a single-chunk response.
+
+### DI registration
+
+```csharp
+services.AddCisharpaiRagPipeline(builder =>
+{
+    builder
+        .WithRetriever(myRetriever)
+        .WithContextPacker(myPacker)
+        .WithChatClient(myChatClient);
+});
+
+// Or with service provider access for resolving dependencies:
+services.AddCisharpaiRagPipeline((sp, builder) =>
+{
+    builder
+        .WithRetriever(sp.GetRequiredService<IRetriever>())
+        .WithReranker(sp.GetRequiredService<IRerankerClient>())
+        .WithContextPacker(sp.GetRequiredService<IContextPacker>())
+        .WithChatClient(sp.GetRequiredService<IChatCompletionClient>());
+});
+```
+
+### Execution flow
+
+1. **Conversation rewrite** — if `ConversationQueryRewriter` is configured and conversation history is provided, the follow-up question is rewritten into a standalone search query.
+2. **Query transformation** — optional `IQueryTransformer`(s) expand or refine the query.
+3. **Retrieval** — each registered `IRetriever` is called with each search query.
+4. **Rank fusion** — if multiple retrievers or multiple queries produced results, `RankFusion.ReciprocalRank` merges them.
+5. **Reranking** — optional `IRerankerClient` rescores and filters the fused results.
+6. **Context packing** — optional `IContextPacker` fits chunks within a token budget.
+7. **Grounded chat** — the chat client answers using `IGroundedChatFeature` (native citations) or falls back to prompt-injection with `GroundedChatFallbackHelper`.
+
+### Testing
+
+Use `FakeRagPipeline` and `FakeQueryTransformer` from `Cisharpai.Testing`:
+
+```csharp
+var fake = new FakeRagPipeline
+{
+    DefaultResponse = FakeResponses.RagAnswer("The refund policy is 30 days.")
+};
+
+var result = await fake.AskAsync("refund policy?");
+Assert.That(result.Answer, Is.EqualTo("The refund policy is 30 days."));
+Assert.That(fake.ReceivedQueries[0].Query, Is.EqualTo("refund policy?"));
+
+// Streaming
+fake.DefaultStreamingResponse = FakeResponses.RagStreamingChunks("The ", "answer.");
+await foreach (var chunk in fake.AskStreamingAsync("test")) { /* ... */ }
+```
+
 ## Offline tests
 
-Reuse `FakeEmbeddingClient` with one vector per submitted chunk, `FakeTokenCounter` for token counting (including with `ContextPacker`), `FakeRetriever` for retrieval, and `FakeHostedRetrievalFeature` for hosted retrieval. See [Testing](testing.md#rag-ingestion-tests) for a complete example and test commands.
+Reuse `FakeEmbeddingClient` with one vector per submitted chunk, `FakeTokenCounter` for token counting (including with `ContextPacker`), `FakeRetriever` for retrieval, `FakeHostedRetrievalFeature` for hosted retrieval, and `FakeRagPipeline` / `FakeQueryTransformer` for pipeline testing. See [Testing](testing.md#rag-ingestion-tests) for a complete example and test commands.
