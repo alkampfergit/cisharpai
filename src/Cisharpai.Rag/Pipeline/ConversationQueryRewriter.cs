@@ -48,8 +48,7 @@ public sealed class ConversationQueryRewriter
         var historyBlock = new StringBuilder();
         foreach (var msg in conversationHistory)
         {
-            var role = msg.Role == LlmRole.User ? "User" : "Assistant";
-            historyBlock.AppendLine($"{role}: {msg.Content}");
+            historyBlock.AppendLine($"{msg.Role}: {msg.Content}");
         }
 
         var userPrompt = $"Conversation history:\n{historyBlock}\nFollow-up question: {query}";

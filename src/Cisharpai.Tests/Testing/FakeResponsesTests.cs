@@ -185,4 +185,15 @@ public class FakeResponsesTests
             Assert.That(response.ErrorMessage, Is.EqualTo("model not found"));
         });
     }
+
+    [Test]
+    public async Task QueryTransformer_Identity_PassesThroughInput()
+    {
+        var fake = FakeResponses.QueryTransformer();
+
+        var result = await fake.TransformAsync("hello world");
+
+        Assert.That(result, Has.Count.EqualTo(1));
+        Assert.That(result[0], Is.EqualTo("hello world"));
+    }
 }
