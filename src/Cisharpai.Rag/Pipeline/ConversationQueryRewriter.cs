@@ -1,6 +1,5 @@
 using System.Text;
 using Cisharpai.Models;
-using Cisharpai.Rag.QueryTransformation;
 
 namespace Cisharpai.Rag.Pipeline;
 
@@ -34,7 +33,7 @@ public sealed class ConversationQueryRewriter
         _temperature = temperature;
     }
 
-    public async Task<string> RewriteAsync(
+    public Task<string> RewriteAsync(
         string query,
         IReadOnlyList<LlmMessage> conversationHistory,
         CancellationToken cancellationToken = default)
@@ -43,8 +42,16 @@ public sealed class ConversationQueryRewriter
         ArgumentNullException.ThrowIfNull(conversationHistory);
 
         if (conversationHistory.Count == 0)
-            return query;
+            return Task.FromResult(query);
 
+        return RewriteCoreAsync(query, conversationHistory, cancellationToken);
+    }
+
+    private async Task<string> RewriteCoreAsync(
+        string query,
+        IReadOnlyList<LlmMessage> conversationHistory,
+        CancellationToken cancellationToken)
+    {
         var historyBlock = new StringBuilder();
         foreach (var msg in conversationHistory)
         {

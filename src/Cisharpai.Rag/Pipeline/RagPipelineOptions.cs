@@ -26,9 +26,9 @@ public sealed record RagPipelineOptions
 
     internal void Validate()
     {
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(TopK, nameof(TopK));
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(TopK);
 
         if (RerankerTopN is not null)
-            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(RerankerTopN.Value, nameof(RerankerTopN));
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(RerankerTopN.Value);
     }
 }
