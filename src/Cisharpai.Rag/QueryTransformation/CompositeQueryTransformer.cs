@@ -7,7 +7,7 @@ namespace Cisharpai.Rag.QueryTransformation;
 /// </summary>
 public sealed class CompositeQueryTransformer : IQueryTransformer
 {
-    private readonly IReadOnlyList<IQueryTransformer> _transformers;
+    private readonly List<IQueryTransformer> _transformers;
 
     public CompositeQueryTransformer(IEnumerable<IQueryTransformer> transformers)
     {
@@ -15,6 +15,8 @@ public sealed class CompositeQueryTransformer : IQueryTransformer
         _transformers = transformers.ToList();
         if (_transformers.Count == 0)
             throw new ArgumentException("At least one transformer is required.", nameof(transformers));
+        if (_transformers.Any(t => t is null))
+            throw new ArgumentException("Transformer collection must not contain null elements.", nameof(transformers));
     }
 
     public CompositeQueryTransformer(params IQueryTransformer[] transformers)

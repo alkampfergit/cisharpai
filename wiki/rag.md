@@ -797,7 +797,7 @@ IReadOnlyList<string> queries = await rewriter.TransformAsync(
 
 ### MultiQueryExpander
 
-Generates N query variants that approach the topic from different angles. Each is retrieved independently; results fuse through `RankFusion.ReciprocalRank`. By default the original query is included in the output.
+Generates N query variants that approach the topic from different angles. The caller retrieves each variant independently and fuses results (e.g. via `RankFusion.ReciprocalRank`). By default the original query is included in the output.
 
 ```csharp
 var expander = new MultiQueryExpander(chatClient, variantCount: 3);
