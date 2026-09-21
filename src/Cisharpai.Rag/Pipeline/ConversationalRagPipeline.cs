@@ -72,15 +72,8 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
 
         if (_chatClient is null)
         {
-            return new RagResult
-            {
-                Answer = string.Empty,
-                RetrievedChunks = retrieved,
-                PackedChunks = packed,
-                DroppedChunks = dropped,
-                RewrittenQuery = rewrittenQuery,
-                ExpandedQueries = searchQueries.Count > 1 ? searchQueries : null
-            };
+            return BuildRagResult(
+                string.Empty, [], retrieved, packed, dropped, rewrittenQuery, searchQueries);
         }
 
         var (answer, citations, errorMessage) = await ChatAsync(query, packed, options, cancellationToken)
@@ -88,26 +81,13 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
 
         if (answer is null)
         {
-            return RagResult.Error(errorMessage ?? "Chat completion failed.") with
-            {
-                RetrievedChunks = retrieved,
-                PackedChunks = packed,
-                DroppedChunks = dropped,
-                RewrittenQuery = rewrittenQuery,
-                ExpandedQueries = searchQueries.Count > 1 ? searchQueries : null
-            };
+            return BuildRagResult(
+                string.Empty, [], retrieved, packed, dropped, rewrittenQuery, searchQueries,
+                isSuccess: false, errorMessage: errorMessage ?? "Chat completion failed.");
         }
 
-        return new RagResult
-        {
-            Answer = answer,
-            Citations = citations,
-            RetrievedChunks = retrieved,
-            PackedChunks = packed,
-            DroppedChunks = dropped,
-            RewrittenQuery = rewrittenQuery,
-            ExpandedQueries = searchQueries.Count > 1 ? searchQueries : null
-        };
+        return BuildRagResult(
+            answer, citations, retrieved, packed, dropped, rewrittenQuery, searchQueries);
     }
 
     public async IAsyncEnumerable<RagStreamingChunk> AskStreamingAsync(
@@ -136,15 +116,8 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
             yield return new RagStreamingChunk
             {
                 FinishReason = "stop",
-                FinalResult = new RagResult
-                {
-                    Answer = string.Empty,
-                    RetrievedChunks = retrieved,
-                    PackedChunks = packed,
-                    DroppedChunks = dropped,
-                    RewrittenQuery = rewrittenQuery,
-                    ExpandedQueries = searchQueries.Count > 1 ? searchQueries : null
-                }
+                FinalResult = BuildRagResult(
+                    string.Empty, [], retrieved, packed, dropped, rewrittenQuery, searchQueries)
             };
             yield break;
         }
@@ -152,26 +125,9 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
         var streamingFeature = _chatClient.Features.Get<IStreamingChatFeature>();
         if (streamingFeature is null)
         {
-            var (answer, citations, errorMessage) = await ChatAsync(query, packed, options, cancellationToken)
+            yield return await CreateNonStreamingFallbackChunkAsync(
+                query, packed, options, retrieved, dropped, rewrittenQuery, searchQueries, cancellationToken)
                 .ConfigureAwait(false);
-
-            yield return new RagStreamingChunk
-            {
-                ContentDelta = answer ?? string.Empty,
-                FinishReason = "stop",
-                FinalResult = new RagResult
-                {
-                    Answer = answer ?? string.Empty,
-                    Citations = citations,
-                    IsSuccess = answer is not null,
-                    ErrorMessage = answer is null ? (errorMessage ?? "Chat completion failed.") : null,
-                    RetrievedChunks = retrieved,
-                    PackedChunks = packed,
-                    DroppedChunks = dropped,
-                    RewrittenQuery = rewrittenQuery,
-                    ExpandedQueries = searchQueries.Count > 1 ? searchQueries : null
-                }
-            };
             yield break;
         }
 
@@ -205,16 +161,8 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
                 {
                     ContentDelta = chunk.Content,
                     FinishReason = chunk.FinishReason,
-                    FinalResult = new RagResult
-                    {
-                        Answer = finalAnswer,
-                        Citations = citations,
-                        RetrievedChunks = retrieved,
-                        PackedChunks = packed,
-                        DroppedChunks = dropped,
-                        RewrittenQuery = rewrittenQuery,
-                        ExpandedQueries = searchQueries.Count > 1 ? searchQueries : null
-                    }
+                    FinalResult = BuildRagResult(
+                        finalAnswer, citations, retrieved, packed, dropped, rewrittenQuery, searchQueries)
                 };
             }
             else
@@ -222,6 +170,56 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
                 yield return new RagStreamingChunk { ContentDelta = chunk.Content };
             }
         }
+    }
+
+    private async Task<RagStreamingChunk> CreateNonStreamingFallbackChunkAsync(
+        string query,
+        IReadOnlyList<ScoredChunk> packed,
+        RagPipelineOptions options,
+        IReadOnlyList<ScoredChunk> retrieved,
+        IReadOnlyList<DroppedChunk> dropped,
+        string? rewrittenQuery,
+        IReadOnlyList<string> searchQueries,
+        CancellationToken cancellationToken)
+    {
+        var (answer, citations, errorMessage) = await ChatAsync(query, packed, options, cancellationToken)
+            .ConfigureAwait(false);
+
+        return new RagStreamingChunk
+        {
+            ContentDelta = answer ?? string.Empty,
+            FinishReason = "stop",
+            FinalResult = BuildRagResult(
+                answer ?? string.Empty, citations,
+                retrieved, packed, dropped, rewrittenQuery, searchQueries,
+                isSuccess: answer is not null,
+                errorMessage: answer is null ? (errorMessage ?? "Chat completion failed.") : null)
+        };
+    }
+
+    private static RagResult BuildRagResult(
+        string answer,
+        IReadOnlyList<Citation> citations,
+        IReadOnlyList<ScoredChunk> retrieved,
+        IReadOnlyList<ScoredChunk> packed,
+        IReadOnlyList<DroppedChunk> dropped,
+        string? rewrittenQuery,
+        IReadOnlyList<string> searchQueries,
+        bool isSuccess = true,
+        string? errorMessage = null)
+    {
+        return new RagResult
+        {
+            Answer = answer,
+            Citations = citations,
+            IsSuccess = isSuccess,
+            ErrorMessage = errorMessage,
+            RetrievedChunks = retrieved,
+            PackedChunks = packed,
+            DroppedChunks = dropped,
+            RewrittenQuery = rewrittenQuery,
+            ExpandedQueries = searchQueries.Count > 1 ? searchQueries : null
+        };
     }
 
     private async Task<(IReadOnlyList<string> SearchQueries, string? RewrittenQuery)> TransformQueryAsync(
@@ -374,18 +372,24 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
             return (cleanContent, citations, null);
         }
 
-        {
-            var request = BuildPlainChatRequest(query, options);
-            var response = await _chatClient.GetChatCompletionAsync(request, cancellationToken)
-                .ConfigureAwait(false);
-
-            return response.IsSuccess
-                ? (response.Content, [], null)
-                : (null, [], response.ErrorMessage);
-        }
+        return await PlainChatAsync(query, options, cancellationToken).ConfigureAwait(false);
     }
 
-    private ChatCompletionRequest BuildPlainChatRequest(
+    private async Task<(string? Answer, IReadOnlyList<Citation> Citations, string? ErrorMessage)> PlainChatAsync(
+        string query,
+        RagPipelineOptions options,
+        CancellationToken cancellationToken)
+    {
+        var request = BuildPlainChatRequest(query, options);
+        var response = await _chatClient!.GetChatCompletionAsync(request, cancellationToken)
+            .ConfigureAwait(false);
+
+        return response.IsSuccess
+            ? (response.Content, [], null)
+            : (null, [], response.ErrorMessage);
+    }
+
+    private static ChatCompletionRequest BuildPlainChatRequest(
         string query,
         RagPipelineOptions options)
     {
@@ -413,7 +417,7 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
             Temperature: options.Temperature);
     }
 
-    private IReadOnlyList<LlmMessage> BuildPlainMessages(
+    private static List<LlmMessage> BuildPlainMessages(
         string query,
         RagPipelineOptions options)
     {
@@ -427,7 +431,7 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
         return messages;
     }
 
-    private IReadOnlyList<LlmMessage> BuildMessagesWithContext(
+    private static List<LlmMessage> BuildMessagesWithContext(
         string query,
         IReadOnlyList<ScoredChunk> packedChunks,
         RagPipelineOptions options)
@@ -459,7 +463,7 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
         return messages;
     }
 
-    private static IReadOnlyList<DocumentChunk> ChunksToDocuments(IReadOnlyList<ScoredChunk> chunks)
+    private static List<DocumentChunk> ChunksToDocuments(IReadOnlyList<ScoredChunk> chunks)
     {
         return chunks
             .Select(c =>
