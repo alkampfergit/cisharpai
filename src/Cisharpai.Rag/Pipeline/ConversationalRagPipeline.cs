@@ -31,6 +31,13 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
     private readonly IChatCompletionClient? _chatClient;
     private readonly double _rankFusionK;
 
+    private readonly record struct PipelineStageResults(
+        IReadOnlyList<ScoredChunk> Retrieved,
+        IReadOnlyList<ScoredChunk> Packed,
+        IReadOnlyList<DroppedChunk> Dropped,
+        string? RewrittenQuery,
+        IReadOnlyList<string> SearchQueries);
+
     internal ConversationalRagPipeline(
         IReadOnlyList<IRetriever> retrievers,
         IReadOnlyList<IQueryTransformer> queryTransformers,
@@ -70,10 +77,11 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
         var (packed, dropped) = await PackAsync(reranked, options, cancellationToken)
             .ConfigureAwait(false);
 
+        var stages = new PipelineStageResults(retrieved, packed, dropped, rewrittenQuery, searchQueries);
+
         if (_chatClient is null)
         {
-            return BuildRagResult(
-                string.Empty, [], retrieved, packed, dropped, rewrittenQuery, searchQueries);
+            return BuildRagResult(string.Empty, [], stages);
         }
 
         var (answer, citations, errorMessage) = await ChatAsync(query, packed, options, cancellationToken)
@@ -82,12 +90,11 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
         if (answer is null)
         {
             return BuildRagResult(
-                string.Empty, [], retrieved, packed, dropped, rewrittenQuery, searchQueries,
+                string.Empty, [], stages,
                 isSuccess: false, errorMessage: errorMessage ?? "Chat completion failed.");
         }
 
-        return BuildRagResult(
-            answer, citations, retrieved, packed, dropped, rewrittenQuery, searchQueries);
+        return BuildRagResult(answer, citations, stages);
     }
 
     public async IAsyncEnumerable<RagStreamingChunk> AskStreamingAsync(
@@ -111,13 +118,14 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
         var (packed, dropped) = await PackAsync(reranked, options, cancellationToken)
             .ConfigureAwait(false);
 
+        var stages = new PipelineStageResults(retrieved, packed, dropped, rewrittenQuery, searchQueries);
+
         if (_chatClient is null)
         {
             yield return new RagStreamingChunk
             {
                 FinishReason = "stop",
-                FinalResult = BuildRagResult(
-                    string.Empty, [], retrieved, packed, dropped, rewrittenQuery, searchQueries)
+                FinalResult = BuildRagResult(string.Empty, [], stages)
             };
             yield break;
         }
@@ -126,7 +134,7 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
         if (streamingFeature is null)
         {
             yield return await CreateNonStreamingFallbackChunkAsync(
-                query, packed, options, retrieved, dropped, rewrittenQuery, searchQueries, cancellationToken)
+                query, options, stages, cancellationToken)
                 .ConfigureAwait(false);
             yield break;
         }
@@ -161,8 +169,7 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
                 {
                     ContentDelta = chunk.Content,
                     FinishReason = chunk.FinishReason,
-                    FinalResult = BuildRagResult(
-                        finalAnswer, citations, retrieved, packed, dropped, rewrittenQuery, searchQueries)
+                    FinalResult = BuildRagResult(finalAnswer, citations, stages)
                 };
             }
             else
@@ -174,15 +181,11 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
 
     private async Task<RagStreamingChunk> CreateNonStreamingFallbackChunkAsync(
         string query,
-        IReadOnlyList<ScoredChunk> packed,
         RagPipelineOptions options,
-        IReadOnlyList<ScoredChunk> retrieved,
-        IReadOnlyList<DroppedChunk> dropped,
-        string? rewrittenQuery,
-        IReadOnlyList<string> searchQueries,
+        PipelineStageResults stages,
         CancellationToken cancellationToken)
     {
-        var (answer, citations, errorMessage) = await ChatAsync(query, packed, options, cancellationToken)
+        var (answer, citations, errorMessage) = await ChatAsync(query, stages.Packed, options, cancellationToken)
             .ConfigureAwait(false);
 
         return new RagStreamingChunk
@@ -190,8 +193,7 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
             ContentDelta = answer ?? string.Empty,
             FinishReason = "stop",
             FinalResult = BuildRagResult(
-                answer ?? string.Empty, citations,
-                retrieved, packed, dropped, rewrittenQuery, searchQueries,
+                answer ?? string.Empty, citations, stages,
                 isSuccess: answer is not null,
                 errorMessage: answer is null ? (errorMessage ?? "Chat completion failed.") : null)
         };
@@ -200,11 +202,7 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
     private static RagResult BuildRagResult(
         string answer,
         IReadOnlyList<Citation> citations,
-        IReadOnlyList<ScoredChunk> retrieved,
-        IReadOnlyList<ScoredChunk> packed,
-        IReadOnlyList<DroppedChunk> dropped,
-        string? rewrittenQuery,
-        IReadOnlyList<string> searchQueries,
+        PipelineStageResults stages,
         bool isSuccess = true,
         string? errorMessage = null)
     {
@@ -214,11 +212,11 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
             Citations = citations,
             IsSuccess = isSuccess,
             ErrorMessage = errorMessage,
-            RetrievedChunks = retrieved,
-            PackedChunks = packed,
-            DroppedChunks = dropped,
-            RewrittenQuery = rewrittenQuery,
-            ExpandedQueries = searchQueries.Count > 1 ? searchQueries : null
+            RetrievedChunks = stages.Retrieved,
+            PackedChunks = stages.Packed,
+            DroppedChunks = stages.Dropped,
+            RewrittenQuery = stages.RewrittenQuery,
+            ExpandedQueries = stages.SearchQueries.Count > 1 ? stages.SearchQueries : null
         };
     }
 
