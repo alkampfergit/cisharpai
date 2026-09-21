@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Cisharpai.Models;
 using Cisharpai.Rag.Packing;
+using Cisharpai.Rag.Pipeline;
 
 namespace Cisharpai.Testing;
 
@@ -213,4 +214,68 @@ public static class FakeResponses
         {
             GroundingKind = GroundingKind.WebSearch
         };
+
+    /// <summary>
+    /// Creates a successful <see cref="RagResult"/>.
+    /// </summary>
+    public static RagResult RagAnswer(
+        string answer,
+        IReadOnlyList<Citation>? citations = null,
+        IReadOnlyList<ScoredChunk>? retrievedChunks = null,
+        IReadOnlyList<ScoredChunk>? packedChunks = null) =>
+        new()
+        {
+            Answer = answer,
+            Citations = citations ?? [],
+            RetrievedChunks = retrievedChunks ?? [],
+            PackedChunks = packedChunks ?? []
+        };
+
+    /// <summary>
+    /// Creates a <see cref="RagResult"/> error.
+    /// </summary>
+    public static RagResult RagError(string errorMessage) =>
+        RagResult.Error(errorMessage);
+
+    /// <summary>
+    /// Creates streaming chunks for a RAG pipeline response.
+    /// </summary>
+    public static IReadOnlyList<RagStreamingChunk> RagStreamingChunks(params string[] textSegments)
+    {
+        var chunks = new List<RagStreamingChunk>();
+        var fullContent = string.Concat(textSegments);
+
+        for (var i = 0; i < textSegments.Length; i++)
+        {
+            var isLast = i == textSegments.Length - 1;
+            chunks.Add(new RagStreamingChunk
+            {
+                ContentDelta = textSegments[i],
+                FinishReason = isLast ? "stop" : null,
+                FinalResult = isLast
+                    ? new RagResult { Answer = fullContent }
+                    : null
+            });
+        }
+
+        return chunks;
+    }
+
+    /// <summary>
+    /// Creates a pre-configured <see cref="FakeRagPipeline"/> with a default response.
+    /// </summary>
+    public static FakeRagPipeline RagPipeline(RagResult defaultResponse) =>
+        new() { DefaultResponse = defaultResponse };
+
+    /// <summary>
+    /// Creates a pre-configured <see cref="FakeQueryTransformer"/> that returns the input unchanged.
+    /// </summary>
+    public static FakeQueryTransformer QueryTransformer() =>
+        new() { DefaultResponse = null };
+
+    /// <summary>
+    /// Creates a pre-configured <see cref="FakeQueryTransformer"/> with a fixed response.
+    /// </summary>
+    public static FakeQueryTransformer QueryTransformer(IReadOnlyList<string> defaultResponse) =>
+        new() { DefaultResponse = defaultResponse };
 }

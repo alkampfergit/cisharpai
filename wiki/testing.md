@@ -388,6 +388,40 @@ Assert.That(fake.StoreIds, Does.Contain("vs_my_store"));
 Assert.That(fake.GetRetriever("vs_my_store")!.CallCount, Is.EqualTo(1));
 ```
 
+## FakeRagPipeline
+
+`FakeRagPipeline` fakes `IRagPipeline` for testing code that consumes the RAG pipeline.
+
+```csharp
+var fake = new FakeRagPipeline
+{
+    DefaultResponse = FakeResponses.RagAnswer("The answer is 42.")
+};
+
+var result = await fake.AskAsync("What is the answer?");
+Assert.That(result.Answer, Is.EqualTo("The answer is 42."));
+Assert.That(fake.ReceivedQueries[0].Query, Is.EqualTo("What is the answer?"));
+
+// Streaming
+fake.DefaultStreamingResponse = FakeResponses.RagStreamingChunks("The ", "answer.");
+await foreach (var chunk in fake.AskStreamingAsync("test")) { /* ... */ }
+```
+
+## FakeQueryTransformer
+
+`FakeQueryTransformer` fakes `IQueryTransformer` for testing code that uses query transformation.
+
+```csharp
+var fake = new FakeQueryTransformer
+{
+    DefaultResponse = new[] { "transformed query" }
+};
+
+var result = await fake.TransformAsync("original query");
+Assert.That(result[0], Is.EqualTo("transformed query"));
+Assert.That(fake.ReceivedQueries[0], Is.EqualTo("original query"));
+```
+
 ## Feature Opt-Out
 
 Both fake chat and embedding clients register all feature interfaces by default. Use the flags enums to control which features are available -- useful for testing feature-detection code paths.
@@ -701,6 +735,29 @@ public async Task ConversationAgent_HandlesMultipleTurns()
 | `EnqueueResponse(response)` | `void` | Queue a response (FIFO) |
 | `CallCount` | `int` | Number of `RetrieveAsync` calls |
 | `ReceivedQueries` | `IReadOnlyList<(string Query, int TopK)>` | Captured retrieval queries |
+| `Reset()` | `void` | Clears the queue and captured queries |
+
+### FakeRagPipeline
+
+| Member | Type | Description |
+|--------|------|-------------|
+| `DefaultResponse` | `RagResult?` | Fallback for `AskAsync` when the queue is empty |
+| `DefaultStreamingResponse` | `IReadOnlyList<RagStreamingChunk>?` | Fallback for `AskStreamingAsync` |
+| `EnqueueResponse(response)` | `void` | Queue an `AskAsync` response (FIFO) |
+| `EnqueueStreamingResponse(chunks)` | `void` | Queue streaming chunks (FIFO) |
+| `CallCount` | `int` | Total calls across `AskAsync` and `AskStreamingAsync` |
+| `ReceivedQueries` | `IReadOnlyList<(string Query, RagPipelineOptions? Options)>` | Captured `AskAsync` queries |
+| `ReceivedStreamingQueries` | `IReadOnlyList<(string Query, RagPipelineOptions? Options)>` | Captured streaming queries |
+| `Reset()` | `void` | Clears all queues and captured queries |
+
+### FakeQueryTransformer
+
+| Member | Type | Description |
+|--------|------|-------------|
+| `DefaultResponse` | `IReadOnlyList<string>?` | Fallback used when the queue is empty |
+| `EnqueueResponse(response)` | `void` | Queue a response (FIFO) |
+| `CallCount` | `int` | Number of `TransformAsync` calls |
+| `ReceivedQueries` | `IReadOnlyList<string>` | Captured input queries |
 | `Reset()` | `void` | Clears the queue and captured queries |
 
 ### FakeClientFactoryProvider
