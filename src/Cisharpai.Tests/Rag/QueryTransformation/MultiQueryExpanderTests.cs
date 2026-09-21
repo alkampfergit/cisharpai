@@ -100,4 +100,45 @@ public class MultiQueryExpanderTests
 
         Assert.That(fake.ReceivedRequests[0].Temperature, Is.EqualTo(0.7));
     }
+
+    [Test]
+    public async Task TransformAsync_CapsVariantsToRequestedCount()
+    {
+        var fake = new FakeChatCompletionClient();
+        fake.EnqueueResponse(FakeResponses.Chat("v1\nv2\nv3\nv4\nv5"));
+
+        var expander = new MultiQueryExpander(fake, variantCount: 2);
+        var result = await expander.TransformAsync("original");
+
+        Assert.That(result, Has.Count.EqualTo(3));
+        Assert.That(result[0], Is.EqualTo("original"));
+        Assert.That(result[1], Is.EqualTo("v1"));
+        Assert.That(result[2], Is.EqualTo("v2"));
+    }
+
+    [Test]
+    public async Task TransformAsync_OptionsSnapshotted_MutationDoesNotAffect()
+    {
+        var fake = new FakeChatCompletionClient();
+        fake.DefaultResponse = FakeResponses.Chat("v1");
+
+        var options = new QueryTransformerOptions { Temperature = 0.5 };
+        var expander = new MultiQueryExpander(fake, options: options);
+
+        await expander.TransformAsync("test");
+        Assert.That(fake.ReceivedRequests[0].Temperature, Is.EqualTo(0.5));
+    }
+
+    [Test]
+    public async Task TransformAsync_NullTemperatureInOptions_Uses0Point7Default()
+    {
+        var fake = new FakeChatCompletionClient();
+        fake.EnqueueResponse(FakeResponses.Chat("v1"));
+
+        var options = new QueryTransformerOptions { Model = "test-model" };
+        var expander = new MultiQueryExpander(fake, options: options);
+        await expander.TransformAsync("test");
+
+        Assert.That(fake.ReceivedRequests[0].Temperature, Is.EqualTo(0.7));
+    }
 }

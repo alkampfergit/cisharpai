@@ -15,6 +15,8 @@ public sealed class StepBackTransformer : IQueryTransformer
         "information that helps answer the original specific question. Output ONLY the " +
         "step-back question, nothing else.";
 
+    private const double DefaultTemperature = 0.0;
+
     private readonly IChatCompletionClient _client;
     private readonly QueryTransformerOptions _options;
     private readonly string _systemPrompt;
@@ -28,7 +30,7 @@ public sealed class StepBackTransformer : IQueryTransformer
     {
         ArgumentNullException.ThrowIfNull(client);
         _client = client;
-        _options = options ?? new QueryTransformerOptions();
+        _options = (options ?? new QueryTransformerOptions()).Snapshot();
         _systemPrompt = systemPrompt ?? DefaultSystemPrompt;
         _includeOriginal = includeOriginal;
     }
@@ -45,7 +47,7 @@ public sealed class StepBackTransformer : IQueryTransformer
                 new LlmMessage(LlmRole.User, query)
             ],
             Model: _options.Model,
-            Temperature: _options.Temperature);
+            Temperature: _options.Temperature ?? DefaultTemperature);
 
         var response = await _client.GetChatCompletionAsync(request, cancellationToken)
             .ConfigureAwait(false);

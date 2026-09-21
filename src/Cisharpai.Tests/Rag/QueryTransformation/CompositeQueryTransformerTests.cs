@@ -61,7 +61,18 @@ public class CompositeQueryTransformerTests
         var composite = new CompositeQueryTransformer(expander, stepBack);
         var result = await composite.TransformAsync("specific question");
 
-        Assert.That(result.Count, Is.GreaterThanOrEqualTo(2));
+        Assert.That(result, Has.Count.GreaterThanOrEqualTo(2));
+    }
+
+    [Test]
+    public void Constructor_NullElement_Throws()
+    {
+        var client = new FakeChatCompletionClient();
+        client.DefaultResponse = FakeResponses.Chat("x");
+        var rewriter = new QueryRewriter(client);
+
+        Assert.Throws<ArgumentException>(
+            () => new CompositeQueryTransformer(rewriter, null!));
     }
 
     [Test]

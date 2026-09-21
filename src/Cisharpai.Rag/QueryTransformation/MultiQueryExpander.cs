@@ -16,6 +16,8 @@ public sealed class MultiQueryExpander : IQueryTransformer
         "that could retrieve relevant documents independently. Output one query per line, " +
         "no numbering, no bullets, no extra text.";
 
+    private const double DefaultTemperature = 0.7;
+
     private readonly IChatCompletionClient _client;
     private readonly QueryTransformerOptions _options;
     private readonly int _variantCount;
@@ -34,7 +36,7 @@ public sealed class MultiQueryExpander : IQueryTransformer
 
         _client = client;
         _variantCount = variantCount;
-        _options = options ?? new QueryTransformerOptions { Temperature = 0.7 };
+        _options = (options ?? new QueryTransformerOptions()).Snapshot();
         _systemPrompt = systemPrompt ?? string.Format(DefaultSystemPromptTemplate, variantCount);
         _includeOriginal = includeOriginal;
     }
@@ -51,7 +53,7 @@ public sealed class MultiQueryExpander : IQueryTransformer
                 new LlmMessage(LlmRole.User, query)
             ],
             Model: _options.Model,
-            Temperature: _options.Temperature);
+            Temperature: _options.Temperature ?? DefaultTemperature);
 
         var response = await _client.GetChatCompletionAsync(request, cancellationToken)
             .ConfigureAwait(false);
@@ -63,6 +65,7 @@ public sealed class MultiQueryExpander : IQueryTransformer
         var variants = response.Content
             .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Where(line => !string.IsNullOrWhiteSpace(line))
+            .Take(_variantCount)
             .ToList();
 
         var result = new List<string>(_variantCount + 1);
