@@ -778,6 +778,87 @@ if (processed.Value?.Status == "failed")
 
 **Scope boundary:** this client wraps provider-hosted file and store APIs. Local file management, document parsing, and storage abstractions over third-party stores are out of scope.
 
+## Query transformation
+
+Query transformers improve retrieval quality by rewriting or expanding user queries before they reach the retriever. Each implements `IQueryTransformer` — a single method `TransformAsync(string query)` that returns one or more output queries. All transformers take an `IChatCompletionClient` at construction (these are model calls, not rule-based rewrites) and accept optional `QueryTransformerOptions` for model/temperature overrides and a custom system prompt.
+
+### QueryRewriter
+
+Reformulates the query for better retrieval — removes conversational filler, clarifies intent, produces a clean search query. Returns exactly one output.
+
+```csharp
+using Cisharpai.Rag.QueryTransformation;
+
+var rewriter = new QueryRewriter(chatClient);
+IReadOnlyList<string> queries = await rewriter.TransformAsync(
+    "hey so like what are the benefits of rag pipelines?");
+// ["What are the benefits of RAG pipelines?"]
+```
+
+### MultiQueryExpander
+
+Generates N query variants that approach the topic from different angles. Each is retrieved independently; results fuse through `RankFusion.ReciprocalRank`. By default the original query is included in the output.
+
+```csharp
+var expander = new MultiQueryExpander(chatClient, variantCount: 3);
+IReadOnlyList<string> queries = await expander.TransformAsync("How does RAG work?");
+// ["How does RAG work?", "variant 1", "variant 2", "variant 3"]
+```
+
+Set `includeOriginal: false` to omit the original query from results.
+
+### HydeTransformer
+
+Hypothetical Document Embeddings (HyDE): generates a hypothetical answer, which is embedded instead of the raw question. The hypothesis tends to be closer in embedding space to relevant documents. By default the original query is excluded (embed the hypothesis only).
+
+```csharp
+var hyde = new HydeTransformer(chatClient);
+IReadOnlyList<string> queries = await hyde.TransformAsync("What is chunking?");
+// ["Chunking is the process of splitting documents into smaller segments..."]
+```
+
+Set `hypothesisCount: N` to generate multiple hypotheses. Set `includeOriginal: true` to also embed the raw query.
+
+### StepBackTransformer
+
+Generates a broader, more abstract question to retrieve supporting context the specific query might miss. By default both the original and step-back queries are returned.
+
+```csharp
+var stepBack = new StepBackTransformer(chatClient);
+IReadOnlyList<string> queries = await stepBack.TransformAsync(
+    "Why does BM25 underperform on short queries?");
+// ["Why does BM25 underperform on short queries?",
+//  "What are the key principles of information retrieval?"]
+```
+
+### Composing transformers
+
+Chain transformers with `CompositeQueryTransformer`. Each stage receives every query from the previous stage; outputs are flattened and deduplicated.
+
+```csharp
+var pipeline = new CompositeQueryTransformer(
+    new QueryRewriter(chatClient),
+    new MultiQueryExpander(chatClient, variantCount: 3));
+
+IReadOnlyList<string> queries = await pipeline.TransformAsync("messy user input");
+// Rewritten query + 3 variants of the rewritten query
+```
+
+### Testing
+
+All transformers use `IChatCompletionClient`, so test with `FakeChatCompletionClient`:
+
+```csharp
+var fake = new FakeChatCompletionClient();
+fake.EnqueueResponse(FakeResponses.Chat("clean query"));
+
+var rewriter = new QueryRewriter(fake);
+var result = await rewriter.TransformAsync("messy input");
+
+Assert.That(result[0], Is.EqualTo("clean query"));
+Assert.That(fake.ReceivedRequests, Has.Count.EqualTo(1));
+```
+
 ## Offline tests
 
 Reuse `FakeEmbeddingClient` with one vector per submitted chunk, `FakeTokenCounter` for token counting (including with `ContextPacker`), `FakeRetriever` for retrieval, and `FakeHostedRetrievalFeature` for hosted retrieval. See [Testing](testing.md#rag-ingestion-tests) for a complete example and test commands.
