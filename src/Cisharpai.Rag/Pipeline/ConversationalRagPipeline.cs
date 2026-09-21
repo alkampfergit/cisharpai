@@ -56,11 +56,12 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
         options ??= new RagPipelineOptions();
+        options.Validate();
 
         var (searchQueries, rewrittenQuery) = await TransformQueryAsync(query, options, cancellationToken)
             .ConfigureAwait(false);
 
-        var retrieved = await RetrieveAsync(searchQueries, options.TopK, cancellationToken)
+        var retrieved = await RetrieveAsync(searchQueries, options, cancellationToken)
             .ConfigureAwait(false);
 
         var reranked = await RerankAsync(retrieved, searchQueries[0], options, cancellationToken)
@@ -82,12 +83,12 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
             };
         }
 
-        var (answer, citations) = await ChatAsync(query, packed, options, cancellationToken)
+        var (answer, citations, errorMessage) = await ChatAsync(query, packed, options, cancellationToken)
             .ConfigureAwait(false);
 
         if (answer is null)
         {
-            return RagResult.Error("Chat completion failed.") with
+            return RagResult.Error(errorMessage ?? "Chat completion failed.") with
             {
                 RetrievedChunks = retrieved,
                 PackedChunks = packed,
@@ -116,11 +117,12 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
         options ??= new RagPipelineOptions();
+        options.Validate();
 
         var (searchQueries, rewrittenQuery) = await TransformQueryAsync(query, options, cancellationToken)
             .ConfigureAwait(false);
 
-        var retrieved = await RetrieveAsync(searchQueries, options.TopK, cancellationToken)
+        var retrieved = await RetrieveAsync(searchQueries, options, cancellationToken)
             .ConfigureAwait(false);
 
         var reranked = await RerankAsync(retrieved, searchQueries[0], options, cancellationToken)
@@ -150,7 +152,7 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
         var streamingFeature = _chatClient.Features.Get<IStreamingChatFeature>();
         if (streamingFeature is null)
         {
-            var (answer, citations) = await ChatAsync(query, packed, options, cancellationToken)
+            var (answer, citations, errorMessage) = await ChatAsync(query, packed, options, cancellationToken)
                 .ConfigureAwait(false);
 
             yield return new RagStreamingChunk
@@ -162,7 +164,7 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
                     Answer = answer ?? string.Empty,
                     Citations = citations,
                     IsSuccess = answer is not null,
-                    ErrorMessage = answer is null ? "Chat completion failed." : null,
+                    ErrorMessage = answer is null ? (errorMessage ?? "Chat completion failed.") : null,
                     RetrievedChunks = retrieved,
                     PackedChunks = packed,
                     DroppedChunks = dropped,
@@ -173,23 +175,40 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
             yield break;
         }
 
-        var streamRequest = BuildChatRequest(query, packed, options);
+        var usesFallbackMarkers = packed.Count > 0
+                                  && _chatClient.Features.Get<IGroundedChatFeature>() is null;
+        var documents = usesFallbackMarkers ? ChunksToDocuments(packed) : [];
+        var streamRequest = BuildStreamingChatRequest(query, packed, options);
         var fullContent = new StringBuilder();
 
         await foreach (var chunk in streamingFeature.GetChatCompletionStreamAsync(streamRequest, cancellationToken)
                            .ConfigureAwait(false))
         {
+            if (string.IsNullOrEmpty(chunk.Content) && chunk.FinishReason is null)
+                continue;
+
             fullContent.Append(chunk.Content);
 
             if (chunk.FinishReason is not null)
             {
+                var rawAnswer = fullContent.ToString();
+                string finalAnswer;
+                IReadOnlyList<Citation> citations;
+
+                if (usesFallbackMarkers)
+                    (finalAnswer, citations) = GroundedChatFallbackHelper
+                        .ParseAndStripMarkers(rawAnswer, documents);
+                else
+                    (finalAnswer, citations) = (rawAnswer, []);
+
                 yield return new RagStreamingChunk
                 {
                     ContentDelta = chunk.Content,
                     FinishReason = chunk.FinishReason,
                     FinalResult = new RagResult
                     {
-                        Answer = fullContent.ToString(),
+                        Answer = finalAnswer,
+                        Citations = citations,
                         RetrievedChunks = retrieved,
                         PackedChunks = packed,
                         DroppedChunks = dropped,
@@ -233,7 +252,10 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
             {
                 var results = await transformer.TransformAsync(q, cancellationToken)
                     .ConfigureAwait(false);
-                expanded.AddRange(results);
+                if (results.Count > 0)
+                    expanded.AddRange(results);
+                else
+                    expanded.Add(q);
             }
             queries = expanded.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         }
@@ -243,11 +265,11 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
 
     private async Task<IReadOnlyList<ScoredChunk>> RetrieveAsync(
         IReadOnlyList<string> searchQueries,
-        int topK,
+        RagPipelineOptions options,
         CancellationToken cancellationToken)
     {
         if (_retrievers.Count == 0)
-            return [];
+            return options.PrePackedChunks ?? [];
 
         var allLists = new List<IReadOnlyList<ScoredChunk>>();
 
@@ -255,7 +277,7 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
         {
             foreach (var retriever in _retrievers)
             {
-                var results = await retriever.RetrieveAsync(searchQuery, topK, cancellationToken)
+                var results = await retriever.RetrieveAsync(searchQuery, options.TopK, cancellationToken)
                     .ConfigureAwait(false);
                 allLists.Add(results);
             }
@@ -309,7 +331,7 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
         return (result.Selected, result.Dropped);
     }
 
-    private async Task<(string? Answer, IReadOnlyList<Citation> Citations)> ChatAsync(
+    private async Task<(string? Answer, IReadOnlyList<Citation> Citations, string? ErrorMessage)> ChatAsync(
         string query,
         IReadOnlyList<ScoredChunk> packedChunks,
         RagPipelineOptions options,
@@ -320,7 +342,7 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
 
         if (groundedFeature is not null && documents.Count > 0)
         {
-            var request = BuildChatRequest(query, packedChunks, options);
+            var request = BuildPlainChatRequest(query, options);
             var groundedOptions = new GroundedChatOptions(documents, options.CitationMode);
 
             var response = await groundedFeature
@@ -328,8 +350,8 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
                 .ConfigureAwait(false);
 
             return response.IsSuccess
-                ? (response.Content, response.Citations)
-                : (null, []);
+                ? (response.Content, response.Citations, null)
+                : (null, [], response.ErrorMessage);
         }
 
         if (documents.Count > 0)
@@ -344,35 +366,65 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
                 .ConfigureAwait(false);
 
             if (!response.IsSuccess)
-                return (null, []);
+                return (null, [], response.ErrorMessage);
 
             var (cleanContent, citations) = GroundedChatFallbackHelper
                 .ParseAndStripMarkers(response.Content, documents);
 
-            return (cleanContent, citations);
+            return (cleanContent, citations, null);
         }
 
         {
-            var request = BuildChatRequest(query, packedChunks, options);
+            var request = BuildPlainChatRequest(query, options);
             var response = await _chatClient.GetChatCompletionAsync(request, cancellationToken)
                 .ConfigureAwait(false);
 
             return response.IsSuccess
-                ? (response.Content, [])
-                : (null, []);
+                ? (response.Content, [], null)
+                : (null, [], response.ErrorMessage);
         }
     }
 
-    private ChatCompletionRequest BuildChatRequest(
+    private ChatCompletionRequest BuildPlainChatRequest(
+        string query,
+        RagPipelineOptions options)
+    {
+        var messages = BuildPlainMessages(query, options);
+        return new ChatCompletionRequest(
+            Messages: messages,
+            Model: options.Model,
+            Temperature: options.Temperature);
+    }
+
+    private ChatCompletionRequest BuildStreamingChatRequest(
         string query,
         IReadOnlyList<ScoredChunk> packedChunks,
         RagPipelineOptions options)
     {
+        var hasGroundedChat = _chatClient!.Features.Get<IGroundedChatFeature>() is not null;
+
+        if (hasGroundedChat || packedChunks.Count == 0)
+            return BuildPlainChatRequest(query, options);
+
         var messages = BuildMessagesWithContext(query, packedChunks, options);
         return new ChatCompletionRequest(
             Messages: messages,
             Model: options.Model,
             Temperature: options.Temperature);
+    }
+
+    private IReadOnlyList<LlmMessage> BuildPlainMessages(
+        string query,
+        RagPipelineOptions options)
+    {
+        var messages = new List<LlmMessage>();
+        messages.Add(new LlmMessage(LlmRole.System, options.SystemPrompt ?? DefaultSystemPrompt));
+
+        if (options.ConversationHistory is { Count: > 0 })
+            messages.AddRange(options.ConversationHistory);
+
+        messages.Add(new LlmMessage(LlmRole.User, query));
+        return messages;
     }
 
     private IReadOnlyList<LlmMessage> BuildMessagesWithContext(
@@ -410,9 +462,18 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
     private static IReadOnlyList<DocumentChunk> ChunksToDocuments(IReadOnlyList<ScoredChunk> chunks)
     {
         return chunks
-            .Select(c => new DocumentChunk(
-                Id: $"{c.Chunk.DocumentId}_{c.Chunk.Index}",
-                Text: c.Chunk.Text))
+            .Select(c =>
+            {
+                var id = $"{c.Chunk.DocumentId}_{c.Chunk.Index}";
+                var source = c.Chunk.Metadata.TryGetValue("source", out var src) && src is string s
+                    ? s
+                    : c.Chunk.DocumentId;
+                var title = c.Chunk.Metadata.TryGetValue("title", out var t) && t is string ts
+                    ? ts
+                    : null;
+
+                return new DocumentChunk(Id: id, Text: c.Chunk.Text) { Source = source, Title = title };
+            })
             .ToList();
     }
 }

@@ -268,10 +268,9 @@ public static class FakeResponses
         new() { DefaultResponse = defaultResponse };
 
     /// <summary>
-    /// Creates a pre-configured <see cref="FakeQueryTransformer"/> that returns the input unchanged.
+    /// Creates a <see cref="FakeQueryTransformer"/> that passes the input query through unchanged.
     /// </summary>
-    public static FakeQueryTransformer QueryTransformer() =>
-        new() { DefaultResponse = null };
+    public static FakeQueryTransformer QueryTransformer() => new();
 
     /// <summary>
     /// Creates a pre-configured <see cref="FakeQueryTransformer"/> with a fixed response.

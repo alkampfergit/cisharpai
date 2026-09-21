@@ -102,4 +102,69 @@ public class RagPipelineStreamingTests
             await foreach (var _ in pipeline.AskStreamingAsync(null!)) { }
         });
     }
+
+    [Test]
+    public async Task AskStreamingAsync_FallbackMarkers_ParsedInFinalResult()
+    {
+        var retriever = new FakeRetriever { DefaultResponse = SampleChunks() };
+        var chatClient = new FakeChatCompletionClient(FakeChatFeatures.Streaming);
+        chatClient.DefaultStreamingResponse =
+            FakeResponses.StreamingChunks("«cite:0»The capital ", "is Paris.«/cite»");
+
+        var pipeline = new RagPipelineBuilder()
+            .WithRetriever(retriever)
+            .WithChatClient(chatClient)
+            .Build();
+
+        var chunks = new List<RagStreamingChunk>();
+        await foreach (var chunk in pipeline.AskStreamingAsync("test"))
+            chunks.Add(chunk);
+
+        var final = chunks.Last().FinalResult;
+        Assert.That(final, Is.Not.Null);
+        Assert.That(final!.Answer, Is.EqualTo("The capital is Paris."));
+        Assert.That(final.Citations, Has.Count.EqualTo(1));
+    }
+
+    [Test]
+    public async Task AskStreamingAsync_EmptyTrailingEvent_IsSkipped()
+    {
+        var retriever = new FakeRetriever { DefaultResponse = SampleChunks() };
+        var emptyThenFinish = new List<ChatCompletionChunk>
+        {
+            new("Hello", null, "fake-model"),
+            new(string.Empty, null, "fake-model"),
+            new(" world", "stop", "fake-model")
+        };
+        var chatClient = new FakeChatCompletionClient();
+        chatClient.DefaultStreamingResponse = emptyThenFinish;
+
+        var pipeline = new RagPipelineBuilder()
+            .WithRetriever(retriever)
+            .WithChatClient(chatClient)
+            .Build();
+
+        var chunks = new List<RagStreamingChunk>();
+        await foreach (var chunk in pipeline.AskStreamingAsync("test"))
+            chunks.Add(chunk);
+
+        Assert.That(chunks, Has.Count.EqualTo(2));
+        Assert.That(chunks[0].ContentDelta, Is.EqualTo("Hello"));
+        Assert.That(chunks[1].ContentDelta, Is.EqualTo(" world"));
+        Assert.That(chunks[1].FinalResult!.Answer, Is.EqualTo("Hello world"));
+    }
+
+    [Test]
+    public void AskStreamingAsync_ZeroTopK_ThrowsArgumentOutOfRange()
+    {
+        var pipeline = new RagPipelineBuilder()
+            .WithRetriever(FakeResponses.Retriever())
+            .Build();
+
+        Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () =>
+        {
+            await foreach (var _ in pipeline.AskStreamingAsync("test",
+                new RagPipelineOptions { TopK = 0 })) { }
+        });
+    }
 }

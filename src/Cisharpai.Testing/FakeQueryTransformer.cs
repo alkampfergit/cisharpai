@@ -42,8 +42,6 @@ public sealed class FakeQueryTransformer : IQueryTransformer
         if (DefaultResponse is not null)
             return Task.FromResult(DefaultResponse);
 
-        throw new InvalidOperationException(
-            $"No queued response and no default configured for {nameof(FakeQueryTransformer)}. " +
-            "Enqueue a response or set a default before calling the transformer.");
+        return Task.FromResult<IReadOnlyList<string>>([query]);
     }
 }

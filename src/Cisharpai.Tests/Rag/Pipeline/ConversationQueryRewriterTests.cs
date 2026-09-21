@@ -116,4 +116,28 @@ public class ConversationQueryRewriterTests
 
         Assert.That(result, Is.EqualTo("clean query"));
     }
+
+    [Test]
+    public async Task RewriteAsync_PreservesSystemAndToolRoles()
+    {
+        var fake = new FakeChatCompletionClient();
+        fake.EnqueueResponse(FakeResponses.Chat("rewritten"));
+
+        var rewriter = new ConversationQueryRewriter(fake);
+        var history = new List<LlmMessage>
+        {
+            new(LlmRole.System, "system instruction"),
+            new(LlmRole.User, "user question"),
+            new(LlmRole.Tool, "tool result"),
+            new(LlmRole.Assistant, "assistant answer")
+        };
+
+        await rewriter.RewriteAsync("follow up", history);
+
+        var userMsg = fake.ReceivedRequests[0].Messages[1].Content;
+        Assert.That(userMsg, Does.Contain("System: system instruction"));
+        Assert.That(userMsg, Does.Contain("Tool: tool result"));
+        Assert.That(userMsg, Does.Contain("User: user question"));
+        Assert.That(userMsg, Does.Contain("Assistant: assistant answer"));
+    }
 }

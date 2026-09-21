@@ -232,7 +232,7 @@ public class ConversationalRagPipelineTests
     }
 
     [Test]
-    public async Task AskAsync_ChatError_ReturnsErrorResult()
+    public async Task AskAsync_ChatError_ReturnsErrorResultWithProviderMessage()
     {
         var retriever = new FakeRetriever { DefaultResponse = SampleChunks() };
         var chatClient = new FakeChatCompletionClient();
@@ -247,6 +247,7 @@ public class ConversationalRagPipelineTests
             new RagPipelineOptions { PackingOptions = new ContextPackingOptions { TokenBudget = 4096 } });
 
         Assert.That(result.IsSuccess, Is.False);
+        Assert.That(result.ErrorMessage, Is.EqualTo("model overloaded"));
         Assert.That(result.RetrievedChunks, Has.Count.EqualTo(3));
     }
 
@@ -413,5 +414,109 @@ public class ConversationalRagPipelineTests
         Assert.That(result.IsSuccess, Is.True);
         Assert.That(result.Answer, Is.EqualTo("I don't have context."));
         Assert.That(result.RetrievedChunks, Is.Empty);
+    }
+
+    [Test]
+    public void AskAsync_ZeroTopK_ThrowsArgumentOutOfRange()
+    {
+        var pipeline = new RagPipelineBuilder()
+            .WithRetriever(FakeResponses.Retriever())
+            .Build();
+
+        Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            pipeline.AskAsync("test", new RagPipelineOptions { TopK = 0 }));
+    }
+
+    [Test]
+    public void AskAsync_NegativeRerankerTopN_ThrowsArgumentOutOfRange()
+    {
+        var pipeline = new RagPipelineBuilder()
+            .WithRetriever(FakeResponses.Retriever())
+            .Build();
+
+        Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            pipeline.AskAsync("test", new RagPipelineOptions { RerankerTopN = -1 }));
+    }
+
+    [Test]
+    public async Task AskAsync_TransformerReturnsEmpty_PreservesOriginalQuery()
+    {
+        var transformer = new FakeQueryTransformer();
+        transformer.EnqueueResponse([]);
+        var retriever = new FakeRetriever { DefaultResponse = SampleChunks() };
+
+        var pipeline = new RagPipelineBuilder()
+            .WithQueryTransformer(transformer)
+            .WithRetriever(retriever)
+            .Build();
+
+        await pipeline.AskAsync("my query");
+
+        Assert.That(retriever.ReceivedQueries[0].Query, Is.EqualTo("my query"));
+    }
+
+    [Test]
+    public async Task AskAsync_NativeGroundedChat_DoesNotDuplicateContextInPrompt()
+    {
+        var retriever = new FakeRetriever { DefaultResponse = SampleChunks() };
+        var chatClient = new FakeChatCompletionClient();
+        chatClient.DefaultGroundedChatResponse = FakeResponses.GroundedChat("answer");
+
+        var pipeline = new RagPipelineBuilder()
+            .WithRetriever(retriever)
+            .WithChatClient(chatClient)
+            .Build();
+
+        await pipeline.AskAsync("test",
+            new RagPipelineOptions { PackingOptions = new ContextPackingOptions { TokenBudget = 4096 } });
+
+        var (request, _) = chatClient.ReceivedGroundedChatRequests[0];
+        var systemMsg = request.Messages[0].Content;
+        Assert.That(systemMsg, Does.Not.Contain("REFERENCE DOCUMENTS"));
+    }
+
+    [Test]
+    public async Task AskAsync_PrePackedChunks_UsedWhenNoRetriever()
+    {
+        var chatClient = new FakeChatCompletionClient(FakeChatFeatures.Streaming);
+        chatClient.DefaultResponse = FakeResponses.Chat(
+            "«cite:0»The capital is Paris.«/cite»");
+
+        var prePackedChunks = SampleChunks();
+        var pipeline = new RagPipelineBuilder()
+            .WithChatClient(chatClient)
+            .Build();
+
+        var result = await pipeline.AskAsync("What is the capital?",
+            new RagPipelineOptions { PrePackedChunks = prePackedChunks });
+
+        Assert.That(result.IsSuccess, Is.True);
+        Assert.That(result.Answer, Is.EqualTo("The capital is Paris."));
+        Assert.That(result.Citations, Has.Count.EqualTo(1));
+        Assert.That(result.PackedChunks, Has.Count.EqualTo(3));
+    }
+
+    [Test]
+    public async Task AskAsync_DocumentChunks_IncludeSourceFromMetadata()
+    {
+        var chunkWithSource = new TextChunk("doc1", 0, 0, 10, "chunk text",
+            new Dictionary<string, object?> { ["source"] = "https://example.com/doc1", ["title"] = "Doc One" });
+        var retriever = new FakeRetriever
+        {
+            DefaultResponse = [new ScoredChunk(chunkWithSource, 0.9)]
+        };
+
+        var chatClient = new FakeChatCompletionClient(FakeChatFeatures.Streaming);
+        chatClient.DefaultResponse = FakeResponses.Chat("«cite:0»chunk text«/cite»");
+
+        var pipeline = new RagPipelineBuilder()
+            .WithRetriever(retriever)
+            .WithChatClient(chatClient)
+            .Build();
+
+        var result = await pipeline.AskAsync("test");
+
+        Assert.That(result.IsSuccess, Is.True);
+        Assert.That(result.Citations, Has.Count.EqualTo(1));
     }
 }
