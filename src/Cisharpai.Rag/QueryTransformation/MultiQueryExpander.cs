@@ -1,5 +1,3 @@
-using Cisharpai.Models;
-
 namespace Cisharpai.Rag.QueryTransformation;
 
 /// <summary>
@@ -7,7 +5,7 @@ namespace Cisharpai.Rag.QueryTransformation;
 /// and results are fused (e.g. via <see cref="RankFusion.ReciprocalRank"/>). Returns the
 /// original query plus the generated variants.
 /// </summary>
-public sealed class MultiQueryExpander : IQueryTransformer
+public sealed class MultiQueryExpander : QueryTransformerBase
 {
     private const string DefaultSystemPromptTemplate =
         "You are a search query expansion assistant. Given a user question, generate " +
@@ -16,13 +14,10 @@ public sealed class MultiQueryExpander : IQueryTransformer
         "that could retrieve relevant documents independently. Output one query per line, " +
         "no numbering, no bullets, no extra text.";
 
-    private const double DefaultTemperature = 0.7;
-
-    private readonly IChatCompletionClient _client;
-    private readonly QueryTransformerOptions _options;
     private readonly int _variantCount;
-    private readonly string _systemPrompt;
     private readonly bool _includeOriginal;
+
+    protected override double DefaultTemperature => 0.7;
 
     public MultiQueryExpander(
         IChatCompletionClient client,
@@ -30,39 +25,23 @@ public sealed class MultiQueryExpander : IQueryTransformer
         QueryTransformerOptions? options = null,
         string? systemPrompt = null,
         bool includeOriginal = true)
+        : base(client, options, systemPrompt, string.Format(DefaultSystemPromptTemplate, variantCount))
     {
-        ArgumentNullException.ThrowIfNull(client);
         ArgumentOutOfRangeException.ThrowIfLessThan(variantCount, 1);
-
-        _client = client;
         _variantCount = variantCount;
-        _options = (options ?? new QueryTransformerOptions()).Snapshot();
-        _systemPrompt = systemPrompt ?? string.Format(DefaultSystemPromptTemplate, variantCount);
         _includeOriginal = includeOriginal;
     }
 
-    public async Task<IReadOnlyList<string>> TransformAsync(
+    public override async Task<IReadOnlyList<string>> TransformAsync(
         string query,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(query);
 
-        var request = new ChatCompletionRequest(
-            Messages: [
-                new LlmMessage(LlmRole.System, _systemPrompt),
-                new LlmMessage(LlmRole.User, query)
-            ],
-            Model: _options.Model,
-            Temperature: _options.Temperature ?? DefaultTemperature);
-
-        var response = await _client.GetChatCompletionAsync(request, cancellationToken)
+        var content = await CallLlmAsync(query, "Multi-query expansion failed", cancellationToken)
             .ConfigureAwait(false);
 
-        if (!response.IsSuccess)
-            throw new InvalidOperationException(
-                $"Multi-query expansion failed: {response.ErrorMessage}");
-
-        var variants = response.Content
+        var variants = content
             .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .Where(line => !string.IsNullOrWhiteSpace(line))
             .Take(_variantCount)

@@ -1,5 +1,3 @@
-using Cisharpai.Models;
-
 namespace Cisharpai.Rag.QueryTransformation;
 
 /// <summary>
@@ -8,7 +6,7 @@ namespace Cisharpai.Rag.QueryTransformation;
 /// tends to be closer in embedding space to real relevant documents than the raw question.
 /// Returns one or more hypothetical documents; the caller should embed these for retrieval.
 /// </summary>
-public sealed class HydeTransformer : IQueryTransformer
+public sealed class HydeTransformer : QueryTransformerBase
 {
     private const string DefaultSystemPrompt =
         "You are a helpful assistant. Given a question, write a short passage that " +
@@ -17,13 +15,10 @@ public sealed class HydeTransformer : IQueryTransformer
         "on the topic. Do not include any preamble or meta-commentary — output only the " +
         "passage text.";
 
-    private const double DefaultTemperature = 0.7;
-
-    private readonly IChatCompletionClient _client;
-    private readonly QueryTransformerOptions _options;
-    private readonly string _systemPrompt;
     private readonly int _hypothesisCount;
     private readonly bool _includeOriginal;
+
+    protected override double DefaultTemperature => 0.7;
 
     public HydeTransformer(
         IChatCompletionClient client,
@@ -31,18 +26,14 @@ public sealed class HydeTransformer : IQueryTransformer
         QueryTransformerOptions? options = null,
         string? systemPrompt = null,
         bool includeOriginal = false)
+        : base(client, options, systemPrompt, DefaultSystemPrompt)
     {
-        ArgumentNullException.ThrowIfNull(client);
         ArgumentOutOfRangeException.ThrowIfLessThan(hypothesisCount, 1);
-
-        _client = client;
         _hypothesisCount = hypothesisCount;
-        _options = (options ?? new QueryTransformerOptions()).Snapshot();
-        _systemPrompt = systemPrompt ?? DefaultSystemPrompt;
         _includeOriginal = includeOriginal;
     }
 
-    public async Task<IReadOnlyList<string>> TransformAsync(
+    public override async Task<IReadOnlyList<string>> TransformAsync(
         string query,
         CancellationToken cancellationToken = default)
     {
@@ -54,22 +45,9 @@ public sealed class HydeTransformer : IQueryTransformer
 
         for (var i = 0; i < _hypothesisCount; i++)
         {
-            var request = new ChatCompletionRequest(
-                Messages: [
-                    new LlmMessage(LlmRole.System, _systemPrompt),
-                    new LlmMessage(LlmRole.User, query)
-                ],
-                Model: _options.Model,
-                Temperature: _options.Temperature ?? DefaultTemperature);
-
-            var response = await _client.GetChatCompletionAsync(request, cancellationToken)
+            var hypothesis = await CallLlmAsync(query, "HyDE generation failed", cancellationToken)
                 .ConfigureAwait(false);
 
-            if (!response.IsSuccess)
-                throw new InvalidOperationException(
-                    $"HyDE generation failed: {response.ErrorMessage}");
-
-            var hypothesis = response.Content.Trim();
             if (!string.IsNullOrWhiteSpace(hypothesis))
                 result.Add(hypothesis);
         }
