@@ -18,10 +18,11 @@ public static class RankingMetrics
         if (retrievedIds.Count == 0 || relevantIds.Count == 0)
             return 0.0;
 
+        var seen = new HashSet<string>();
         var dcg = 0.0;
         for (var i = 0; i < retrievedIds.Count; i++)
         {
-            if (relevantIds.Contains(retrievedIds[i]))
+            if (relevantIds.Contains(retrievedIds[i]) && seen.Add(retrievedIds[i]))
                 dcg += 1.0 / Math.Log2(i + 2);
         }
 
@@ -80,10 +81,11 @@ public static class RankingMetrics
             return 0.0;
 
         var limit = Math.Min(k, retrievedIds.Count);
+        var seen = new HashSet<string>();
         var found = 0;
         for (var i = 0; i < limit; i++)
         {
-            if (relevantIds.Contains(retrievedIds[i]))
+            if (relevantIds.Contains(retrievedIds[i]) && seen.Add(retrievedIds[i]))
                 found++;
         }
 

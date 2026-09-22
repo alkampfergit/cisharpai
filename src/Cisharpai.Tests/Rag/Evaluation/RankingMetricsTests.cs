@@ -17,7 +17,7 @@ public class RankingMetricsTests
     }
 
     [Test]
-    public void Ndcg_ReversedRanking_LessThanOne()
+    public void Ndcg_AllRelevantReversed_ReturnsOne()
     {
         var retrieved = new[] { "c", "b", "a" };
         var relevant = new HashSet<string> { "a", "b", "c" };
@@ -66,6 +66,17 @@ public class RankingMetricsTests
         Assert.That(
             RankingMetrics.Ndcg(topRanked, relevant),
             Is.GreaterThan(RankingMetrics.Ndcg(bottomRanked, relevant)));
+    }
+
+    [Test]
+    public void Ndcg_DuplicateRetrievedIds_CountsEachRelevantOnce()
+    {
+        var retrieved = new[] { "a", "a" };
+        var relevant = new HashSet<string> { "a" };
+
+        var score = RankingMetrics.Ndcg(retrieved, relevant);
+        Assert.That(score, Is.LessThanOrEqualTo(1.0),
+            "Duplicate retrieved IDs must not inflate nDCG above 1.0");
     }
 
     [Test]
@@ -269,5 +280,15 @@ public class RankingMetricsTests
         var relevant = new HashSet<string> { "b" };
 
         Assert.That(RankingMetrics.RecallAtK(retrieved, relevant, 1), Is.EqualTo(0.0));
+    }
+
+    [Test]
+    public void RecallAtK_DuplicateRetrievedIds_CountsEachRelevantOnce()
+    {
+        var retrieved = new[] { "a", "a" };
+        var relevant = new HashSet<string> { "a" };
+
+        Assert.That(RankingMetrics.RecallAtK(retrieved, relevant, 2), Is.LessThanOrEqualTo(1.0));
+        Assert.That(RankingMetrics.RecallAtK(retrieved, relevant, 2), Is.EqualTo(1.0));
     }
 }

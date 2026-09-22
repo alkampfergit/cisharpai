@@ -46,9 +46,13 @@ public class JudgeEvaluatorTests
 
         Assert.That(client.ReceivedJsonOutputRequests, Has.Count.EqualTo(1));
         var (request, options) = client.ReceivedJsonOutputRequests[0];
+        Assert.That(request.Messages, Has.Count.EqualTo(2));
+        Assert.That(request.Messages[0].Role, Is.EqualTo(LlmRole.System));
         Assert.That(request.Messages[0].Content, Does.Contain("groundedness"));
-        Assert.That(request.Messages[0].Content, Does.Contain("[1] ctx1"));
-        Assert.That(request.Messages[0].Content, Does.Contain("[2] ctx2"));
+        Assert.That(request.Messages[0].Content, Does.Contain("UNTRUSTED DATA"));
+        Assert.That(request.Messages[1].Role, Is.EqualTo(LlmRole.User));
+        Assert.That(request.Messages[1].Content, Does.Contain("[1] ctx1"));
+        Assert.That(request.Messages[1].Content, Does.Contain("[2] ctx2"));
         Assert.That(options.Mode, Is.EqualTo(JsonOutputMode.JsonSchema));
     }
 
@@ -75,8 +79,8 @@ public class JudgeEvaluatorTests
 
         await evaluator.EvaluateAsync("q", "a", new[] { "ctx" });
 
-        var prompt = client.ReceivedJsonOutputRequests[0].Request.Messages[0].Content;
-        Assert.That(prompt, Does.Contain("relevance"));
+        var systemContent = client.ReceivedJsonOutputRequests[0].Request.Messages[0].Content;
+        Assert.That(systemContent, Does.Contain("relevance"));
     }
 
     // --- Context Precision ---
@@ -101,8 +105,8 @@ public class JudgeEvaluatorTests
 
         await evaluator.EvaluateAsync("q", "a", new[] { "ctx" });
 
-        var prompt = client.ReceivedJsonOutputRequests[0].Request.Messages[0].Content;
-        Assert.That(prompt, Does.Contain("precision"));
+        var systemContent = client.ReceivedJsonOutputRequests[0].Request.Messages[0].Content;
+        Assert.That(systemContent, Does.Contain("precision"));
     }
 
     // --- Context Recall ---
@@ -127,8 +131,8 @@ public class JudgeEvaluatorTests
 
         await evaluator.EvaluateAsync("q", "a", new[] { "ctx" });
 
-        var prompt = client.ReceivedJsonOutputRequests[0].Request.Messages[0].Content;
-        Assert.That(prompt, Does.Contain("recall"));
+        var systemContent = client.ReceivedJsonOutputRequests[0].Request.Messages[0].Content;
+        Assert.That(systemContent, Does.Contain("recall"));
     }
 
     // --- Shared behavior ---
@@ -177,16 +181,29 @@ public class JudgeEvaluatorTests
     }
 
     [Test]
-    public async Task Evaluator_ScoreClamped_WhenModelReturnsBoundaryValue()
+    public async Task Evaluator_ScoreClamped_WhenModelReturnsOutOfRange()
     {
         var client = new FakeChatCompletionClient();
         client.EnqueueJsonOutputResponse(new ChatCompletionResponse(
-            Content: "{\"score\": 1.0, \"rationale\": \"perfect\"}",
+            Content: "{\"score\": 1.5, \"rationale\": \"overconfident\"}",
             Model: "test", PromptTokens: 1, CompletionTokens: 1));
         var evaluator = new GroundednessEvaluator(client);
 
         var result = await evaluator.EvaluateAsync("q", "a", new[] { "ctx" });
         Assert.That(result.Score, Is.EqualTo(1.0));
+    }
+
+    [Test]
+    public async Task Evaluator_ScoreClamped_WhenModelReturnsNegative()
+    {
+        var client = new FakeChatCompletionClient();
+        client.EnqueueJsonOutputResponse(new ChatCompletionResponse(
+            Content: "{\"score\": -0.3, \"rationale\": \"underconfident\"}",
+            Model: "test", PromptTokens: 1, CompletionTokens: 1));
+        var evaluator = new GroundednessEvaluator(client);
+
+        var result = await evaluator.EvaluateAsync("q", "a", new[] { "ctx" });
+        Assert.That(result.Score, Is.EqualTo(0.0));
     }
 
     [Test]
