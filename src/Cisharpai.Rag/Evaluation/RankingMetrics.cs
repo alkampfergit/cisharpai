@@ -18,7 +18,7 @@ public static class RankingMetrics
         if (retrievedIds.Count == 0 || relevantIds.Count == 0)
             return 0.0;
 
-        var seen = new HashSet<string>();
+        var seen = new HashSet<string>(GetComparer(relevantIds));
         var dcg = 0.0;
         for (var i = 0; i < retrievedIds.Count; i++)
         {
@@ -81,7 +81,7 @@ public static class RankingMetrics
             return 0.0;
 
         var limit = Math.Min(k, retrievedIds.Count);
-        var seen = new HashSet<string>();
+        var seen = new HashSet<string>(GetComparer(relevantIds));
         var found = 0;
         for (var i = 0; i < limit; i++)
         {
@@ -98,4 +98,7 @@ public static class RankingMetrics
         ArgumentNullException.ThrowIfNull(relevantIds);
         return RecallAtK(retrievedIds, new HashSet<string>(relevantIds), k);
     }
+
+    private static IEqualityComparer<string> GetComparer(IReadOnlySet<string> set) =>
+        set is HashSet<string> hs ? hs.Comparer : StringComparer.Ordinal;
 }

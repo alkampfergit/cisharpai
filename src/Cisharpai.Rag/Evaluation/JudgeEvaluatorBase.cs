@@ -110,11 +110,15 @@ public abstract class JudgeEvaluatorBase : IRagEvaluator
             Strict: true);
 
         var response = await _jsonOutput.GetChatCompletionWithJsonOutputAsync(
-            request, jsonOptions, cancellationToken);
+            request, jsonOptions, cancellationToken).ConfigureAwait(false);
 
         if (!response.IsSuccess)
             throw new InvalidOperationException(
                 $"Evaluation LLM call failed: {response.ErrorMessage}");
+
+        if (!string.IsNullOrEmpty(response.Refusal))
+            throw new InvalidOperationException(
+                $"Evaluation LLM refused to produce output: {response.Refusal}");
 
         return ParseScore(response.Content);
     }

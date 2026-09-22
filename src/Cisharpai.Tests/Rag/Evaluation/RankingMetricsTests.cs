@@ -80,6 +80,17 @@ public class RankingMetricsTests
     }
 
     [Test]
+    public void Ndcg_CaseInsensitiveRelevantIds_UsesConsistentComparer()
+    {
+        var retrieved = new[] { "A", "a" };
+        var relevant = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "a" };
+
+        var score = RankingMetrics.Ndcg(retrieved, relevant);
+        Assert.That(score, Is.LessThanOrEqualTo(1.0),
+            "Case-insensitive relevant set must not cause double-counting");
+    }
+
+    [Test]
     public void Ndcg_NullRetrieved_Throws()
     {
         Assert.That(
@@ -290,5 +301,15 @@ public class RankingMetricsTests
 
         Assert.That(RankingMetrics.RecallAtK(retrieved, relevant, 2), Is.LessThanOrEqualTo(1.0));
         Assert.That(RankingMetrics.RecallAtK(retrieved, relevant, 2), Is.EqualTo(1.0));
+    }
+
+    [Test]
+    public void RecallAtK_CaseInsensitiveRelevantIds_UsesConsistentComparer()
+    {
+        var retrieved = new[] { "A", "a" };
+        var relevant = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "a" };
+
+        Assert.That(RankingMetrics.RecallAtK(retrieved, relevant, 2), Is.LessThanOrEqualTo(1.0),
+            "Case-insensitive relevant set must not cause double-counting");
     }
 }
