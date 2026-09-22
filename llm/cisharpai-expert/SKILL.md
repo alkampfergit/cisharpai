@@ -376,6 +376,21 @@ Use the separate `Cisharpai.Rag` package for ingestion, retrieval, and context p
 - **Testing**: `FakeRetriever` in `Cisharpai.Testing` — queue/default/capture pattern like the other fakes. `FakeResponses.Retriever()` (empty default) or `FakeResponses.Retriever(scoredChunks)`. DI: `services.AddFakeRetriever()`.
 - **Hosted Retrieval**: `IHostedRetrievalFeature` (in `Cisharpai.Rag`) is a factory that returns an `IRetriever` bound to a specific provider-hosted vector store. Discover via `client.Features.Get<IHostedRetrievalFeature>()?.ForStore(vectorStoreId)`. Currently implemented by OpenAI only (GPT-5 models via Responses API `file_search` tool). The returned `IRetriever` maps `file_search` results to `ScoredChunk` with passage-relative `TextChunk` offsets (`StartOffset=0`, `EndOffset=text.Length`). Failed `file_search_call` items set log warnings and are excluded from results; HTTP/API errors return empty list (no throw). `DefaultModel` must be set on `OpenAiClientOptions`. `OpenAiVectorStoreClient` provides store/file lifecycle management (create, upload, poll-until-processed with bounded timeout/cancellation, list, delete) via `VectorStoreResult<T>` (IsSuccess/Value/ErrorMessage). DI: `services.AddOpenAiVectorStoreClient(o => { ... })`.
 - **Testing Hosted Retrieval**: `FakeHostedRetrievalFeature` in `Cisharpai.Testing` — per-store `FakeRetriever` dictionary. `AddStore(storeId)` registers a store, `ForStore(storeId)` returns its `FakeRetriever`, `GetRetriever(storeId)` accesses the fake for setup (enqueue responses, check captured queries). Unregistered store IDs return an empty-default `FakeRetriever` (no throw).
+- **Evaluation** (`.Evaluation`): LLM-as-judge scorers and pure ranking metrics for measuring RAG quality.
+  - `IRagEvaluator` — contract: `EvaluateAsync(question, answer, contexts, ct)` returns `Task<EvaluationScore>`. Provider-agnostic — any `IChatCompletionClient` with `IJsonOutputFeature`.
+  - `EvaluationScore(double Score, string Rationale)` — immutable record, `Score` in `[0, 1]`, validated.
+  - Four built-in evaluators (all extend `JudgeEvaluatorBase`):
+    - `GroundednessEvaluator` — is the answer supported by the context?
+    - `AnswerRelevanceEvaluator` — does the answer address the question?
+    - `ContextPrecisionEvaluator` — are the retrieved chunks relevant to the question?
+    - `ContextRecallEvaluator` — do the chunks cover the information needed to answer?
+  - Evaluators use system/user message separation with untrusted-data guards to mitigate prompt injection from user-provided inputs.
+  - `RankingMetrics` — pure-function static class, no model calls:
+    - `Ndcg(retrievedIds, relevantIds)` — Normalized Discounted Cumulative Gain
+    - `Mrr(retrievedIds, relevantIds)` — Mean Reciprocal Rank
+    - `RecallAtK(retrievedIds, relevantIds, k)` — Recall at k
+  - All ranking metrics accept `IReadOnlySet<string>` or `IReadOnlyList<string>` for `relevantIds`. Duplicate retrieved IDs are deduplicated (each relevant ID credited once).
+  - Test with `FakeChatCompletionClient` — enqueue JSON responses with `EnqueueJsonOutputResponse(...)`.
 
 ## Provider-Specific Guides
 
