@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.Json;
 using Cisharpai.Features;
 using Cisharpai.Features.Chat;
@@ -34,7 +35,30 @@ public abstract class JudgeEvaluatorBase : IRagEvaluator
                 "Use a client that registers IJsonOutputFeature (all built-in providers do).");
     }
 
-    protected abstract string BuildPrompt(string question, string answer, IReadOnlyList<string> contexts);
+    protected abstract string SystemInstruction { get; }
+    protected virtual string ContextHeader => "Context passages";
+    protected virtual string AnswerHeader => "Answer";
+    protected abstract string ScoreInstruction { get; }
+
+    private string BuildPrompt(string question, string answer, IReadOnlyList<string> contexts)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine(SystemInstruction);
+        sb.AppendLine();
+        sb.AppendLine($"## {ContextHeader}");
+        for (var i = 0; i < contexts.Count; i++)
+            sb.AppendLine($"[{i + 1}] {contexts[i]}");
+        sb.AppendLine();
+        sb.AppendLine("## Question");
+        sb.AppendLine(question);
+        sb.AppendLine();
+        sb.AppendLine($"## {AnswerHeader}");
+        sb.AppendLine(answer);
+        sb.AppendLine();
+        sb.AppendLine(ScoreInstruction);
+        sb.AppendLine("Respond with JSON: {\"score\": <number>, \"rationale\": \"<brief explanation>\"}");
+        return sb.ToString();
+    }
 
     public async Task<EvaluationScore> EvaluateAsync(
         string question,
