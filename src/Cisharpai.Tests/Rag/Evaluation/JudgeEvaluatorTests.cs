@@ -181,6 +181,23 @@ public class JudgeEvaluatorTests
     }
 
     [Test]
+    public void Evaluator_LlmRefusal_Throws()
+    {
+        var client = new FakeChatCompletionClient();
+        client.EnqueueJsonOutputResponse(new ChatCompletionResponse(
+            Content: string.Empty,
+            Model: "test",
+            PromptTokens: 10,
+            CompletionTokens: 0,
+            Refusal: "I cannot evaluate this content"));
+        var evaluator = new GroundednessEvaluator(client);
+
+        Assert.That(
+            async () => await evaluator.EvaluateAsync("q", "a", new[] { "ctx" }),
+            Throws.InvalidOperationException.With.Message.Contains("refused"));
+    }
+
+    [Test]
     public async Task Evaluator_ScoreClamped_WhenModelReturnsOutOfRange()
     {
         var client = new FakeChatCompletionClient();
