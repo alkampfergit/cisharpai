@@ -29,7 +29,7 @@ public sealed record RagPipelineOptions
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(TopK);
         if (Retrieval?.TopK is <= 0)
-            throw new ArgumentOutOfRangeException("Retrieval.TopK", Retrieval.TopK, "Retrieval.TopK must be positive when set.");
+            throw new ArgumentOutOfRangeException(nameof(Retrieval), Retrieval.TopK, "Retrieval.TopK must be positive when set.");
 
         if (RerankerTopN is not null)
             ArgumentOutOfRangeException.ThrowIfNegativeOrZero(RerankerTopN.Value);
