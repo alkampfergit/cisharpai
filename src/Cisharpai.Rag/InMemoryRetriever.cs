@@ -108,9 +108,6 @@ public sealed class InMemoryRetriever : IRetriever
             snapshot = _store.ToArray();
         }
 
-        if (snapshot.Length == 0)
-            return Array.Empty<ScoredChunk>();
-
         var embeddingResponse = await _embeddingClient.GetEmbeddingsAsync(
             new EmbeddingRequest([query], _model, InputType: EmbeddingInputType.Query),
             cancellationToken).ConfigureAwait(false);
