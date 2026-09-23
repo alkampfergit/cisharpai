@@ -639,10 +639,12 @@ using Cisharpai.Rag;
 using Cisharpai.Rag.Packing;
 
 IRetriever retriever = /* your implementation */;
-IReadOnlyList<ScoredChunk> results = await retriever.RetrieveAsync("What is the refund policy?", topK: 5);
+IReadOnlyList<ScoredChunk> results = await retriever.RetrieveAsync(
+    "What is the refund policy?",
+    new RetrievalOptions { TopK = 5 });
 ```
 
-The query parameter is a `string`, not a vector — implementations that need embeddings obtain them internally. The return type is the existing `ScoredChunk` record.
+The query parameter is a `string`, not a vector — implementations that need embeddings obtain them internally. The return type is the existing `ScoredChunk` record. `RetrievalOptions.MetadataEquals` provides portable AND-combined equality filters; `ProviderQuery` carries optional provider-specific query extensions. `MinScore` is evaluated against each backend's native score scale, so scores are not directly comparable across different retrievers/providers.
 
 ### InMemoryRetriever (demo/testing)
 
@@ -661,7 +663,9 @@ retriever.AddRange(chunkVectorPairs);
 // Or feed BulkEmbeddingProcessor output directly — ChunkEmbedding is accepted natively
 retriever.AddRange(batchResult.Items);
 
-var results = await retriever.RetrieveAsync("search query", topK: 5);
+var results = await retriever.RetrieveAsync(
+    "search query",
+    new RetrievalOptions { TopK = 5 });
 ```
 
 ### Hybrid retrieval with Reciprocal Rank Fusion
@@ -671,8 +675,8 @@ var results = await retriever.RetrieveAsync("search query", topK: 5);
 ```csharp
 using Cisharpai.Rag;
 
-IReadOnlyList<ScoredChunk> denseResults = await denseRetriever.RetrieveAsync(query, topK: 20);
-IReadOnlyList<ScoredChunk> lexicalResults = await bm25Retriever.RetrieveAsync(query, topK: 20);
+IReadOnlyList<ScoredChunk> denseResults = await denseRetriever.RetrieveAsync(query, new RetrievalOptions { TopK = 20 });
+IReadOnlyList<ScoredChunk> lexicalResults = await bm25Retriever.RetrieveAsync(query, new RetrievalOptions { TopK = 20 });
 
 var fused = RankFusion.ReciprocalRank(new[] { denseResults, lexicalResults });
 // fused is sorted by descending RRF score
@@ -692,10 +696,20 @@ public class Bm25Retriever : IRetriever
     public Bm25Retriever(ISearchEngine engine) => _engine = engine;
 
     public async Task<IReadOnlyList<ScoredChunk>> RetrieveAsync(
-        string query, int topK, CancellationToken cancellationToken = default)
+        string query, RetrievalOptions options, CancellationToken cancellationToken = default)
     {
-        var hits = await _engine.SearchAsync(query, topK, cancellationToken);
-        return hits.Select(h => new ScoredChunk(h.Chunk, h.Score)).ToList();
+        var hits = await _engine.SearchAsync(query, options.TopK ?? 20, cancellationToken);
+
+        var filtered = hits.Where(h =>
+            options.MetadataEquals is null
+            || options.MetadataEquals.All(filter =>
+                h.Chunk.Metadata.TryGetValue(filter.Key, out var value)
+                && string.Equals(value?.ToString(), filter.Value, StringComparison.Ordinal)));
+
+        if (options.MinScore is not null)
+            filtered = filtered.Where(h => h.Score >= options.MinScore.Value);
+
+        return filtered.Select(h => new ScoredChunk(h.Chunk, h.Score)).ToList();
     }
 }
 ```
@@ -720,7 +734,9 @@ client.Features.Set<IHostedRetrievalFeature>(feature);
 // Discovery now works
 var resolved = client.Features.Get<IHostedRetrievalFeature>()!;
 IRetriever retriever = resolved.ForStore("vs_my_store_id");
-IReadOnlyList<ScoredChunk> results = await retriever.RetrieveAsync("What is the refund policy?", topK: 5);
+IReadOnlyList<ScoredChunk> results = await retriever.RetrieveAsync(
+    "What is the refund policy?",
+    new RetrievalOptions { TopK = 5 });
 ```
 
 Each `ForStore` call creates an independent retriever with no shared mutable state — two concurrent retrievals against different stores do not interfere. Consumers that only need retrieval depend on `IRetriever`, never on the hosted feature directly. DI registration:

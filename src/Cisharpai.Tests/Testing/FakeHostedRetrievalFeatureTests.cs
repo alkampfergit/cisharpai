@@ -1,5 +1,6 @@
 using Cisharpai.Rag.Models;
 using Cisharpai.Rag.Packing;
+using Cisharpai.Rag;
 using Cisharpai.Testing;
 
 namespace Cisharpai.Tests.Testing;
@@ -32,7 +33,7 @@ public sealed class FakeHostedRetrievalFeatureTests
     {
         var fake = new FakeHostedRetrievalFeature();
         var retriever = fake.ForStore("vs_unknown");
-        var results = await retriever.RetrieveAsync("query", 5);
+        var results = await retriever.RetrieveAsync("query", new RetrievalOptions { TopK = 5 });
         Assert.That(results, Is.Empty);
     }
 
@@ -45,7 +46,7 @@ public sealed class FakeHostedRetrievalFeatureTests
         fakeRetriever.EnqueueResponse(expected);
 
         var retriever = fake.ForStore("vs_1");
-        var results = await retriever.RetrieveAsync("query", 5);
+        var results = await retriever.RetrieveAsync("query", new RetrievalOptions { TopK = 5 });
 
         Assert.That(results, Has.Count.EqualTo(1));
         Assert.That(results[0].Chunk.DocumentId, Is.EqualTo("doc-1"));
@@ -87,11 +88,11 @@ public sealed class FakeHostedRetrievalFeatureTests
         fakeRetriever.DefaultResponse = [];
 
         var retriever = fake.ForStore("vs_1");
-        await retriever.RetrieveAsync("my query", 10);
+        await retriever.RetrieveAsync("my query", new RetrievalOptions { TopK = 10 });
 
         Assert.That(fakeRetriever.ReceivedQueries, Has.Count.EqualTo(1));
         Assert.That(fakeRetriever.ReceivedQueries[0].Query, Is.EqualTo("my query"));
-        Assert.That(fakeRetriever.ReceivedQueries[0].TopK, Is.EqualTo(10));
+        Assert.That(fakeRetriever.ReceivedQueries[0].Options.TopK, Is.EqualTo(10));
     }
 
     [Test]
@@ -127,8 +128,8 @@ public sealed class FakeHostedRetrievalFeatureTests
         var r2 = fake.AddStore("vs_2");
         r2.DefaultResponse = [CreateChunk("doc-from-2", 0.8)];
 
-        var results1 = await fake.ForStore("vs_1").RetrieveAsync("q", 5);
-        var results2 = await fake.ForStore("vs_2").RetrieveAsync("q", 5);
+        var results1 = await fake.ForStore("vs_1").RetrieveAsync("q", new RetrievalOptions { TopK = 5 });
+        var results2 = await fake.ForStore("vs_2").RetrieveAsync("q", new RetrievalOptions { TopK = 5 });
 
         Assert.Multiple(() =>
         {

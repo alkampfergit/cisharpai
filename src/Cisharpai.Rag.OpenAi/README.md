@@ -27,7 +27,9 @@ Once registered, discover the feature through the standard `Features.Get<T>()` p
 var feature = chatClient.Features.Get<IHostedRetrievalFeature>()!;
 IRetriever retriever = feature.ForStore("vs_my_store");
 
-IReadOnlyList<ScoredChunk> results = await retriever.RetrieveAsync("search query", topK: 5);
+IReadOnlyList<ScoredChunk> results = await retriever.RetrieveAsync(
+    "search query",
+    new RetrievalOptions { TopK = 5 });
 ```
 
 Each `ForStore` call returns an independent, thread-safe `IRetriever`. Consumers that need only retrieval depend on `IRetriever` directly and can swap implementations (hosted, BM25, hybrid) by changing a DI registration.

@@ -33,19 +33,25 @@ internal sealed class OpenAiFileSearchRetriever : IRetriever
 
     public Task<IReadOnlyList<ScoredChunk>> RetrieveAsync(
         string query,
-        int topK,
+        RetrievalOptions options,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(query);
-        if (topK <= 0)
-            throw new ArgumentOutOfRangeException(nameof(topK), topK, "topK must be positive.");
+        ArgumentNullException.ThrowIfNull(options);
+        if (options.TopK is <= 0)
+            throw new ArgumentOutOfRangeException(nameof(options), options.TopK, "TopK must be positive when set.");
+        if (options.ProviderQuery is not null)
+            throw new ArgumentException(
+                $"{nameof(OpenAiFileSearchRetriever)} does not support provider query extensions. " +
+                $"Received provider query type '{options.ProviderQuery.GetType().FullName}'.",
+                nameof(options));
 
-        return RetrieveCoreAsync(query, topK, cancellationToken);
+        return RetrieveCoreAsync(query, options, cancellationToken);
     }
 
     private async Task<IReadOnlyList<ScoredChunk>> RetrieveCoreAsync(
         string query,
-        int topK,
+        RetrievalOptions options,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -69,7 +75,7 @@ internal sealed class OpenAiFileSearchRetriever : IRetriever
                     {
                         Type = "file_search",
                         VectorStoreIds = [_vectorStoreId],
-                        MaxNumResults = topK
+                        MaxNumResults = options.TopK
                     }
                 ],
                 Include = ["file_search_call.results"]
@@ -78,7 +84,7 @@ internal sealed class OpenAiFileSearchRetriever : IRetriever
             var response = await _client.PostAsync<OpenAiResponsesApiRequest, OpenAiResponsesApiResponse>(
                 "responses", request, cancellationToken: cancellationToken).ConfigureAwait(false);
 
-            return MapFileSearchResults(response, topK);
+            return MapFileSearchResults(response, options);
         }
         catch (LlmHttpRequestException ex)
         {
@@ -98,7 +104,7 @@ internal sealed class OpenAiFileSearchRetriever : IRetriever
         }
     }
 
-    private List<ScoredChunk> MapFileSearchResults(OpenAiResponsesApiResponse response, int topK)
+    private List<ScoredChunk> MapFileSearchResults(OpenAiResponsesApiResponse response, RetrievalOptions options)
     {
         var fileSearchCalls = response.Output
             .Where(o => o.Type == "file_search_call")
@@ -132,7 +138,23 @@ internal sealed class OpenAiFileSearchRetriever : IRetriever
 
         scored.Sort((a, b) => b.Score.CompareTo(a.Score));
 
-        return scored.Count <= topK ? scored : scored.GetRange(0, topK);
+        IEnumerable<ScoredChunk> filtered = scored;
+        if (options.MetadataEquals is { Count: > 0 } metadataEquals)
+        {
+            filtered = filtered.Where(c => MatchesMetadata(c.Chunk, metadataEquals));
+        }
+
+        if (options.MinScore is not null)
+        {
+            filtered = filtered.Where(c => c.Score >= options.MinScore.Value);
+        }
+
+        if (options.TopK is not null)
+        {
+            filtered = filtered.Take(options.TopK.Value);
+        }
+
+        return filtered.ToList();
     }
 
     private static ScoredChunk MapToScoredChunk(OpenAiFileSearchResult result, int perFileOrdinal)
@@ -158,5 +180,19 @@ internal sealed class OpenAiFileSearchRetriever : IRetriever
             Metadata: new ReadOnlyDictionary<string, object?>(metadata));
 
         return new ScoredChunk(chunk, result.Score);
+    }
+
+    private static bool MatchesMetadata(TextChunk chunk, IReadOnlyDictionary<string, string> metadataEquals)
+    {
+        foreach (var (key, expectedValue) in metadataEquals)
+        {
+            if (!chunk.Metadata.TryGetValue(key, out var value))
+                return false;
+
+            if (!string.Equals(value?.ToString(), expectedValue, StringComparison.Ordinal))
+                return false;
+        }
+
+        return true;
     }
 }

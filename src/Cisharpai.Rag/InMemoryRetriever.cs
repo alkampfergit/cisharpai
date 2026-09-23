@@ -9,13 +9,13 @@ namespace Cisharpai.Rag;
 /// Embeds the query at retrieval time via <see cref="IEmbeddingClient"/> and scores
 /// each stored chunk by cosine similarity. Not suitable for production workloads —
 /// use a purpose-built store behind <see cref="IRetriever"/> instead.
-/// This type is not thread-safe. Concurrent <see cref="Add"/>/<see cref="AddRange(IEnumerable{ValueTuple{TextChunk, float[]}})"/>
-/// and <see cref="RetrieveAsync"/> calls are not supported.
+/// This type supports concurrent ingestion and retrieval via snapshot reads.
 /// </summary>
 public sealed class InMemoryRetriever : IRetriever
 {
     private readonly IEmbeddingClient _embeddingClient;
     private readonly string? _model;
+    private readonly object _gate = new();
     private readonly List<(TextChunk Chunk, float[] Vector)> _store = new();
 
     /// <param name="embeddingClient">Client used to embed the query at retrieval time.</param>
@@ -34,7 +34,10 @@ public sealed class InMemoryRetriever : IRetriever
     {
         ArgumentNullException.ThrowIfNull(chunk);
         ArgumentNullException.ThrowIfNull(vector);
-        _store.Add((chunk, (float[])vector.Clone()));
+        lock (_gate)
+        {
+            _store.Add((chunk, (float[])vector.Clone()));
+        }
     }
 
     /// <summary>
@@ -59,29 +62,53 @@ public sealed class InMemoryRetriever : IRetriever
     }
 
     /// <summary>Number of chunks currently stored.</summary>
-    public int Count => _store.Count;
+    public int Count
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _store.Count;
+            }
+        }
+    }
 
     /// <inheritdoc />
     public Task<IReadOnlyList<ScoredChunk>> RetrieveAsync(
         string query,
-        int topK,
+        RetrievalOptions options,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(query);
-        if (topK <= 0)
-            throw new ArgumentOutOfRangeException(nameof(topK), topK, "topK must be positive.");
+        ArgumentNullException.ThrowIfNull(options);
+        if (options.TopK is <= 0)
+            throw new ArgumentOutOfRangeException(nameof(options), options.TopK, "TopK must be positive when set.");
+        if (options.ProviderQuery is not null)
+            throw new ArgumentException(
+                $"{nameof(InMemoryRetriever)} does not support provider query extensions. " +
+                $"Received provider query type '{options.ProviderQuery.GetType().FullName}'.",
+                nameof(options));
 
-        return RetrieveCoreAsync(query, topK, cancellationToken);
+        return RetrieveCoreAsync(query, options, cancellationToken);
     }
 
     private async Task<IReadOnlyList<ScoredChunk>> RetrieveCoreAsync(
         string query,
-        int topK,
+        RetrievalOptions options,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (_store.Count == 0)
+        (TextChunk Chunk, float[] Vector)[] snapshot;
+        lock (_gate)
+        {
+            if (_store.Count == 0)
+                return Array.Empty<ScoredChunk>();
+
+            snapshot = _store.ToArray();
+        }
+
+        if (snapshot.Length == 0)
             return Array.Empty<ScoredChunk>();
 
         var embeddingResponse = await _embeddingClient.GetEmbeddingsAsync(
@@ -97,23 +124,46 @@ public sealed class InMemoryRetriever : IRetriever
         if (queryVector is null || queryVector.Length == 0 || queryVector.Any(v => !float.IsFinite(v)))
             return Array.Empty<ScoredChunk>();
 
-        var snapshot = _store.ToArray();
+        var scored = new List<ScoredChunk>(snapshot.Length);
+        foreach (var (chunk, vector) in snapshot)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var score = VectorMath.CosineSimilarity(queryVector, vector);
+            scored.Add(new ScoredChunk(chunk, score));
+        }
 
-        var candidates = new float[snapshot.Length][];
-        for (var i = 0; i < snapshot.Length; i++)
-            candidates[i] = snapshot[i].Vector;
+        IEnumerable<ScoredChunk> filtered = scored;
+        if (options.MetadataEquals is { Count: > 0 } metadataEquals)
+        {
+            filtered = filtered.Where(c => MatchesMetadata(c.Chunk, metadataEquals));
+        }
 
-        var topResults = VectorMath.TopK(
-            (ReadOnlySpan<float>)queryVector,
-            (ReadOnlySpan<float[]>)candidates,
-            topK);
+        if (options.MinScore is not null)
+        {
+            filtered = filtered.Where(c => c.Score >= options.MinScore.Value);
+        }
 
-        cancellationToken.ThrowIfCancellationRequested();
+        IEnumerable<ScoredChunk> ordered = filtered.OrderByDescending(c => c.Score);
 
-        var results = new ScoredChunk[topResults.Length];
-        for (var i = 0; i < topResults.Length; i++)
-            results[i] = new ScoredChunk(snapshot[topResults[i].Index].Chunk, topResults[i].Score);
+        if (options.TopK is not null)
+        {
+            ordered = ordered.Take(options.TopK.Value);
+        }
 
-        return results;
+        return ordered.ToList();
+    }
+
+    private static bool MatchesMetadata(TextChunk chunk, IReadOnlyDictionary<string, string> metadataEquals)
+    {
+        foreach (var (key, expectedValue) in metadataEquals)
+        {
+            if (!chunk.Metadata.TryGetValue(key, out var value))
+                return false;
+
+            if (!string.Equals(value?.ToString(), expectedValue, StringComparison.Ordinal))
+                return false;
+        }
+
+        return true;
     }
 }

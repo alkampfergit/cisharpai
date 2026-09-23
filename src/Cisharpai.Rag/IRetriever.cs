@@ -11,14 +11,14 @@ namespace Cisharpai.Rag;
 public interface IRetriever
 {
     /// <summary>
-    /// Returns up to <paramref name="topK"/> chunks ranked by relevance to <paramref name="query"/>.
+    /// Returns chunks ranked by relevance to <paramref name="query"/> using the provided <paramref name="options"/>.
     /// </summary>
     /// <param name="query">The natural-language query string.</param>
-    /// <param name="topK">Maximum number of chunks to return.</param>
+    /// <param name="options">Portable retrieval options with optional provider query extension.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>Ranked chunks in descending relevance order. May return fewer than <paramref name="topK"/> items.</returns>
+    /// <returns>Ranked chunks in descending relevance order.</returns>
     Task<IReadOnlyList<ScoredChunk>> RetrieveAsync(
         string query,
-        int topK,
+        RetrievalOptions options,
         CancellationToken cancellationToken = default);
 }

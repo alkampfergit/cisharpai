@@ -9,6 +9,8 @@ namespace Cisharpai.Tests.RagOpenAi;
 
 public sealed class OpenAiFileSearchRetrievalTests
 {
+    private sealed record DummyProviderQuery : IRetrievalQueryExtension;
+
     #region Response Fixtures
 
     private const string FileSearchSuccessResponse = """
@@ -408,6 +410,19 @@ public sealed class OpenAiFileSearchRetrievalTests
         return new OpenAiHostedRetrievalFeature(httpClient, new OpenAiClientOptions { DefaultModel = "gpt-5-0" });
     }
 
+    private static RetrievalOptions Options(
+        int? topK = null,
+        double? minScore = null,
+        IReadOnlyDictionary<string, string>? metadataEquals = null,
+        IRetrievalQueryExtension? providerQuery = null) =>
+        new()
+        {
+            TopK = topK,
+            MinScore = minScore,
+            MetadataEquals = metadataEquals,
+            ProviderQuery = providerQuery
+        };
+
     #endregion
 
     #region IHostedRetrievalFeature Discovery
@@ -459,7 +474,7 @@ public sealed class OpenAiFileSearchRetrievalTests
         var (_, feature, getCapturedBody) = CreateClientWithFeature(FileSearchSuccessResponse);
         var retriever = feature.ForStore("vs_my_store");
 
-        await retriever.RetrieveAsync("test query", 5);
+        await retriever.RetrieveAsync("test query", new RetrievalOptions { TopK = 5 });
 
         var body = getCapturedBody()!;
         var doc = JsonDocument.Parse(body);
@@ -481,13 +496,27 @@ public sealed class OpenAiFileSearchRetrievalTests
         var (_, feature, getCapturedBody) = CreateClientWithFeature(FileSearchSuccessResponse);
         var retriever = feature.ForStore("vs_test");
 
-        await retriever.RetrieveAsync("query", 10);
+        await retriever.RetrieveAsync("query", new RetrievalOptions { TopK = 10 });
 
         var body = getCapturedBody()!;
         var doc = JsonDocument.Parse(body);
         var include = doc.RootElement.GetProperty("include");
         Assert.That(include.GetArrayLength(), Is.EqualTo(1));
         Assert.That(include[0].GetString(), Is.EqualTo("file_search_call.results"));
+    }
+
+    [Test]
+    public async Task Retrieve_NullTopK_DoesNotSetMaxNumResults()
+    {
+        var (_, feature, getCapturedBody) = CreateClientWithFeature(FileSearchSuccessResponse);
+        var retriever = feature.ForStore("vs_test");
+
+        await retriever.RetrieveAsync("query", Options());
+
+        var body = getCapturedBody()!;
+        var doc = JsonDocument.Parse(body);
+        var tool = doc.RootElement.GetProperty("tools")[0];
+        Assert.That(tool.TryGetProperty("max_num_results", out _), Is.False);
     }
 
     [Test]
@@ -504,7 +533,7 @@ public sealed class OpenAiFileSearchRetrievalTests
         var feature = new OpenAiHostedRetrievalFeature(httpClient, options);
         var retriever = feature.ForStore("vs_test");
 
-        await retriever.RetrieveAsync("query", 5);
+        await retriever.RetrieveAsync("query", new RetrievalOptions { TopK = 5 });
 
         Assert.That(handler.LastRequest?.RequestUri?.AbsolutePath, Does.EndWith("/responses"));
     }
@@ -515,7 +544,7 @@ public sealed class OpenAiFileSearchRetrievalTests
         var (_, feature, getCapturedBody) = CreateClientWithFeature(FileSearchSuccessResponse);
         var retriever = feature.ForStore("vs_test");
 
-        await retriever.RetrieveAsync("my search query", 5);
+        await retriever.RetrieveAsync("my search query", new RetrievalOptions { TopK = 5 });
 
         var body = getCapturedBody()!;
         var doc = JsonDocument.Parse(body);
@@ -540,7 +569,7 @@ public sealed class OpenAiFileSearchRetrievalTests
         var (_, feature, _) = CreateClientWithFeature(FileSearchSuccessResponse);
         var retriever = feature.ForStore("vs_test");
 
-        var results = await retriever.RetrieveAsync("query", 10);
+        var results = await retriever.RetrieveAsync("query", new RetrievalOptions { TopK = 10 });
 
         Assert.That(results, Has.Count.EqualTo(2));
     }
@@ -551,7 +580,7 @@ public sealed class OpenAiFileSearchRetrievalTests
         var (_, feature, _) = CreateClientWithFeature(FileSearchSuccessResponse);
         var retriever = feature.ForStore("vs_test");
 
-        var results = await retriever.RetrieveAsync("query", 10);
+        var results = await retriever.RetrieveAsync("query", new RetrievalOptions { TopK = 10 });
 
         Assert.That(results[0].Score, Is.EqualTo(0.92).Within(0.001));
     }
@@ -562,7 +591,7 @@ public sealed class OpenAiFileSearchRetrievalTests
         var (_, feature, _) = CreateClientWithFeature(FileSearchSuccessResponse);
         var retriever = feature.ForStore("vs_test");
 
-        var results = await retriever.RetrieveAsync("query", 10);
+        var results = await retriever.RetrieveAsync("query", new RetrievalOptions { TopK = 10 });
 
         Assert.That(results[0].Chunk.DocumentId, Is.EqualTo("file-abc123"));
     }
@@ -573,7 +602,7 @@ public sealed class OpenAiFileSearchRetrievalTests
         var (_, feature, _) = CreateClientWithFeature(FileSearchSuccessResponse);
         var retriever = feature.ForStore("vs_test");
 
-        var results = await retriever.RetrieveAsync("query", 10);
+        var results = await retriever.RetrieveAsync("query", new RetrievalOptions { TopK = 10 });
 
         Assert.Multiple(() =>
         {
@@ -588,7 +617,7 @@ public sealed class OpenAiFileSearchRetrievalTests
         var (_, feature, _) = CreateClientWithFeature(FileSearchSuccessResponse);
         var retriever = feature.ForStore("vs_test");
 
-        var results = await retriever.RetrieveAsync("query", 10);
+        var results = await retriever.RetrieveAsync("query", new RetrievalOptions { TopK = 10 });
 
         Assert.Multiple(() =>
         {
@@ -603,7 +632,7 @@ public sealed class OpenAiFileSearchRetrievalTests
         var (_, feature, _) = CreateClientWithFeature(FileSearchSuccessResponse);
         var retriever = feature.ForStore("vs_test");
 
-        var results = await retriever.RetrieveAsync("query", 10);
+        var results = await retriever.RetrieveAsync("query", new RetrievalOptions { TopK = 10 });
 
         Assert.That(results[0].Chunk.Text, Is.EqualTo("This is the relevant passage from the document."));
     }
@@ -614,7 +643,7 @@ public sealed class OpenAiFileSearchRetrievalTests
         var (_, feature, _) = CreateClientWithFeature(FileSearchSuccessResponse);
         var retriever = feature.ForStore("vs_test");
 
-        var results = await retriever.RetrieveAsync("query", 10);
+        var results = await retriever.RetrieveAsync("query", new RetrievalOptions { TopK = 10 });
 
         Assert.Multiple(() =>
         {
@@ -629,9 +658,35 @@ public sealed class OpenAiFileSearchRetrievalTests
         var (_, feature, _) = CreateClientWithFeature(FileSearchNoResultsResponse);
         var retriever = feature.ForStore("vs_test");
 
-        var results = await retriever.RetrieveAsync("obscure", 10);
+        var results = await retriever.RetrieveAsync("obscure", new RetrievalOptions { TopK = 10 });
 
         Assert.That(results, Is.Empty);
+    }
+
+    [Test]
+    public async Task Retrieve_MinScore_PostFiltersResults()
+    {
+        var (_, feature, _) = CreateClientWithFeature(FileSearchSuccessResponse);
+        var retriever = feature.ForStore("vs_test");
+
+        var results = await retriever.RetrieveAsync("query", Options(topK: 10, minScore: 0.9));
+
+        Assert.That(results, Has.Count.EqualTo(1));
+        Assert.That(results[0].Chunk.DocumentId, Is.EqualTo("file-abc123"));
+    }
+
+    [Test]
+    public async Task Retrieve_MetadataEquals_PostFiltersResults()
+    {
+        var (_, feature, _) = CreateClientWithFeature(FileSearchSuccessResponse);
+        var retriever = feature.ForStore("vs_test");
+
+        var results = await retriever.RetrieveAsync("query", Options(
+            topK: 10,
+            metadataEquals: new Dictionary<string, string> { ["attr_category"] = "technical" }));
+
+        Assert.That(results, Has.Count.EqualTo(1));
+        Assert.That(results[0].Chunk.DocumentId, Is.EqualTo("file-abc123"));
     }
 
     #endregion
@@ -644,7 +699,7 @@ public sealed class OpenAiFileSearchRetrievalTests
         var (_, feature) = CreateClientWithStatusAndFeature(HttpStatusCode.InternalServerError);
         var retriever = feature.ForStore("vs_test");
 
-        var results = await retriever.RetrieveAsync("query", 5);
+        var results = await retriever.RetrieveAsync("query", new RetrievalOptions { TopK = 5 });
 
         Assert.That(results, Is.Empty);
     }
@@ -655,7 +710,7 @@ public sealed class OpenAiFileSearchRetrievalTests
         var (_, feature, _) = CreateClientWithFeature(FileSearchFailedCallResponse);
         var retriever = feature.ForStore("vs_test");
 
-        var results = await retriever.RetrieveAsync("query", 5);
+        var results = await retriever.RetrieveAsync("query", new RetrievalOptions { TopK = 5 });
 
         Assert.That(results, Is.Empty);
     }
@@ -666,7 +721,7 @@ public sealed class OpenAiFileSearchRetrievalTests
         var (_, feature, _) = CreateClientWithFeature(FileSearchMixedStatusResponse);
         var retriever = feature.ForStore("vs_test");
 
-        var results = await retriever.RetrieveAsync("query", 10);
+        var results = await retriever.RetrieveAsync("query", new RetrievalOptions { TopK = 10 });
 
         Assert.That(results, Has.Count.EqualTo(1));
         Assert.That(results[0].Chunk.DocumentId, Is.EqualTo("file-ok"));
@@ -682,7 +737,7 @@ public sealed class OpenAiFileSearchRetrievalTests
         cts.Cancel();
 
         Assert.ThrowsAsync<OperationCanceledException>(
-            () => retriever.RetrieveAsync("query", 5, cts.Token));
+            () => retriever.RetrieveAsync("query", new RetrievalOptions { TopK = 5 }, cts.Token));
     }
 
     [Test]
@@ -695,7 +750,7 @@ public sealed class OpenAiFileSearchRetrievalTests
         var retriever = feature.ForStore("vs_test");
 
         Assert.ThrowsAsync<InvalidOperationException>(
-            () => retriever.RetrieveAsync("query", 5));
+            () => retriever.RetrieveAsync("query", new RetrievalOptions { TopK = 5 }));
     }
 
     #endregion
@@ -709,7 +764,7 @@ public sealed class OpenAiFileSearchRetrievalTests
         var retriever = feature.ForStore("vs_test");
 
         Assert.ThrowsAsync<ArgumentNullException>(() =>
-            retriever.RetrieveAsync(null!, 5));
+            retriever.RetrieveAsync(null!, new RetrievalOptions { TopK = 5 }));
     }
 
     [Test]
@@ -719,7 +774,7 @@ public sealed class OpenAiFileSearchRetrievalTests
         var retriever = feature.ForStore("vs_test");
 
         Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
-            retriever.RetrieveAsync("query", 0));
+            retriever.RetrieveAsync("query", new RetrievalOptions { TopK = 0 }));
     }
 
     [Test]
@@ -729,7 +784,17 @@ public sealed class OpenAiFileSearchRetrievalTests
         var retriever = feature.ForStore("vs_test");
 
         Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
-            retriever.RetrieveAsync("query", -1));
+            retriever.RetrieveAsync("query", new RetrievalOptions { TopK = -1 }));
+    }
+
+    [Test]
+    public void Retrieve_UnsupportedProviderQuery_ThrowsArgumentException()
+    {
+        var feature = CreateFeature(FileSearchSuccessResponse);
+        var retriever = feature.ForStore("vs_test");
+
+        Assert.ThrowsAsync<ArgumentException>(() =>
+            retriever.RetrieveAsync("query", Options(topK: 5, providerQuery: new DummyProviderQuery())));
     }
 
     #endregion
@@ -742,7 +807,7 @@ public sealed class OpenAiFileSearchRetrievalTests
         var feature = CreateFeature(MultipleFileSearchCallsResponse);
         var retriever = feature.ForStore("vs_test");
 
-        var results = await retriever.RetrieveAsync("query", 3);
+        var results = await retriever.RetrieveAsync("query", new RetrievalOptions { TopK = 3 });
 
         Assert.That(results, Has.Count.EqualTo(3),
             "topK should be enforced after flattening results from multiple file_search_call items");
@@ -754,7 +819,7 @@ public sealed class OpenAiFileSearchRetrievalTests
         var feature = CreateFeature(MultipleFileSearchCallsResponse);
         var retriever = feature.ForStore("vs_test");
 
-        var results = await retriever.RetrieveAsync("query", 1);
+        var results = await retriever.RetrieveAsync("query", new RetrievalOptions { TopK = 1 });
 
         Assert.That(results, Has.Count.EqualTo(1));
         Assert.That(results[0].Chunk.DocumentId, Is.EqualTo("file-1"));
@@ -766,7 +831,7 @@ public sealed class OpenAiFileSearchRetrievalTests
         var feature = CreateFeature(MultipleFileSearchCallsResponse);
         var retriever = feature.ForStore("vs_test");
 
-        var results = await retriever.RetrieveAsync("query", 100);
+        var results = await retriever.RetrieveAsync("query", new RetrievalOptions { TopK = 100 });
 
         Assert.That(results, Has.Count.EqualTo(5));
     }
@@ -783,7 +848,7 @@ public sealed class OpenAiFileSearchRetrievalTests
         var retriever = feature.ForStore("vs_test");
 
         Assert.ThrowsAsync<HttpRequestException>(() =>
-            retriever.RetrieveAsync("query", 5));
+            retriever.RetrieveAsync("query", new RetrievalOptions { TopK = 5 }));
     }
 
     [Test]
@@ -794,7 +859,7 @@ public sealed class OpenAiFileSearchRetrievalTests
         var retriever = feature.ForStore("vs_test");
 
         Assert.ThrowsAsync<HttpRequestException>(() =>
-            retriever.RetrieveAsync("query", 5));
+            retriever.RetrieveAsync("query", new RetrievalOptions { TopK = 5 }));
     }
 
     #endregion
@@ -807,7 +872,7 @@ public sealed class OpenAiFileSearchRetrievalTests
         var (_, feature, _) = CreateClientWithFeature(FileSearchSameFileMultiplePassagesResponse);
         var retriever = feature.ForStore("vs_test");
 
-        var results = await retriever.RetrieveAsync("query", 10);
+        var results = await retriever.RetrieveAsync("query", new RetrievalOptions { TopK = 10 });
 
         Assert.That(results, Has.Count.EqualTo(3));
         Assert.Multiple(() =>
@@ -823,7 +888,7 @@ public sealed class OpenAiFileSearchRetrievalTests
         var (_, feature, _) = CreateClientWithFeature(FileSearchSameFileMultiplePassagesResponse);
         var retriever = feature.ForStore("vs_test");
 
-        var results = await retriever.RetrieveAsync("query", 10);
+        var results = await retriever.RetrieveAsync("query", new RetrievalOptions { TopK = 10 });
 
         // Provider order: score 0.95 (ordinal 0), 0.80 (ordinal 1), 0.70 (ordinal 2)
         // After sort by score descending, ordinals should remain: 0, 1, 2
@@ -844,7 +909,7 @@ public sealed class OpenAiFileSearchRetrievalTests
         var (_, feature, _) = CreateClientWithFeature(FileSearchSameFileMultiplePassagesResponse);
         var retriever = feature.ForStore("vs_test");
 
-        var results = await retriever.RetrieveAsync("query", 10);
+        var results = await retriever.RetrieveAsync("query", new RetrievalOptions { TopK = 10 });
 
         // Verify the precondition: all from same file
         Assert.That(results.All(r => r.Chunk.DocumentId == "file-same"), Is.True);
@@ -862,7 +927,7 @@ public sealed class OpenAiFileSearchRetrievalTests
         var (_, feature, _) = CreateClientWithFeature(FileSearchMultiCallUnsortedResponse);
         var retriever = feature.ForStore("vs_test");
 
-        var results = await retriever.RetrieveAsync("query", 10);
+        var results = await retriever.RetrieveAsync("query", new RetrievalOptions { TopK = 10 });
 
         Assert.That(results, Has.Count.EqualTo(4));
         for (int i = 1; i < results.Count; i++)
@@ -879,7 +944,7 @@ public sealed class OpenAiFileSearchRetrievalTests
         var retriever = feature.ForStore("vs_test");
 
         // 4 results across two calls; topK=2 should keep the two highest-scoring
-        var results = await retriever.RetrieveAsync("query", 2);
+        var results = await retriever.RetrieveAsync("query", new RetrievalOptions { TopK = 2 });
 
         Assert.That(results, Has.Count.EqualTo(2));
         Assert.Multiple(() =>
@@ -895,7 +960,7 @@ public sealed class OpenAiFileSearchRetrievalTests
         var (_, feature, _) = CreateClientWithFeature(FileSearchMultiCallUnsortedResponse);
         var retriever = feature.ForStore("vs_test");
 
-        var results = await retriever.RetrieveAsync("query", 10);
+        var results = await retriever.RetrieveAsync("query", new RetrievalOptions { TopK = 10 });
 
         var fileAResults = results.Where(r => r.Chunk.DocumentId == "file-a").ToList();
         var fileBResults = results.Where(r => r.Chunk.DocumentId == "file-b").ToList();
