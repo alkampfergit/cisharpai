@@ -124,6 +124,26 @@ public sealed class InMemoryRetriever : IRetriever
         if (queryVector is null || queryVector.Length == 0 || queryVector.Any(v => !float.IsFinite(v)))
             return Array.Empty<ScoredChunk>();
 
+        if ((options.MetadataEquals is null || options.MetadataEquals.Count == 0)
+            && options.MinScore is null
+            && options.TopK is int topK)
+        {
+            var candidates = new float[snapshot.Length][];
+            for (var i = 0; i < snapshot.Length; i++)
+                candidates[i] = snapshot[i].Vector;
+
+            var topResults = VectorMath.TopK(
+                (ReadOnlySpan<float>)queryVector,
+                (ReadOnlySpan<float[]>)candidates,
+                topK);
+
+            var topKResults = new ScoredChunk[topResults.Length];
+            for (var i = 0; i < topResults.Length; i++)
+                topKResults[i] = new ScoredChunk(snapshot[topResults[i].Index].Chunk, topResults[i].Score);
+
+            return topKResults;
+        }
+
         var scored = new List<ScoredChunk>(snapshot.Length);
         foreach (var (chunk, vector) in snapshot)
         {
