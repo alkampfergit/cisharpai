@@ -149,6 +149,9 @@ internal sealed class OpenAiFileSearchRetriever : IRetriever
             filtered = filtered.Where(c => c.Score >= options.MinScore.Value);
         }
 
+        // TopK is sent to the provider and then applied again after local post-filters.
+        // When post-filters remove candidates from the provider window, the final count
+        // can be lower than TopK.
         if (options.TopK is not null)
         {
             filtered = filtered.Take(options.TopK.Value);

@@ -162,6 +162,38 @@ public sealed class OpenAiFileSearchRetrievalTests
         }
         """;
 
+    private const string FileSearchProviderWindowResponse = """
+        {
+            "id": "resp_fs_004b",
+            "model": "gpt-5-0",
+            "status": "completed",
+            "output": [
+                {
+                    "type": "file_search_call",
+                    "id": "fs_window",
+                    "status": "completed",
+                    "queries": ["query"],
+                    "results": [
+                        {
+                            "file_id": "file-high",
+                            "filename": "high.pdf",
+                            "score": 0.99,
+                            "text": "High score filtered out.",
+                            "attributes": { "category": "skip" }
+                        },
+                        {
+                            "file_id": "file-mid",
+                            "filename": "mid.pdf",
+                            "score": 0.90,
+                            "text": "Mid score kept.",
+                            "attributes": { "category": "keep" }
+                        }
+                    ]
+                }
+            ]
+        }
+        """;
+
     private const string FileSearchWithCitationsResponse = """
         {
             "id": "resp_fs_005",
@@ -687,6 +719,20 @@ public sealed class OpenAiFileSearchRetrievalTests
 
         Assert.That(results, Has.Count.EqualTo(1));
         Assert.That(results[0].Chunk.DocumentId, Is.EqualTo("file-abc123"));
+    }
+
+    [Test]
+    public async Task Retrieve_MetadataEquals_WithTopK_IsBestEffortWithinProviderWindow()
+    {
+        var (_, feature, _) = CreateClientWithFeature(FileSearchProviderWindowResponse);
+        var retriever = feature.ForStore("vs_test");
+
+        var results = await retriever.RetrieveAsync("query", Options(
+            topK: 2,
+            metadataEquals: new Dictionary<string, string> { ["attr_category"] = "keep" }));
+
+        Assert.That(results, Has.Count.EqualTo(1));
+        Assert.That(results[0].Chunk.DocumentId, Is.EqualTo("file-mid"));
     }
 
     #endregion

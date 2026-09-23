@@ -763,6 +763,8 @@ services.AddSingleton<IRetriever>(sp =>
 | `EndOffset` | `Text.Length` | Passage-relative |
 | `Metadata` | `file_id`, `filename`, provider attributes | Nothing lost |
 
+For OpenAI hosted retrieval, `TopK` is sent to `file_search` and then applied again after local `MetadataEquals`/`MinScore` post-filters. If post-filters remove items from the provider result window, final count can be lower than `TopK` (best-effort within the provider window).
+
 **Error handling:** a failed `file_search_call` on the `IRetriever` path returns an empty list and logs the failure — it does not throw. On the chat path (`GetChatCompletionAsync`), a failed `file_search_call` sets `IsSuccess=false` with content preserved and `ErrorMessage` naming the failed call IDs, matching `IWebSearchFeature` semantics.
 
 ### Vector store management (OpenAI)

@@ -1,4 +1,5 @@
 using Cisharpai.Models;
+using Cisharpai.Rag;
 using Cisharpai.Rag.Models;
 using Cisharpai.Rag.Packing;
 using Cisharpai.Rag.Pipeline;
@@ -10,6 +11,8 @@ namespace Cisharpai.Tests.Rag.Pipeline;
 [TestFixture]
 public class ConversationalRagPipelineTests
 {
+    private sealed record DummyProviderQuery : IRetrievalQueryExtension;
+
     private static TextChunk MakeChunk(string docId, int index, string text) =>
         new(docId, index, 0, text.Length, text);
 
@@ -179,6 +182,57 @@ public class ConversationalRagPipelineTests
 
         Assert.That(retriever.ReceivedQueries, Has.Count.EqualTo(1));
         Assert.That(retriever.ReceivedQueries[0].Options.TopK, Is.EqualTo(3));
+    }
+
+    [Test]
+    public async Task AskAsync_RetrievalOptions_PropagatesPortableAndProviderOptions()
+    {
+        var retriever = new FakeRetriever { DefaultResponse = SampleChunks() };
+        var providerQuery = new DummyProviderQuery();
+        var metadata = new Dictionary<string, string> { ["tenant"] = "acme" };
+
+        var pipeline = new RagPipelineBuilder()
+            .WithRetriever(retriever)
+            .Build();
+
+        await pipeline.AskAsync("capital?", new RagPipelineOptions
+        {
+            TopK = 4,
+            Retrieval = new RetrievalOptions
+            {
+                MinScore = 0.5,
+                MetadataEquals = metadata,
+                ProviderQuery = providerQuery
+            }
+        });
+
+        Assert.That(retriever.ReceivedQueries, Has.Count.EqualTo(1));
+        Assert.That(retriever.ReceivedQueries[0].Options.TopK, Is.EqualTo(4));
+        Assert.That(retriever.ReceivedQueries[0].Options.MinScore, Is.EqualTo(0.5));
+        Assert.That(retriever.ReceivedQueries[0].Options.MetadataEquals, Is.EqualTo(metadata));
+        Assert.That(retriever.ReceivedQueries[0].Options.ProviderQuery, Is.SameAs(providerQuery));
+    }
+
+    [Test]
+    public async Task AskAsync_RetrievalTopK_WhenSet_TakesPrecedenceOverTopK()
+    {
+        var retriever = new FakeRetriever { DefaultResponse = SampleChunks() };
+
+        var pipeline = new RagPipelineBuilder()
+            .WithRetriever(retriever)
+            .Build();
+
+        await pipeline.AskAsync("capital?", new RagPipelineOptions
+        {
+            TopK = 4,
+            Retrieval = new RetrievalOptions
+            {
+                TopK = 2
+            }
+        });
+
+        Assert.That(retriever.ReceivedQueries, Has.Count.EqualTo(1));
+        Assert.That(retriever.ReceivedQueries[0].Options.TopK, Is.EqualTo(2));
     }
 
     [Test]
