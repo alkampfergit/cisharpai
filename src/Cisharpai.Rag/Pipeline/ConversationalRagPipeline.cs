@@ -273,7 +273,11 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
         {
             foreach (var retriever in _retrievers)
             {
-                var results = await retriever.RetrieveAsync(searchQuery, options.TopK, cancellationToken)
+                var retrievalOptions = new RetrievalOptions
+                {
+                    TopK = options.TopK
+                };
+                var results = await retriever.RetrieveAsync(searchQuery, retrievalOptions, cancellationToken)
                     .ConfigureAwait(false);
                 allLists.Add(results);
             }

@@ -335,11 +335,12 @@ var fake = new FakeRetriever
     DefaultResponse = new[] { new ScoredChunk(chunk, 0.95) }
 };
 
-var results = await fake.RetrieveAsync("query", 5);
+var results = await fake.RetrieveAsync("query", new RetrievalOptions { TopK = 5 });
 Assert.That(results, Has.Count.EqualTo(1));
 
 // Inspect captured queries:
-Assert.That(fake.ReceivedQueries[0], Is.EqualTo(("query", 5)));
+Assert.That(fake.ReceivedQueries[0].Query, Is.EqualTo("query"));
+Assert.That(fake.ReceivedQueries[0].Options.TopK, Is.EqualTo(5));
 Assert.That(fake.CallCount, Is.EqualTo(1));
 ```
 
@@ -375,12 +376,12 @@ fakeRetriever.EnqueueResponse(new[] { new ScoredChunk(myChunk, 0.95) });
 
 // Use in application code
 IRetriever retriever = fake.ForStore("vs_my_store");
-var results = await retriever.RetrieveAsync("query", 5);
+var results = await retriever.RetrieveAsync("query", new RetrievalOptions { TopK = 5 });
 // results[0].Score == 0.95
 
 // Unregistered stores return empty results by default
 var emptyRetriever = fake.ForStore("vs_unknown");
-var empty = await emptyRetriever.RetrieveAsync("query", 5);
+var empty = await emptyRetriever.RetrieveAsync("query", new RetrievalOptions { TopK = 5 });
 // empty.Count == 0
 
 // Assert which stores were accessed
@@ -734,7 +735,7 @@ public async Task ConversationAgent_HandlesMultipleTurns()
 | `DefaultResponse` | `IReadOnlyList<ScoredChunk>?` | Fallback used when the queue is empty |
 | `EnqueueResponse(response)` | `void` | Queue a response (FIFO) |
 | `CallCount` | `int` | Number of `RetrieveAsync` calls |
-| `ReceivedQueries` | `IReadOnlyList<(string Query, int TopK)>` | Captured retrieval queries |
+| `ReceivedQueries` | `IReadOnlyList<(string Query, RetrievalOptions Options)>` | Captured retrieval queries |
 | `Reset()` | `void` | Clears the queue and captured queries |
 
 ### FakeRagPipeline

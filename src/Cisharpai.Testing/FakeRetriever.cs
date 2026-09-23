@@ -10,7 +10,7 @@ namespace Cisharpai.Testing;
 public sealed class FakeRetriever : IRetriever
 {
     private readonly Queue<IReadOnlyList<ScoredChunk>> _responses = new();
-    private readonly List<(string Query, int TopK)> _receivedQueries = new();
+    private readonly List<(string Query, RetrievalOptions Options)> _receivedQueries = new();
 
     // --- Response configuration ---
 
@@ -20,7 +20,7 @@ public sealed class FakeRetriever : IRetriever
 
     // --- Request capture ---
 
-    public IReadOnlyList<(string Query, int TopK)> ReceivedQueries => _receivedQueries;
+    public IReadOnlyList<(string Query, RetrievalOptions Options)> ReceivedQueries => _receivedQueries;
 
     public int CallCount => _receivedQueries.Count;
 
@@ -34,10 +34,12 @@ public sealed class FakeRetriever : IRetriever
 
     public Task<IReadOnlyList<ScoredChunk>> RetrieveAsync(
         string query,
-        int topK,
+        RetrievalOptions options,
         CancellationToken cancellationToken = default)
     {
-        _receivedQueries.Add((query, topK));
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentNullException.ThrowIfNull(options);
+        _receivedQueries.Add((query, options));
 
         if (_responses.Count > 0)
             return Task.FromResult(_responses.Dequeue());

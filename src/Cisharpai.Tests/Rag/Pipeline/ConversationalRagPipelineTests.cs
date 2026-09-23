@@ -167,6 +167,21 @@ public class ConversationalRagPipelineTests
     }
 
     [Test]
+    public async Task AskAsync_TopK_PropagatesToRetrievalOptions()
+    {
+        var retriever = new FakeRetriever { DefaultResponse = SampleChunks() };
+
+        var pipeline = new RagPipelineBuilder()
+            .WithRetriever(retriever)
+            .Build();
+
+        await pipeline.AskAsync("capital?", new RagPipelineOptions { TopK = 3 });
+
+        Assert.That(retriever.ReceivedQueries, Has.Count.EqualTo(1));
+        Assert.That(retriever.ReceivedQueries[0].Options.TopK, Is.EqualTo(3));
+    }
+
+    [Test]
     public async Task AskAsync_WithConversationRewriter_RewritesQuery()
     {
         var rewriterClient = new FakeChatCompletionClient();
