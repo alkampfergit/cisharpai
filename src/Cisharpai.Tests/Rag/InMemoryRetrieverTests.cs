@@ -494,7 +494,7 @@ public class InMemoryRetrieverTests
     }
 
     [Test]
-    public async Task RetrieveAsync_NullTopK_ReturnsAllMatchingChunks()
+    public async Task RetrieveAsync_NullTopK_AppliesDefaultTopK()
     {
         var fakeEmbedding = new FakeEmbeddingClient();
         fakeEmbedding.EnqueueResponse(FakeResponses.Embedding(new float[] { 1f, 0f }));
@@ -509,6 +509,23 @@ public class InMemoryRetrieverTests
         });
 
         Assert.That(results, Has.Count.EqualTo(2));
+        Assert.That(InMemoryRetriever.DefaultTopK, Is.EqualTo(10));
+    }
+
+    [Test]
+    public async Task RetrieveAsync_NullTopK_CapsAtDefaultTopK()
+    {
+        var fakeEmbedding = new FakeEmbeddingClient();
+        var queryVector = new float[] { 1f };
+        fakeEmbedding.EnqueueResponse(FakeResponses.Embedding(queryVector));
+
+        var retriever = new InMemoryRetriever(fakeEmbedding);
+        for (var i = 0; i < InMemoryRetriever.DefaultTopK + 5; i++)
+            retriever.Add(MakeChunk("doc", i, $"chunk{i}"), new float[] { 1f });
+
+        var results = await retriever.RetrieveAsync("query", new RetrievalOptions());
+
+        Assert.That(results, Has.Count.EqualTo(InMemoryRetriever.DefaultTopK));
     }
 
     [Test]
@@ -523,5 +540,65 @@ public class InMemoryRetrieverTests
         Assert.That(
             () => retriever.RetrieveAsync("query", new RetrievalOptions { TopK = 1, ProviderQuery = new DummyProviderQuery() }),
             Throws.TypeOf<ArgumentException>());
+    }
+
+    [Test]
+    public async Task RetrieveAsync_MetadataEquals_CultureInvariant_NumericValue()
+    {
+        var fakeEmbedding = new FakeEmbeddingClient();
+        fakeEmbedding.EnqueueResponse(FakeResponses.Embedding(new float[] { 1f, 0f }));
+
+        var retriever = new InMemoryRetriever(fakeEmbedding);
+        retriever.Add(
+            MakeChunk("doc", 0, "with-decimal", new Dictionary<string, object?> { ["price"] = 1.5d }),
+            new float[] { 1f, 0f });
+
+        var results = await retriever.RetrieveAsync("query", new RetrievalOptions
+        {
+            TopK = 10,
+            MetadataEquals = new Dictionary<string, string> { ["price"] = "1.5" }
+        });
+
+        Assert.That(results, Has.Count.EqualTo(1));
+        Assert.That(results[0].Chunk.Text, Is.EqualTo("with-decimal"));
+    }
+
+    [Test]
+    public void AddRange_TupleOverload_IsAtomic_AllOrNothingVisibility()
+    {
+        var fakeEmbedding = new FakeEmbeddingClient
+        {
+            DefaultResponse = FakeResponses.Embedding()
+        };
+        var retriever = new InMemoryRetriever(fakeEmbedding);
+
+        var items = new[]
+        {
+            (MakeChunk("doc", 0, "a"), new float[] { 1f }),
+            (MakeChunk("doc", 1, "b"), new float[] { 0f }),
+            (MakeChunk("doc", 2, "c"), new float[] { 0.5f })
+        };
+        retriever.AddRange(items);
+
+        Assert.That(retriever.Count, Is.EqualTo(3));
+    }
+
+    [Test]
+    public void AddRange_ChunkEmbeddingOverload_IsAtomic()
+    {
+        var fakeEmbedding = new FakeEmbeddingClient
+        {
+            DefaultResponse = FakeResponses.Embedding()
+        };
+        var retriever = new InMemoryRetriever(fakeEmbedding);
+
+        var items = new[]
+        {
+            new ChunkEmbedding(MakeChunk("doc", 0, "a"), new float[] { 1f }),
+            new ChunkEmbedding(MakeChunk("doc", 1, "b"), new float[] { 0f })
+        };
+        retriever.AddRange(items);
+
+        Assert.That(retriever.Count, Is.EqualTo(2));
     }
 }

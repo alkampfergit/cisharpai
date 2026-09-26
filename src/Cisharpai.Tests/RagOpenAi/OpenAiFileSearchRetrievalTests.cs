@@ -715,7 +715,7 @@ public sealed class OpenAiFileSearchRetrievalTests
 
         var results = await retriever.RetrieveAsync("query", Options(
             topK: 10,
-            metadataEquals: new Dictionary<string, string> { ["attr_category"] = "technical" }));
+            metadataEquals: new Dictionary<string, string> { ["category"] = "technical" }));
 
         Assert.That(results, Has.Count.EqualTo(1));
         Assert.That(results[0].Chunk.DocumentId, Is.EqualTo("file-abc123"));
@@ -729,7 +729,7 @@ public sealed class OpenAiFileSearchRetrievalTests
 
         var results = await retriever.RetrieveAsync("query", Options(
             topK: 2,
-            metadataEquals: new Dictionary<string, string> { ["attr_category"] = "keep" }));
+            metadataEquals: new Dictionary<string, string> { ["category"] = "keep" }));
 
         Assert.That(results, Has.Count.EqualTo(1));
         Assert.That(results[0].Chunk.DocumentId, Is.EqualTo("file-mid"));
@@ -880,6 +880,92 @@ public sealed class OpenAiFileSearchRetrievalTests
         var results = await retriever.RetrieveAsync("query", new RetrievalOptions { TopK = 100 });
 
         Assert.That(results, Has.Count.EqualTo(5));
+    }
+
+    [Test]
+    public async Task Retrieve_MetadataEquals_UsesUnprefixedKeys()
+    {
+        var (_, feature, _) = CreateClientWithFeature(FileSearchSuccessResponse);
+        var retriever = feature.ForStore("vs_test");
+
+        var results = await retriever.RetrieveAsync("query", Options(
+            topK: 10,
+            metadataEquals: new Dictionary<string, string> { ["category"] = "technical" }));
+
+        Assert.That(results, Has.Count.EqualTo(1));
+        Assert.That(results[0].Chunk.Metadata.ContainsKey("category"), Is.True);
+        Assert.That(results[0].Chunk.Metadata.ContainsKey("attr_category"), Is.False);
+    }
+
+    [Test]
+    public async Task Retrieve_MetadataEquals_SendsNativeFiltersInRequest()
+    {
+        var (_, feature, getCapturedBody) = CreateClientWithFeature(FileSearchSuccessResponse);
+        var retriever = feature.ForStore("vs_test");
+
+        await retriever.RetrieveAsync("query", Options(
+            topK: 10,
+            metadataEquals: new Dictionary<string, string> { ["category"] = "technical" }));
+
+        var body = getCapturedBody()!;
+        var doc = JsonDocument.Parse(body);
+        var tool = doc.RootElement.GetProperty("tools")[0];
+        Assert.That(tool.TryGetProperty("filters", out var filters), Is.True);
+        Assert.That(filters.GetProperty("type").GetString(), Is.EqualTo("eq"));
+        Assert.That(filters.GetProperty("key").GetString(), Is.EqualTo("category"));
+        Assert.That(filters.GetProperty("value").GetString(), Is.EqualTo("technical"));
+    }
+
+    [Test]
+    public async Task Retrieve_MultipleMetadataEquals_SendsAndFilter()
+    {
+        var (_, feature, getCapturedBody) = CreateClientWithFeature(FileSearchSuccessResponse);
+        var retriever = feature.ForStore("vs_test");
+
+        await retriever.RetrieveAsync("query", Options(
+            topK: 10,
+            metadataEquals: new Dictionary<string, string>
+            {
+                ["category"] = "technical",
+                ["lang"] = "en"
+            }));
+
+        var body = getCapturedBody()!;
+        var doc = JsonDocument.Parse(body);
+        var tool = doc.RootElement.GetProperty("tools")[0];
+        Assert.That(tool.TryGetProperty("filters", out var filters), Is.True);
+        Assert.That(filters.GetProperty("type").GetString(), Is.EqualTo("and"));
+        Assert.That(filters.GetProperty("filters").GetArrayLength(), Is.EqualTo(2));
+    }
+
+    [Test]
+    public async Task Retrieve_MinScore_SendsRankingOptionsInRequest()
+    {
+        var (_, feature, getCapturedBody) = CreateClientWithFeature(FileSearchSuccessResponse);
+        var retriever = feature.ForStore("vs_test");
+
+        await retriever.RetrieveAsync("query", Options(topK: 10, minScore: 0.8));
+
+        var body = getCapturedBody()!;
+        var doc = JsonDocument.Parse(body);
+        var tool = doc.RootElement.GetProperty("tools")[0];
+        Assert.That(tool.TryGetProperty("ranking_options", out var rankingOptions), Is.True);
+        Assert.That(rankingOptions.GetProperty("score_threshold").GetDouble(), Is.EqualTo(0.8).Within(0.001));
+    }
+
+    [Test]
+    public async Task Retrieve_NoFilters_DoesNotSendFiltersOrRankingOptions()
+    {
+        var (_, feature, getCapturedBody) = CreateClientWithFeature(FileSearchSuccessResponse);
+        var retriever = feature.ForStore("vs_test");
+
+        await retriever.RetrieveAsync("query", Options(topK: 10));
+
+        var body = getCapturedBody()!;
+        var doc = JsonDocument.Parse(body);
+        var tool = doc.RootElement.GetProperty("tools")[0];
+        Assert.That(tool.TryGetProperty("filters", out _), Is.False);
+        Assert.That(tool.TryGetProperty("ranking_options", out _), Is.False);
     }
 
     #endregion

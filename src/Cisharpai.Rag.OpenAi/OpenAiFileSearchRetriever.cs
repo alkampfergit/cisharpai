@@ -40,11 +40,7 @@ internal sealed class OpenAiFileSearchRetriever : IRetriever
         ArgumentNullException.ThrowIfNull(options);
         if (options.TopK is <= 0)
             throw new ArgumentOutOfRangeException(nameof(options), options.TopK, "TopK must be positive when set.");
-        if (options.ProviderQuery is not null)
-            throw new ArgumentException(
-                $"{nameof(OpenAiFileSearchRetriever)} does not support provider query extensions. " +
-                $"Received provider query type '{options.ProviderQuery.GetType().FullName}'.",
-                nameof(options));
+        RetrievalFiltering.ThrowIfUnsupportedProviderQuery(options, nameof(OpenAiFileSearchRetriever));
 
         return RetrieveCoreAsync(query, options, cancellationToken);
     }
@@ -62,6 +58,26 @@ internal sealed class OpenAiFileSearchRetriever : IRetriever
 
         try
         {
+            var tool = new OpenAiResponsesApiTool
+            {
+                Type = "file_search",
+                VectorStoreIds = [_vectorStoreId],
+                MaxNumResults = options.TopK
+            };
+
+            if (options.MetadataEquals is { Count: > 0 } metadataEquals)
+            {
+                tool.Filters = BuildNativeFilters(metadataEquals);
+            }
+
+            if (options.MinScore is not null)
+            {
+                tool.RankingOptions = new OpenAiFileSearchRankingOptions
+                {
+                    ScoreThreshold = options.MinScore.Value
+                };
+            }
+
             var request = new OpenAiResponsesApiRequest
             {
                 Model = model,
@@ -69,15 +85,7 @@ internal sealed class OpenAiFileSearchRetriever : IRetriever
                 [
                     new OpenAiChatMessage { Role = "user", Content = query }
                 ],
-                Tools =
-                [
-                    new OpenAiResponsesApiTool
-                    {
-                        Type = "file_search",
-                        VectorStoreIds = [_vectorStoreId],
-                        MaxNumResults = options.TopK
-                    }
-                ],
+                Tools = [tool],
                 Include = ["file_search_call.results"]
             };
 
@@ -136,28 +144,7 @@ internal sealed class OpenAiFileSearchRetriever : IRetriever
             perFileOrdinals[r.FileId] = ordinal + 1;
         }
 
-        scored.Sort((a, b) => b.Score.CompareTo(a.Score));
-
-        IEnumerable<ScoredChunk> filtered = scored;
-        if (options.MetadataEquals is { Count: > 0 } metadataEquals)
-        {
-            filtered = filtered.Where(c => MatchesMetadata(c.Chunk, metadataEquals));
-        }
-
-        if (options.MinScore is not null)
-        {
-            filtered = filtered.Where(c => c.Score >= options.MinScore.Value);
-        }
-
-        // TopK is sent to the provider and then applied again after local post-filters.
-        // When post-filters remove candidates from the provider window, the final count
-        // can be lower than TopK.
-        if (options.TopK is not null)
-        {
-            filtered = filtered.Take(options.TopK.Value);
-        }
-
-        return filtered.ToList();
+        return RetrievalFiltering.ApplyPostFilters(scored, options, defaultTopK: scored.Count).ToList();
     }
 
     private static ScoredChunk MapToScoredChunk(OpenAiFileSearchResult result, int perFileOrdinal)
@@ -171,7 +158,7 @@ internal sealed class OpenAiFileSearchRetriever : IRetriever
         if (result.Attributes is not null)
         {
             foreach (var (key, value) in result.Attributes)
-                metadata[$"attr_{key}"] = value;
+                metadata[key] = value;
         }
 
         var chunk = new TextChunk(
@@ -185,17 +172,15 @@ internal sealed class OpenAiFileSearchRetriever : IRetriever
         return new ScoredChunk(chunk, result.Score);
     }
 
-    private static bool MatchesMetadata(TextChunk chunk, IReadOnlyDictionary<string, string> metadataEquals)
+    private static OpenAiFileSearchFilter BuildNativeFilters(IReadOnlyDictionary<string, string> metadataEquals)
     {
-        foreach (var (key, expectedValue) in metadataEquals)
-        {
-            if (!chunk.Metadata.TryGetValue(key, out var value))
-                return false;
+        var eqFilters = metadataEquals
+            .Select(kv => new OpenAiFileSearchFilter { Type = "eq", Key = kv.Key, Value = kv.Value })
+            .ToList();
 
-            if (!string.Equals(value?.ToString(), expectedValue, StringComparison.Ordinal))
-                return false;
-        }
+        if (eqFilters.Count == 1)
+            return eqFilters[0];
 
-        return true;
+        return new OpenAiFileSearchFilter { Type = "and", SubFilters = eqFilters };
     }
 }

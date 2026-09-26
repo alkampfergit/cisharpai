@@ -267,29 +267,32 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
         if (_retrievers.Count == 0)
             return options.PrePackedChunks ?? [];
 
+        var retrievalOptions = BuildRetrievalOptions(options);
         var allLists = new List<IReadOnlyList<ScoredChunk>>();
 
         foreach (var searchQuery in searchQueries)
         {
             foreach (var retriever in _retrievers)
             {
-                RetrievalOptions retrievalOptions;
-                if (options.Retrieval is null)
+                var perRetrieverOptions = retrievalOptions;
+                if (perRetrieverOptions.ProviderQuery is not null && _retrievers.Count > 1)
                 {
-                    retrievalOptions = new RetrievalOptions { TopK = options.TopK };
-                }
-                else if (options.Retrieval.TopK is null)
-                {
-                    retrievalOptions = options.Retrieval with { TopK = options.TopK };
-                }
-                else
-                {
-                    retrievalOptions = options.Retrieval;
+                    try
+                    {
+                        var results = await retriever.RetrieveAsync(searchQuery, perRetrieverOptions, cancellationToken)
+                            .ConfigureAwait(false);
+                        allLists.Add(results);
+                        continue;
+                    }
+                    catch (ArgumentException)
+                    {
+                        perRetrieverOptions = perRetrieverOptions with { ProviderQuery = null };
+                    }
                 }
 
-                var results = await retriever.RetrieveAsync(searchQuery, retrievalOptions, cancellationToken)
+                var fallbackResults = await retriever.RetrieveAsync(searchQuery, perRetrieverOptions, cancellationToken)
                     .ConfigureAwait(false);
-                allLists.Add(results);
+                allLists.Add(fallbackResults);
             }
         }
 
@@ -297,6 +300,17 @@ internal sealed class ConversationalRagPipeline : IRagPipeline
             return allLists[0];
 
         return RankFusion.ReciprocalRank(allLists, _rankFusionK);
+    }
+
+    private static RetrievalOptions BuildRetrievalOptions(RagPipelineOptions options)
+    {
+        if (options.Retrieval is null)
+            return new RetrievalOptions { TopK = options.TopK };
+
+        if (options.Retrieval.TopK is null)
+            return options.Retrieval with { TopK = options.TopK };
+
+        return options.Retrieval;
     }
 
     private async Task<IReadOnlyList<ScoredChunk>> RerankAsync(
