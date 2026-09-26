@@ -36,6 +36,34 @@ public sealed class OpenAiResponsesApiTool
     [JsonPropertyName("max_num_results")]
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public int? MaxNumResults { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public OpenAiFileSearchFilter? Filters { get; set; }
+
+    [JsonPropertyName("ranking_options")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public OpenAiFileSearchRankingOptions? RankingOptions { get; set; }
+}
+
+public class OpenAiFileSearchFilter
+{
+    public string Type { get; set; } = string.Empty;
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Key { get; set; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public object? Value { get; set; }
+
+    [JsonPropertyName("filters")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<OpenAiFileSearchFilter>? SubFilters { get; set; }
+}
+
+public sealed class OpenAiFileSearchRankingOptions
+{
+    [JsonPropertyName("score_threshold")]
+    public double ScoreThreshold { get; set; }
 }
 
 public sealed class OpenAiReasoningOption

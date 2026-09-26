@@ -1,4 +1,5 @@
 using Cisharpai.Models;
+using Cisharpai.Rag;
 using Cisharpai.Rag.Models;
 using Cisharpai.Rag.Packing;
 using Cisharpai.Rag.Pipeline;
@@ -10,6 +11,8 @@ namespace Cisharpai.Tests.Rag.Pipeline;
 [TestFixture]
 public class ConversationalRagPipelineTests
 {
+    private sealed record DummyProviderQuery : IRetrievalQueryExtension;
+
     private static TextChunk MakeChunk(string docId, int index, string text) =>
         new(docId, index, 0, text.Length, text);
 
@@ -164,6 +167,72 @@ public class ConversationalRagPipelineTests
 
         Assert.That(retriever.CallCount, Is.EqualTo(2));
         Assert.That(result.ExpandedQueries, Has.Count.EqualTo(2));
+    }
+
+    [Test]
+    public async Task AskAsync_TopK_PropagatesToRetrievalOptions()
+    {
+        var retriever = new FakeRetriever { DefaultResponse = SampleChunks() };
+
+        var pipeline = new RagPipelineBuilder()
+            .WithRetriever(retriever)
+            .Build();
+
+        await pipeline.AskAsync("capital?", new RagPipelineOptions { TopK = 3 });
+
+        Assert.That(retriever.ReceivedQueries, Has.Count.EqualTo(1));
+        Assert.That(retriever.ReceivedQueries[0].Options.TopK, Is.EqualTo(3));
+    }
+
+    [Test]
+    public async Task AskAsync_RetrievalOptions_PropagatesPortableAndProviderOptions()
+    {
+        var retriever = new FakeRetriever { DefaultResponse = SampleChunks() };
+        var providerQuery = new DummyProviderQuery();
+        var metadata = new Dictionary<string, string> { ["tenant"] = "acme" };
+
+        var pipeline = new RagPipelineBuilder()
+            .WithRetriever(retriever)
+            .Build();
+
+        await pipeline.AskAsync("capital?", new RagPipelineOptions
+        {
+            TopK = 4,
+            Retrieval = new RetrievalOptions
+            {
+                MinScore = 0.5,
+                MetadataEquals = metadata,
+                ProviderQuery = providerQuery
+            }
+        });
+
+        Assert.That(retriever.ReceivedQueries, Has.Count.EqualTo(1));
+        Assert.That(retriever.ReceivedQueries[0].Options.TopK, Is.EqualTo(4));
+        Assert.That(retriever.ReceivedQueries[0].Options.MinScore, Is.EqualTo(0.5));
+        Assert.That(retriever.ReceivedQueries[0].Options.MetadataEquals, Is.EqualTo(metadata));
+        Assert.That(retriever.ReceivedQueries[0].Options.ProviderQuery, Is.SameAs(providerQuery));
+    }
+
+    [Test]
+    public async Task AskAsync_RetrievalTopK_WhenSet_TakesPrecedenceOverTopK()
+    {
+        var retriever = new FakeRetriever { DefaultResponse = SampleChunks() };
+
+        var pipeline = new RagPipelineBuilder()
+            .WithRetriever(retriever)
+            .Build();
+
+        await pipeline.AskAsync("capital?", new RagPipelineOptions
+        {
+            TopK = 4,
+            Retrieval = new RetrievalOptions
+            {
+                TopK = 2
+            }
+        });
+
+        Assert.That(retriever.ReceivedQueries, Has.Count.EqualTo(1));
+        Assert.That(retriever.ReceivedQueries[0].Options.TopK, Is.EqualTo(2));
     }
 
     [Test]
@@ -518,5 +587,62 @@ public class ConversationalRagPipelineTests
 
         Assert.That(result.IsSuccess, Is.True);
         Assert.That(result.Citations, Has.Count.EqualTo(1));
+    }
+
+    [Test]
+    public async Task AskAsync_MultipleRetrievers_ProviderQueryRejectedByOne_StillReturnsResults()
+    {
+        var fakeRetriever = new FakeRetriever { DefaultResponse = SampleChunks() };
+
+        var rejectingRetriever = Substitute.For<IRetriever>();
+        rejectingRetriever.RetrieveAsync(
+                Arg.Any<string>(),
+                Arg.Is<RetrievalOptions>(o => o.ProviderQuery != null),
+                Arg.Any<CancellationToken>())
+            .Returns<IReadOnlyList<ScoredChunk>>(_ =>
+                throw new ArgumentException("Unsupported provider query"));
+        rejectingRetriever.RetrieveAsync(
+                Arg.Any<string>(),
+                Arg.Is<RetrievalOptions>(o => o.ProviderQuery == null),
+                Arg.Any<CancellationToken>())
+            .Returns(SampleChunks());
+
+        var pipeline = new RagPipelineBuilder()
+            .WithRetriever(fakeRetriever)
+            .WithRetriever(rejectingRetriever)
+            .Build();
+
+        var result = await pipeline.AskAsync("capital?", new RagPipelineOptions
+        {
+            TopK = 3,
+            Retrieval = new RetrievalOptions
+            {
+                ProviderQuery = new DummyProviderQuery()
+            }
+        });
+
+        Assert.That(result.RetrievedChunks, Is.Not.Empty);
+    }
+
+    [Test]
+    public async Task AskAsync_SingleRetriever_ProviderQuery_PassedDirectly()
+    {
+        var fakeRetriever = new FakeRetriever { DefaultResponse = SampleChunks() };
+
+        var pipeline = new RagPipelineBuilder()
+            .WithRetriever(fakeRetriever)
+            .Build();
+
+        var providerQuery = new DummyProviderQuery();
+        await pipeline.AskAsync("capital?", new RagPipelineOptions
+        {
+            TopK = 3,
+            Retrieval = new RetrievalOptions
+            {
+                ProviderQuery = providerQuery
+            }
+        });
+
+        Assert.That(fakeRetriever.ReceivedQueries[0].Options.ProviderQuery, Is.SameAs(providerQuery));
     }
 }

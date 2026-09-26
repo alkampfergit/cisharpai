@@ -9,13 +9,19 @@ namespace Cisharpai.Rag;
 /// Embeds the query at retrieval time via <see cref="IEmbeddingClient"/> and scores
 /// each stored chunk by cosine similarity. Not suitable for production workloads —
 /// use a purpose-built store behind <see cref="IRetriever"/> instead.
-/// This type is not thread-safe. Concurrent <see cref="Add"/>/<see cref="AddRange(IEnumerable{ValueTuple{TextChunk, float[]}})"/>
-/// and <see cref="RetrieveAsync"/> calls are not supported.
+/// Concurrent retrieval is safe via snapshot reads. Batch ingestion via <see cref="AddRange"/>
+/// is atomic per call; concurrent Add + Retrieve may observe a partially-ingested single <see cref="Add"/> call.
 /// </summary>
 public sealed class InMemoryRetriever : IRetriever
 {
+    /// <summary>
+    /// Default TopK used when <see cref="RetrievalOptions.TopK"/> is null.
+    /// </summary>
+    public const int DefaultTopK = 10;
+
     private readonly IEmbeddingClient _embeddingClient;
     private readonly string? _model;
+    private readonly object _gate = new();
     private readonly List<(TextChunk Chunk, float[] Vector)> _store = new();
 
     /// <param name="embeddingClient">Client used to embed the query at retrieval time.</param>
@@ -34,55 +40,89 @@ public sealed class InMemoryRetriever : IRetriever
     {
         ArgumentNullException.ThrowIfNull(chunk);
         ArgumentNullException.ThrowIfNull(vector);
-        _store.Add((chunk, (float[])vector.Clone()));
+        lock (_gate)
+        {
+            _store.Add((chunk, (float[])vector.Clone()));
+        }
     }
 
     /// <summary>
-    /// Adds multiple chunks with their pre-computed embeddings to the store.
+    /// Adds multiple chunks with their pre-computed embeddings to the store atomically.
     /// </summary>
     public void AddRange(IEnumerable<(TextChunk Chunk, float[] Vector)> items)
     {
         ArgumentNullException.ThrowIfNull(items);
-        foreach (var (chunk, vector) in items)
-            Add(chunk, vector);
+        lock (_gate)
+        {
+            foreach (var (chunk, vector) in items)
+            {
+                ArgumentNullException.ThrowIfNull(chunk);
+                ArgumentNullException.ThrowIfNull(vector);
+                _store.Add((chunk, (float[])vector.Clone()));
+            }
+        }
     }
 
     /// <summary>
-    /// Adds multiple <see cref="ChunkEmbedding"/> items to the store — the natural handoff
+    /// Adds multiple <see cref="ChunkEmbedding"/> items to the store atomically — the natural handoff
     /// from <see cref="Embeddings.BulkEmbeddingProcessor"/>.
     /// </summary>
     public void AddRange(IEnumerable<ChunkEmbedding> items)
     {
         ArgumentNullException.ThrowIfNull(items);
-        foreach (var item in items)
-            Add(item.Chunk, item.Vector);
+        lock (_gate)
+        {
+            foreach (var item in items)
+            {
+                ArgumentNullException.ThrowIfNull(item.Chunk);
+                ArgumentNullException.ThrowIfNull(item.Vector);
+                _store.Add((item.Chunk, (float[])item.Vector.Clone()));
+            }
+        }
     }
 
     /// <summary>Number of chunks currently stored.</summary>
-    public int Count => _store.Count;
+    public int Count
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _store.Count;
+            }
+        }
+    }
 
     /// <inheritdoc />
     public Task<IReadOnlyList<ScoredChunk>> RetrieveAsync(
         string query,
-        int topK,
+        RetrievalOptions options,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(query);
-        if (topK <= 0)
-            throw new ArgumentOutOfRangeException(nameof(topK), topK, "topK must be positive.");
+        ArgumentNullException.ThrowIfNull(options);
+        if (options.TopK is <= 0)
+            throw new ArgumentOutOfRangeException(nameof(options), options.TopK, "TopK must be positive when set.");
+        RetrievalFiltering.ThrowIfUnsupportedProviderQuery(options, nameof(InMemoryRetriever));
 
-        return RetrieveCoreAsync(query, topK, cancellationToken);
+        return RetrieveCoreAsync(query, options, cancellationToken);
     }
 
     private async Task<IReadOnlyList<ScoredChunk>> RetrieveCoreAsync(
         string query,
-        int topK,
+        RetrievalOptions options,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        if (_store.Count == 0)
-            return Array.Empty<ScoredChunk>();
+        (TextChunk Chunk, float[] Vector)[] snapshot;
+        lock (_gate)
+        {
+            if (_store.Count == 0)
+                return Array.Empty<ScoredChunk>();
+
+            snapshot = _store.ToArray();
+        }
 
         var embeddingResponse = await _embeddingClient.GetEmbeddingsAsync(
             new EmbeddingRequest([query], _model, InputType: EmbeddingInputType.Query),
@@ -97,23 +137,14 @@ public sealed class InMemoryRetriever : IRetriever
         if (queryVector is null || queryVector.Length == 0 || queryVector.Any(v => !float.IsFinite(v)))
             return Array.Empty<ScoredChunk>();
 
-        var snapshot = _store.ToArray();
+        var scored = new List<ScoredChunk>(snapshot.Length);
+        foreach (var (chunk, vector) in snapshot)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var score = VectorMath.CosineSimilarity(queryVector, vector);
+            scored.Add(new ScoredChunk(chunk, score));
+        }
 
-        var candidates = new float[snapshot.Length][];
-        for (var i = 0; i < snapshot.Length; i++)
-            candidates[i] = snapshot[i].Vector;
-
-        var topResults = VectorMath.TopK(
-            (ReadOnlySpan<float>)queryVector,
-            (ReadOnlySpan<float[]>)candidates,
-            topK);
-
-        cancellationToken.ThrowIfCancellationRequested();
-
-        var results = new ScoredChunk[topResults.Length];
-        for (var i = 0; i < topResults.Length; i++)
-            results[i] = new ScoredChunk(snapshot[topResults[i].Index].Chunk, topResults[i].Score);
-
-        return results;
+        return RetrievalFiltering.ApplyPostFilters(scored, options, DefaultTopK);
     }
 }

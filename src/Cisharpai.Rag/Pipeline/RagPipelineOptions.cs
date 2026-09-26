@@ -10,6 +10,7 @@ public sealed record RagPipelineOptions
 {
     public IReadOnlyList<LlmMessage>? ConversationHistory { get; init; }
     public int TopK { get; init; } = 10;
+    public RetrievalOptions? Retrieval { get; init; }
     public int? RerankerTopN { get; init; }
     public ContextPackingOptions? PackingOptions { get; init; }
     public string? SystemPrompt { get; init; }
@@ -27,6 +28,8 @@ public sealed record RagPipelineOptions
     internal void Validate()
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(TopK);
+        if (Retrieval?.TopK is <= 0)
+            throw new ArgumentOutOfRangeException(nameof(Retrieval), Retrieval.TopK, "Retrieval.TopK must be positive when set.");
 
         if (RerankerTopN is not null)
             ArgumentOutOfRangeException.ThrowIfNegativeOrZero(RerankerTopN.Value);

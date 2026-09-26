@@ -33,19 +33,21 @@ internal sealed class OpenAiFileSearchRetriever : IRetriever
 
     public Task<IReadOnlyList<ScoredChunk>> RetrieveAsync(
         string query,
-        int topK,
+        RetrievalOptions options,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(query);
-        if (topK <= 0)
-            throw new ArgumentOutOfRangeException(nameof(topK), topK, "topK must be positive.");
+        ArgumentNullException.ThrowIfNull(options);
+        if (options.TopK is <= 0)
+            throw new ArgumentOutOfRangeException(nameof(options), options.TopK, "TopK must be positive when set.");
+        RetrievalFiltering.ThrowIfUnsupportedProviderQuery(options, nameof(OpenAiFileSearchRetriever));
 
-        return RetrieveCoreAsync(query, topK, cancellationToken);
+        return RetrieveCoreAsync(query, options, cancellationToken);
     }
 
     private async Task<IReadOnlyList<ScoredChunk>> RetrieveCoreAsync(
         string query,
-        int topK,
+        RetrievalOptions options,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -56,6 +58,26 @@ internal sealed class OpenAiFileSearchRetriever : IRetriever
 
         try
         {
+            var tool = new OpenAiResponsesApiTool
+            {
+                Type = "file_search",
+                VectorStoreIds = [_vectorStoreId],
+                MaxNumResults = options.TopK
+            };
+
+            if (options.MetadataEquals is { Count: > 0 } metadataEquals)
+            {
+                tool.Filters = BuildNativeFilters(metadataEquals);
+            }
+
+            if (options.MinScore is not null)
+            {
+                tool.RankingOptions = new OpenAiFileSearchRankingOptions
+                {
+                    ScoreThreshold = options.MinScore.Value
+                };
+            }
+
             var request = new OpenAiResponsesApiRequest
             {
                 Model = model,
@@ -63,22 +85,14 @@ internal sealed class OpenAiFileSearchRetriever : IRetriever
                 [
                     new OpenAiChatMessage { Role = "user", Content = query }
                 ],
-                Tools =
-                [
-                    new OpenAiResponsesApiTool
-                    {
-                        Type = "file_search",
-                        VectorStoreIds = [_vectorStoreId],
-                        MaxNumResults = topK
-                    }
-                ],
+                Tools = [tool],
                 Include = ["file_search_call.results"]
             };
 
             var response = await _client.PostAsync<OpenAiResponsesApiRequest, OpenAiResponsesApiResponse>(
                 "responses", request, cancellationToken: cancellationToken).ConfigureAwait(false);
 
-            return MapFileSearchResults(response, topK);
+            return MapFileSearchResults(response, options);
         }
         catch (LlmHttpRequestException ex)
         {
@@ -98,7 +112,7 @@ internal sealed class OpenAiFileSearchRetriever : IRetriever
         }
     }
 
-    private List<ScoredChunk> MapFileSearchResults(OpenAiResponsesApiResponse response, int topK)
+    private List<ScoredChunk> MapFileSearchResults(OpenAiResponsesApiResponse response, RetrievalOptions options)
     {
         var fileSearchCalls = response.Output
             .Where(o => o.Type == "file_search_call")
@@ -130,9 +144,7 @@ internal sealed class OpenAiFileSearchRetriever : IRetriever
             perFileOrdinals[r.FileId] = ordinal + 1;
         }
 
-        scored.Sort((a, b) => b.Score.CompareTo(a.Score));
-
-        return scored.Count <= topK ? scored : scored.GetRange(0, topK);
+        return RetrievalFiltering.ApplyPostFilters(scored, options, defaultTopK: scored.Count).ToList();
     }
 
     private static ScoredChunk MapToScoredChunk(OpenAiFileSearchResult result, int perFileOrdinal)
@@ -146,7 +158,7 @@ internal sealed class OpenAiFileSearchRetriever : IRetriever
         if (result.Attributes is not null)
         {
             foreach (var (key, value) in result.Attributes)
-                metadata[$"attr_{key}"] = value;
+                metadata[key] = value;
         }
 
         var chunk = new TextChunk(
@@ -158,5 +170,17 @@ internal sealed class OpenAiFileSearchRetriever : IRetriever
             Metadata: new ReadOnlyDictionary<string, object?>(metadata));
 
         return new ScoredChunk(chunk, result.Score);
+    }
+
+    private static OpenAiFileSearchFilter BuildNativeFilters(IReadOnlyDictionary<string, string> metadataEquals)
+    {
+        var eqFilters = metadataEquals
+            .Select(kv => new OpenAiFileSearchFilter { Type = "eq", Key = kv.Key, Value = kv.Value })
+            .ToList();
+
+        if (eqFilters.Count == 1)
+            return eqFilters[0];
+
+        return new OpenAiFileSearchFilter { Type = "and", SubFilters = eqFilters };
     }
 }
