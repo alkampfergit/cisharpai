@@ -588,4 +588,61 @@ public class ConversationalRagPipelineTests
         Assert.That(result.IsSuccess, Is.True);
         Assert.That(result.Citations, Has.Count.EqualTo(1));
     }
+
+    [Test]
+    public async Task AskAsync_MultipleRetrievers_ProviderQueryRejectedByOne_StillReturnsResults()
+    {
+        var fakeRetriever = new FakeRetriever { DefaultResponse = SampleChunks() };
+
+        var rejectingRetriever = Substitute.For<IRetriever>();
+        rejectingRetriever.RetrieveAsync(
+                Arg.Any<string>(),
+                Arg.Is<RetrievalOptions>(o => o.ProviderQuery != null),
+                Arg.Any<CancellationToken>())
+            .Returns<IReadOnlyList<ScoredChunk>>(_ =>
+                throw new ArgumentException("Unsupported provider query"));
+        rejectingRetriever.RetrieveAsync(
+                Arg.Any<string>(),
+                Arg.Is<RetrievalOptions>(o => o.ProviderQuery == null),
+                Arg.Any<CancellationToken>())
+            .Returns(SampleChunks());
+
+        var pipeline = new RagPipelineBuilder()
+            .WithRetriever(fakeRetriever)
+            .WithRetriever(rejectingRetriever)
+            .Build();
+
+        var result = await pipeline.AskAsync("capital?", new RagPipelineOptions
+        {
+            TopK = 3,
+            Retrieval = new RetrievalOptions
+            {
+                ProviderQuery = new DummyProviderQuery()
+            }
+        });
+
+        Assert.That(result.RetrievedChunks, Is.Not.Empty);
+    }
+
+    [Test]
+    public async Task AskAsync_SingleRetriever_ProviderQuery_PassedDirectly()
+    {
+        var fakeRetriever = new FakeRetriever { DefaultResponse = SampleChunks() };
+
+        var pipeline = new RagPipelineBuilder()
+            .WithRetriever(fakeRetriever)
+            .Build();
+
+        var providerQuery = new DummyProviderQuery();
+        await pipeline.AskAsync("capital?", new RagPipelineOptions
+        {
+            TopK = 3,
+            Retrieval = new RetrievalOptions
+            {
+                ProviderQuery = providerQuery
+            }
+        });
+
+        Assert.That(fakeRetriever.ReceivedQueries[0].Options.ProviderQuery, Is.SameAs(providerQuery));
+    }
 }
