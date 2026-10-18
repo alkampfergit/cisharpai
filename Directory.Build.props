@@ -33,6 +33,8 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />
+    <!-- Same Roslyn rules SonarCloud applies to C#: violations show up as warnings in a local build. -->
+    <PackageReference Include="SonarAnalyzer.CSharp" PrivateAssets="All" IncludeAssets="runtime;build;native;contentfiles;analyzers" />
   </ItemGroup>
 
 </Project>
