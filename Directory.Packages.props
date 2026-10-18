@@ -21,6 +21,7 @@
 
     <!-- Build tooling -->
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="8.0.0" />
+    <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.35.0.4138" />
 
     <!-- Testing packages -->
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />

@@ -70,6 +70,7 @@ Detailed structure: [project_overview.md](memories/project_overview.md)
 ### Build & CI
 
 - `scripts/build.ps1` — Build, test, pack (7 NuGet packages). Outputs to `artifacts/`.
+- Local SonarCloud feedback: `SonarAnalyzer.CSharp` is referenced in `Directory.Build.props`, so `dotnet build` prints Sonar C# violations (`warning Sxxxx`) locally before CI. Duplication/coverage quality-gate conditions are only evaluated in CI.
 - `.github/workflows/ci.yml` — Main CI: build + unit tests + integration tests.
 - `GitVersion.yml` — ContinuousDeployment mode. Labels: `alpha` (develop/feature), `beta` (release/hotfix).
 
