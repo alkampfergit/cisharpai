@@ -227,7 +227,7 @@ public class InMemoryRetrieverTests
     {
         var embeddingClient = Substitute.For<IEmbeddingClient>();
         var cts = new CancellationTokenSource();
-        cts.Cancel();
+        await cts.CancelAsync();
 
         embeddingClient.GetEmbeddingsAsync(Arg.Any<EmbeddingRequest>(), Arg.Any<CancellationToken>())
             .Returns(callInfo =>
@@ -239,7 +239,7 @@ public class InMemoryRetrieverTests
         var retriever = new InMemoryRetriever(embeddingClient);
         retriever.Add(MakeChunk("doc", 0, "text"), new float[] { 1f });
 
-        Assert.That(
+        await Assert.ThatAsync(
             async () => await retriever.RetrieveAsync("query", new RetrievalOptions { TopK = 1 }, cts.Token),
             Throws.TypeOf<OperationCanceledException>());
     }

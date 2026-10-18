@@ -16,8 +16,8 @@ public sealed class CohereEmbeddingScenario : IScenario
     {
         var apiKey = ScenarioHelpers.RequireEnv(DotEnv.CohereApiKey);
 
-        var model = AnsiConsole.Ask("Model?", "embed-english-v3.0");
-        var text = AnsiConsole.Ask("Text to embed?", "The quick brown fox jumps over the lazy dog.");
+        var model = await AnsiConsole.AskAsync("Model?", "embed-english-v3.0", cancellationToken);
+        var text = await AnsiConsole.AskAsync("Text to embed?", "The quick brown fox jumps over the lazy dog.", cancellationToken);
 
         var services = ScenarioHelpers.CreateServiceCollection();
         services.AddCohereEmbeddingClient(options =>

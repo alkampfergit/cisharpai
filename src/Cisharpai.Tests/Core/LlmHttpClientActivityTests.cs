@@ -168,6 +168,7 @@ public sealed class LlmHttpClientActivityTests
 
         await foreach (var _ in client.PostStreamAsync<object>("api/stream", new { Name = "x" }))
         {
+            // drain the stream
         }
 
         Assert.That(spans, Has.Count.EqualTo(1));
@@ -236,6 +237,7 @@ public sealed class LlmHttpClientActivityTests
         {
             await foreach (var _ in client.PostStreamAsync<object>("api/stream", new { Name = "x" }))
             {
+                // drain the stream
             }
         });
 

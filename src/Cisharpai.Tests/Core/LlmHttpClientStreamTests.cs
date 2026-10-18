@@ -249,7 +249,7 @@ public sealed class LlmHttpClientStreamTests
                 results.Add(chunk);
                 if (results.Count == 1)
                 {
-                    cts.Cancel(); // Cancel after first chunk
+                    await cts.CancelAsync(); // Cancel after first chunk
                 }
             }
         });

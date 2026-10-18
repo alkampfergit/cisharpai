@@ -157,7 +157,7 @@ public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOut
 
             var chatCompletion = new ChatCompletionResponse(
                 Content: content,
-                Model: request.Model!,
+                Model: request.Model,
                 PromptTokens: raw.Usage.Tokens.InputTokens,
                 CompletionTokens: raw.Usage.Tokens.OutputTokens,
                 RawResponseJson: rawResponseJson,
@@ -208,7 +208,7 @@ public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOut
                     ChatEndpoint, providerRequest, request.ExtraParameters, cancellationToken);
             }
 
-            return MapToolCallingResponse(raw, request.Model!, rawResponseJson, rawRequestJson);
+            return MapToolCallingResponse(raw, request.Model, rawResponseJson, rawRequestJson);
         }
         catch (LlmHttpRequestException ex)
         {

@@ -73,7 +73,7 @@ public sealed class FakeTokenCounterTests
             Assert.That(fake.CallCount, Is.Zero);
         });
 
-        Assert.That(
+        await Assert.ThatAsync(
             async () => await fake.CountAsync("text"),
             Throws.InstanceOf<InvalidOperationException>());
     }

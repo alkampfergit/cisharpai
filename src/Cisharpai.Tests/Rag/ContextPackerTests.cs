@@ -477,7 +477,7 @@ public class ContextPackerTests
             Separator = "\n\n"
         };
         using var cts = new CancellationTokenSource();
-        cts.Cancel();
+        await cts.CancelAsync();
 
         Assert.ThrowsAsync<OperationCanceledException>(
             () => packer.PackAsync(chunks, options, cts.Token));

@@ -153,7 +153,7 @@ public sealed class AzureOpenAiStreamingTests
             Model: "gpt-4o");
 
         var feature = client.Features.Get<IStreamingChatFeature>()!;
-        await foreach (var _ in feature.GetChatCompletionStreamAsync(request)) { }
+        await foreach (var _ in feature.GetChatCompletionStreamAsync(request)) { /* drain the stream */ }
 
         var body = getBody()!;
         Assert.That(body, Does.Contain("\"stream\":true"));
@@ -195,7 +195,7 @@ public sealed class AzureOpenAiStreamingTests
             MaxTokens: 500);
 
         var feature = client.Features.Get<IStreamingChatFeature>()!;
-        await foreach (var _ in feature.GetChatCompletionStreamAsync(request)) { }
+        await foreach (var _ in feature.GetChatCompletionStreamAsync(request)) { /* drain the stream */ }
 
         var body = getBody()!;
         Assert.Multiple(() =>

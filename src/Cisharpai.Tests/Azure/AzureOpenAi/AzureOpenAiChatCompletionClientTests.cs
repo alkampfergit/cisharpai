@@ -1083,7 +1083,7 @@ public sealed class AzureOpenAiChatCompletionClientTests
         var feature = client.Features.Get<IStreamingChatFeature>()!;
         await foreach (var _ in feature.GetChatCompletionStreamAsync(new ChatCompletionRequest(
                            Messages: [new LlmMessage(LlmRole.User, "Stream")],
-                           Model: "gpt-5"))) { }
+                           Model: "gpt-5"))) { /* drain the stream */ }
 
         var doc = JsonDocument.Parse(capturedBody!);
         Assert.Multiple(() =>

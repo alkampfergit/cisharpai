@@ -439,7 +439,7 @@ public sealed class CohereTokenCounterTests
         await counter.CountAsync("test");
 
         Assert.That(handler.LastRequest!.RequestUri!.Host, Is.EqualTo("my-proxy.example.com"));
-        Assert.That(handler.LastRequest!.RequestUri!.AbsolutePath, Is.EqualTo("/v1/tokenize"));
+        Assert.That(handler.LastRequest.RequestUri.AbsolutePath, Is.EqualTo("/v1/tokenize"));
     }
 
     [Test]

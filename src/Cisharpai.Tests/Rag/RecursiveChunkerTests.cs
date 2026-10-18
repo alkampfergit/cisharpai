@@ -437,7 +437,7 @@ public class RecursiveChunkerTests
             .GetAsyncEnumerator(cts.Token);
 
         Assert.That(await enumerator.MoveNextAsync(), Is.True, "First chunk should be yielded");
-        cts.Cancel();
+        await cts.CancelAsync();
         Assert.ThrowsAsync<OperationCanceledException>(async () => await enumerator.MoveNextAsync());
     }
 

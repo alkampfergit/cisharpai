@@ -16,8 +16,8 @@ public sealed class CohereChatScenario : IScenario
     {
         var apiKey = ScenarioHelpers.RequireEnv(DotEnv.CohereApiKey);
 
-        var model = AnsiConsole.Ask("Model?", "command-a-03-2025");
-        var prompt = AnsiConsole.Ask("User prompt?", "Explain async/await in 3 sentences.");
+        var model = await AnsiConsole.AskAsync("Model?", "command-a-03-2025", cancellationToken);
+        var prompt = await AnsiConsole.AskAsync("User prompt?", "Explain async/await in 3 sentences.", cancellationToken);
 
         var services = ScenarioHelpers.CreateServiceCollection();
         services.AddCohereChatClient(options =>

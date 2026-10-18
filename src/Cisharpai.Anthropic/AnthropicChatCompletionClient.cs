@@ -680,7 +680,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
                     End: blockStart + blockText.Length,
                     Text: blockText,
                     Sources: [new CitationSource(
-                        Id: cite.Url!,
+                        Id: cite.Url,
                         Data: BuildTitleData(cite.Title),
                         CitedText: cite.CitedText)],
                     Type: cite.Type));

@@ -178,7 +178,7 @@ public class FixedSizeChunkerTests
     public async Task ChunkAsync_RespectsCancellationToken()
     {
         using var cts = new CancellationTokenSource();
-        cts.Cancel();
+        await cts.CancelAsync();
         var chunker = new FixedSizeChunker(new() { ChunkSize = 2, Overlap = 0 });
         Assert.ThrowsAsync<OperationCanceledException>(async () =>
             await Collect(chunker.ChunkAsync(new("doc", "abcd"), cts.Token)));

@@ -17,8 +17,8 @@ public sealed class OpenAiEmbeddingScenario : IScenario
         var apiKey = ScenarioHelpers.RequireEnv(DotEnv.OpenAiApiKey);
         var baseUrl = ScenarioHelpers.GetEnv(DotEnv.OpenAiBaseUrl);
 
-        var model = AnsiConsole.Ask("Model?", "text-embedding-3-small");
-        var text = AnsiConsole.Ask("Text to embed?", "The quick brown fox jumps over the lazy dog.");
+        var model = await AnsiConsole.AskAsync("Model?", "text-embedding-3-small", cancellationToken);
+        var text = await AnsiConsole.AskAsync("Text to embed?", "The quick brown fox jumps over the lazy dog.", cancellationToken);
 
         var services = ScenarioHelpers.CreateServiceCollection();
         services.AddOpenAiEmbeddingClient(options =>
