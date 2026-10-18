@@ -89,7 +89,7 @@ public class FakeChatCompletionClientTests
         await fake.GetChatCompletionAsync(request);
         await fake.GetChatCompletionWithToolsAsync(request,
             new ToolCallingOptions([new ToolDefinition("fn", "desc", System.Text.Json.JsonDocument.Parse("{}").RootElement)]));
-        await foreach (var _ in fake.GetChatCompletionStreamAsync(request)) { }
+        await foreach (var _ in fake.GetChatCompletionStreamAsync(request)) { /* drain the stream */ }
 
         Assert.That(fake.CallCount, Is.EqualTo(3));
     }

@@ -84,7 +84,7 @@ public sealed class TiktokenCounterTests
     {
         var counter = new TiktokenCounter("gpt-4o");
 
-        Assert.That(async () => await counter.CountAsync(null!), Throws.ArgumentNullException);
+        await Assert.ThatAsync(async () => await counter.CountAsync(null!), Throws.ArgumentNullException);
     }
 
     [Test]

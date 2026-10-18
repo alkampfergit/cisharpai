@@ -18,8 +18,8 @@ public sealed class AnthropicChatScenario : IScenario
         var baseUrl = ScenarioHelpers.GetEnv(DotEnv.AnthropicBaseUrl);
         var apiVersion = ScenarioHelpers.GetEnv(DotEnv.AnthropicApiVersion);
 
-        var model = AnsiConsole.Ask("Model?", "claude-sonnet-4-20250514");
-        var prompt = AnsiConsole.Ask("User prompt?", "Explain async/await in 3 sentences.");
+        var model = await AnsiConsole.AskAsync("Model?", "claude-sonnet-4-20250514", cancellationToken);
+        var prompt = await AnsiConsole.AskAsync("User prompt?", "Explain async/await in 3 sentences.", cancellationToken);
 
         var services = ScenarioHelpers.CreateServiceCollection();
         services.AddAnthropicClient(options =>

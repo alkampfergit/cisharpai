@@ -70,7 +70,7 @@ public class BulkEmbeddingProviderProfileTests
             });
 
         var processor = new BulkEmbeddingProcessor(client, BulkEmbeddingOptions.ForProvider(EmbeddingProviderProfile.Cohere));
-        await foreach (var _ in processor.EmbedAsync(Enumerable.Range(0, 100).Select(Chunk))) { }
+        await foreach (var _ in processor.EmbedAsync(Enumerable.Range(0, 100).Select(Chunk))) { /* drain the stream */ }
 
         Assert.That(requests.Select(r => r.Input.Count), Is.EqualTo(new[] { 96, 4 }));
     }

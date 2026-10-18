@@ -246,7 +246,7 @@ public class SemanticChunkerTests
     public async Task CancellationIsHonoured()
     {
         using var cts = new CancellationTokenSource();
-        cts.Cancel();
+        await cts.CancelAsync();
         var text = "First sentence. Second sentence. Third sentence.";
         var vectors = new[]
         {
@@ -728,7 +728,7 @@ public class SemanticChunkerTests
             .GetAsyncEnumerator(cts.Token);
 
         Assert.That(await enumerator.MoveNextAsync(), Is.True, "First chunk should be yielded");
-        cts.Cancel();
+        await cts.CancelAsync();
         Assert.ThrowsAsync<OperationCanceledException>(async () => await enumerator.MoveNextAsync());
     }
 

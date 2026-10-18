@@ -128,7 +128,7 @@ public sealed class CohereRerankerClientTests
         Assert.Multiple(() =>
         {
             Assert.That(handler.LastRequest!.Method, Is.EqualTo(HttpMethod.Post));
-            Assert.That(handler.LastRequest!.RequestUri!.ToString(),
+            Assert.That(handler.LastRequest.RequestUri!.ToString(),
                 Is.EqualTo("https://api.cohere.com/v2/rerank"));
         });
     }

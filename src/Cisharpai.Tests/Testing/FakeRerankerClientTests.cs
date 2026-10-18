@@ -83,7 +83,7 @@ public sealed class FakeRerankerClientTests
             Assert.That(fake.CallCount, Is.Zero);
         });
 
-        Assert.That(
+        await Assert.ThatAsync(
             async () => await fake.RerankAsync(new RerankRequest("q", Documents)),
             Throws.InstanceOf<InvalidOperationException>());
     }

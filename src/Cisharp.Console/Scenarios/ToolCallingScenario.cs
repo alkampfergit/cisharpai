@@ -40,10 +40,10 @@ public sealed class ToolCallingScenario : IScenario
     {
         DotEnv.Load();
 
-        var provider = AnsiConsole.Prompt(
+        var provider = await AnsiConsole.PromptAsync(
             new SelectionPrompt<string>()
                 .Title("Which provider?")
-                .AddChoices("OpenAI", "Anthropic", "Cohere"));
+                .AddChoices("OpenAI", "Anthropic", "Cohere"), cancellationToken);
 
         var (client, model) = CreateClient(provider);
         var toolFeature = client.Features.Get<IToolCallingFeature>();
@@ -54,8 +54,8 @@ public sealed class ToolCallingScenario : IScenario
             return;
         }
 
-        model = AnsiConsole.Ask("Model?", model);
-        var prompt = AnsiConsole.Ask("User prompt?", "What is the current weather in Paris and Tokyo?");
+        model = await AnsiConsole.AskAsync("Model?", model, cancellationToken);
+        var prompt = await AnsiConsole.AskAsync("User prompt?", "What is the current weather in Paris and Tokyo?", cancellationToken);
 
         var tools = new ToolCallingOptions(
             Tools:

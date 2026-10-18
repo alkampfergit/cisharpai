@@ -99,7 +99,7 @@ public class RagPipelineStreamingTests
 
         Assert.ThrowsAsync<ArgumentNullException>(async () =>
         {
-            await foreach (var _ in pipeline.AskStreamingAsync(null!)) { }
+            await foreach (var _ in pipeline.AskStreamingAsync(null!)) { /* drain the stream */ }
         });
     }
 
@@ -164,7 +164,7 @@ public class RagPipelineStreamingTests
         Assert.ThrowsAsync<ArgumentOutOfRangeException>(async () =>
         {
             await foreach (var _ in pipeline.AskStreamingAsync("test",
-                new RagPipelineOptions { TopK = 0 })) { }
+                new RagPipelineOptions { TopK = 0 })) { /* drain the stream */ }
         });
     }
 }

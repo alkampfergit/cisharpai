@@ -153,7 +153,7 @@ public sealed class AzureAiInferenceStreamingTests
             Model: "Phi-3-mini");
 
         var feature = client.Features.Get<IStreamingChatFeature>()!;
-        await foreach (var _ in feature.GetChatCompletionStreamAsync(request)) { }
+        await foreach (var _ in feature.GetChatCompletionStreamAsync(request)) { /* drain the stream */ }
 
         var body = getBody()!;
         Assert.That(body, Does.Contain("\"stream\":true"));
@@ -193,7 +193,7 @@ public sealed class AzureAiInferenceStreamingTests
             Model: null);
 
         var feature = client.Features.Get<IStreamingChatFeature>()!;
-        await foreach (var _ in feature.GetChatCompletionStreamAsync(request)) { }
+        await foreach (var _ in feature.GetChatCompletionStreamAsync(request)) { /* drain the stream */ }
 
         var body = getBody()!;
         Assert.That(body, Does.Contain("Phi-3-mini-options"));

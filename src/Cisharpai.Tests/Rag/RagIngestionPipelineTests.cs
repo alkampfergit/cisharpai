@@ -185,7 +185,7 @@ public class RagIngestionPipelineTests
         var pipeline = new RagIngestionPipeline(new FixedSizeChunker(), new BulkEmbeddingProcessor(fake, new() { MaxBatchItems = 1 }));
         await using var enumerator = pipeline.IngestAsync(Source(), null, cancellation.Token).GetAsyncEnumerator();
         Assert.That(await enumerator.MoveNextAsync(), Is.True);
-        cancellation.Cancel();
+        await cancellation.CancelAsync();
         Assert.ThrowsAsync<OperationCanceledException>(async () => await enumerator.MoveNextAsync());
         Assert.That(observedToken, Is.EqualTo(cancellation.Token));
         Assert.That(disposed, Is.True);

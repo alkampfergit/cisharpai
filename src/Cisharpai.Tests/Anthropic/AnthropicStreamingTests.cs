@@ -150,7 +150,7 @@ public sealed class AnthropicStreamingTests
             Model: "claude-3-5-sonnet-20241022");
 
         var feature = client.Features.Get<IStreamingChatFeature>()!;
-        await foreach (var _ in feature.GetChatCompletionStreamAsync(request)) { }
+        await foreach (var _ in feature.GetChatCompletionStreamAsync(request)) { /* drain the stream */ }
 
         var body = getBody()!;
         Assert.That(body, Does.Contain("\"stream\":true"));

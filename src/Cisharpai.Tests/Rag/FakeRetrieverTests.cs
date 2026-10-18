@@ -95,7 +95,7 @@ public class FakeRetrieverTests
 
         Assert.That(fake.ReceivedQueries, Is.Empty);
         Assert.That(fake.CallCount, Is.EqualTo(0));
-        Assert.That(
+        await Assert.ThatAsync(
             async () => await fake.RetrieveAsync("q", new RetrievalOptions { TopK = 1 }),
             Throws.TypeOf<InvalidOperationException>(),
             "Queue should be empty after reset");

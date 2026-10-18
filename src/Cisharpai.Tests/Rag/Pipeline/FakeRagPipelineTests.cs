@@ -76,7 +76,7 @@ public class FakeRagPipelineTests
         };
 
         await fake.AskAsync("q1");
-        await foreach (var _ in fake.AskStreamingAsync("q2")) { }
+        await foreach (var _ in fake.AskStreamingAsync("q2")) { /* drain the stream */ }
 
         Assert.That(fake.CallCount, Is.EqualTo(2));
     }

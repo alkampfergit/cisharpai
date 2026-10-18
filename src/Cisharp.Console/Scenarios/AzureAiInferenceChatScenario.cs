@@ -19,7 +19,7 @@ public sealed class AzureAiInferenceChatScenario : IScenario
         var apiKey = ScenarioHelpers.RequireEnv(DotEnv.AzureInferenceApiKey);
         var modelId = ScenarioHelpers.RequireEnv(DotEnv.AzureInferenceModel);
 
-        var prompt = AnsiConsole.Ask("User prompt?", "Explain the benefits of dependency injection in 3 sentences.");
+        var prompt = await AnsiConsole.AskAsync("User prompt?", "Explain the benefits of dependency injection in 3 sentences.", cancellationToken);
 
         var services = ScenarioHelpers.CreateServiceCollection();
         services.AddAzureAiInferenceChatCompletion(options =>

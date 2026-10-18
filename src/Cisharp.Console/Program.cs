@@ -27,11 +27,11 @@ AnsiConsole.MarkupLine("Select a scenario to run.");
 
 while (true)
 {
-    var choice = AnsiConsole.Prompt(
+    var choice = await AnsiConsole.PromptAsync(
         new SelectionPrompt<string>()
             .Title("Scenario")
             .PageSize(10)
-            .AddChoices(menuItems));
+            .AddChoices(menuItems), cts.Token);
 
     if (choice.Equals("Exit", StringComparison.OrdinalIgnoreCase))
         break;
@@ -57,7 +57,7 @@ while (true)
     }
 
     AnsiConsole.WriteLine();
-    if (!AnsiConsole.Confirm("Run another scenario?"))
+    if (!await AnsiConsole.ConfirmAsync("Run another scenario?", cancellationToken: cts.Token))
         break;
 
     AnsiConsole.Clear();

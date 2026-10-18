@@ -20,7 +20,7 @@ public sealed class AzureOpenAiChatScenario : IScenario
         var apiKey = ScenarioHelpers.RequireEnv(DotEnv.AzureOpenAiApiKey);
         var apiVersion = ScenarioHelpers.GetEnv(DotEnv.AzureOpenAiApiVersion);
 
-        var prompt = AnsiConsole.Ask("User prompt?", "Summarize the benefits of dependency injection.");
+        var prompt = await AnsiConsole.AskAsync("User prompt?", "Summarize the benefits of dependency injection.", cancellationToken);
 
         var services = ScenarioHelpers.CreateServiceCollection();
         services.AddAzureOpenAiClient(options =>
