@@ -313,9 +313,7 @@ public sealed class BulkEmbeddingProcessor : IBulkEmbeddingProcessor
 
             var start = index;
             while (index < message.Length && char.IsAsciiDigit(message[index])) index++;
-            if (index - start != 3) continue;
-            if (start > 0 && char.IsAsciiLetter(message[start - 1])) continue;
-            if (index < message.Length && char.IsAsciiLetter(message[index])) continue;
+            if (!IsStandaloneThreeDigitRun(message, start, index)) continue;
 
             var code = (message[start] - '0') * 100 + (message[start + 1] - '0') * 10 + (message[start + 2] - '0');
             if (code == 429 || code is >= 500 and <= 599) return true;
@@ -323,6 +321,11 @@ public sealed class BulkEmbeddingProcessor : IBulkEmbeddingProcessor
 
         return false;
     }
+
+    private static bool IsStandaloneThreeDigitRun(string message, int start, int end) =>
+        end - start == 3
+        && !(start > 0 && char.IsAsciiLetter(message[start - 1]))
+        && !(end < message.Length && char.IsAsciiLetter(message[end]));
 
     private async Task<(List<TextChunk> Batch, TextChunk? Carryover)> CollectBatchAsync(
         IAsyncEnumerator<TextChunk> enumerator, TextChunk? carryover, CancellationToken cancellationToken)

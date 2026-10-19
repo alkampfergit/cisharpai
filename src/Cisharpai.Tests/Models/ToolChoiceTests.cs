@@ -67,19 +67,25 @@ public sealed class ToolChoiceTests
     [Test]
     public void Auto_Singleton_ReturnsSameInstance()
     {
-        Assert.That(ToolChoice.Auto, Is.SameAs(ToolChoice.Auto));
+        var first = ToolChoice.Auto;
+        var second = ToolChoice.Auto;
+        Assert.That(second, Is.SameAs(first));
     }
 
     [Test]
     public void None_Singleton_ReturnsSameInstance()
     {
-        Assert.That(ToolChoice.None, Is.SameAs(ToolChoice.None));
+        var first = ToolChoice.None;
+        var second = ToolChoice.None;
+        Assert.That(second, Is.SameAs(first));
     }
 
     [Test]
     public void Required_Singleton_ReturnsSameInstance()
     {
-        Assert.That(ToolChoice.Required, Is.SameAs(ToolChoice.Required));
+        var first = ToolChoice.Required;
+        var second = ToolChoice.Required;
+        Assert.That(second, Is.SameAs(first));
     }
 
     [Test]

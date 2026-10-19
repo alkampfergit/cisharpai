@@ -152,12 +152,11 @@ public class RagIngestionPipelineTests
 
         var fake = new FakeEmbeddingClient { DefaultResponse = Response(2) };
         var pipeline = new RagIngestionPipeline(new FixedSizeChunker(), new BulkEmbeddingProcessor(fake, new() { MaxBatchItems = 2 }));
-        await foreach (var batch in pipeline.IngestAsync(Source()))
-        {
-            Assert.That(batch.Items, Has.Count.EqualTo(2));
-            Assert.That(visited, Is.EqualTo(2));
-            break;
-        }
+        var enumerator = pipeline.IngestAsync(Source()).GetAsyncEnumerator();
+        Assert.That(await enumerator.MoveNextAsync(), Is.True);
+        Assert.That(enumerator.Current.Items, Has.Count.EqualTo(2));
+        Assert.That(visited, Is.EqualTo(2));
+        await enumerator.DisposeAsync();
         Assert.That(disposed, Is.True);
         Assert.That(fake.CallCount, Is.EqualTo(1));
     }

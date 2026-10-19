@@ -1,5 +1,4 @@
 using System.Runtime.CompilerServices;
-using System.Text.Json;
 using Cisharpai.Features;
 using Cisharpai.Features.Chat;
 using Cisharpai.Models;

@@ -37,19 +37,6 @@ public sealed class CohereVisionTests
         }
         """;
 
-    private static CohereChatCompletionClient CreateClient(string responseJson)
-    {
-        var handler = new MockHttpMessageHandler((_, _) =>
-            Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                Content = new StringContent(responseJson, System.Text.Encoding.UTF8, "application/json")
-            }));
-
-        var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var options = new CohereClientOptions { ApiKey = "test-key" };
-        return new CohereChatCompletionClient(httpClient, options);
-    }
-
     private static CohereChatCompletionClient CreateCapturingClient(string responseJson, out Func<string?> getBody)
     {
         string? capturedBody = null;

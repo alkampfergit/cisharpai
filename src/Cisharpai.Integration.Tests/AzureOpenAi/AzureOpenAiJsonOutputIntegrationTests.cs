@@ -32,7 +32,7 @@ public sealed class AzureOpenAiJsonOutputIntegrationTests
             yield return deployment;
     }
 
-    private IChatCompletionClient CreateClient(string deployment)
+    private static IChatCompletionClient CreateClient(string deployment)
     {
         var endpoint = Environment.GetEnvironmentVariable(DotEnv.AzureOpenAiTestEndpoint);
         var apiKey = Environment.GetEnvironmentVariable(DotEnv.AzureOpenAiTestApiKey);

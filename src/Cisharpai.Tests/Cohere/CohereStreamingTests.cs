@@ -116,7 +116,7 @@ public sealed class CohereStreamingTests
             chunks.Add(chunk);
         }
 
-        var finalChunk = chunks.Last();
+        var finalChunk = chunks[^1];
         Assert.That(finalChunk.FinishReason, Is.EqualTo("COMPLETE"));
     }
 
@@ -137,7 +137,7 @@ public sealed class CohereStreamingTests
             chunks.Add(chunk);
         }
 
-        var lastChunk = chunks.Last();
+        var lastChunk = chunks[^1];
         Assert.Multiple(() =>
         {
             Assert.That(lastChunk.PromptTokens, Is.EqualTo(15));

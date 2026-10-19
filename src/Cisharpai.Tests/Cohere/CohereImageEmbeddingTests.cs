@@ -25,7 +25,7 @@ public sealed class CohereImageEmbeddingTests
         var imagePath = CreateTestImage();
         try
         {
-            var response = await client.GetImageEmbeddingAsync(imagePath, "embed-v4.0");
+            await client.GetImageEmbeddingAsync(imagePath, "embed-v4.0");
 
             Assert.That(capturedBody, Is.Not.Null);
             var doc = JsonDocument.Parse(capturedBody!);

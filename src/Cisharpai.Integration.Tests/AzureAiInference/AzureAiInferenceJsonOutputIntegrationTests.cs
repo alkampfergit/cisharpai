@@ -32,7 +32,7 @@ public sealed class AzureAiInferenceJsonOutputIntegrationTests
             yield return model;
     }
 
-    private IChatCompletionClient CreateClient(string modelId)
+    private static IChatCompletionClient CreateClient(string modelId)
     {
         var endpoint = Environment.GetEnvironmentVariable(DotEnv.AzureAiInferenceTestEndpoint);
         var apiKey = Environment.GetEnvironmentVariable(DotEnv.AzureAiInferenceTestApiKey);

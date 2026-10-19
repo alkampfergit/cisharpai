@@ -9,7 +9,6 @@ using Cisharpai.Helpers;
 using Cisharpai.Models;
 using Cisharpai.Azure.AzureOpenAi.Models;
 using Cisharpai.Azure.Common;
-using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.Azure.AzureOpenAi;

@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
 
   <ItemGroup>
@@ -20,7 +21,7 @@
     <PackageVersion Include="Microsoft.Extensions.Options" Version="9.0.0" />
 
     <!-- Build tooling -->
-    <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="8.0.0" />
+    <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.402" />
     <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.35.0.4138" />
 
     <!-- Testing packages -->
@@ -32,6 +33,8 @@
     <PackageVersion Include="NUnit3TestAdapter" Version="5.0.0" />
 
     <!-- Tokenization -->
+    <!-- Pin transitive dependency of Microsoft.ML.Tokenizers to a version patched for GHSA-73j8-2gch-69rq -->
+    <PackageVersion Include="Microsoft.Bcl.Memory" Version="9.0.14" />
     <PackageVersion Include="Microsoft.ML.Tokenizers" Version="2.0.0" />
     <PackageVersion Include="Microsoft.ML.Tokenizers.Data.O200kBase" Version="2.0.0" />
     <PackageVersion Include="Microsoft.ML.Tokenizers.Data.Cl100kBase" Version="2.0.0" />

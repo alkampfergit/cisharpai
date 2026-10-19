@@ -496,11 +496,7 @@ public sealed class LlmHttpClientTests
         });
     }
 
-    private sealed class TestResponse
-    {
-        public string Name { get; set; } = string.Empty;
-        public int Count { get; set; }
-    }
+    private sealed record TestResponse(string Name, int Count);
 
     private sealed class ThrowingHttpContent : HttpContent
     {

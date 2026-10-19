@@ -136,7 +136,7 @@ public sealed class LlmHttpClientActivityTests
         Assert.Multiple(() =>
         {
             Assert.That(span.OperationName, Is.EqualTo("POST api/stream"));
-            Assert.That(span.GetTagItem("cisharpai.stream"), Is.EqualTo(true));
+            Assert.That(span.GetTagItem("cisharpai.stream"), Is.True);
             Assert.That(span.GetTagItem("cisharpai.stream.chunks"), Is.EqualTo(2));
             Assert.That(span.GetTagItem("cisharpai.stream.completion_kind"), Is.EqualTo("done"));
             Assert.That(span.Status, Is.EqualTo(ActivityStatusCode.Ok));
@@ -204,10 +204,9 @@ public sealed class LlmHttpClientActivityTests
         using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://test.com/") };
         var client = new LlmHttpClient(httpClient);
 
-        await foreach (var _ in client.PostStreamAsync<object>("api/stream", new { Name = "x" }))
-        {
-            break; // consumer abandons the stream
-        }
+        var enumerator = client.PostStreamAsync<object>("api/stream", new { Name = "x" }).GetAsyncEnumerator();
+        await enumerator.MoveNextAsync();
+        await enumerator.DisposeAsync(); // consumer abandons the stream
 
         Assert.That(spans, Has.Count.EqualTo(1));
         Assert.Multiple(() =>

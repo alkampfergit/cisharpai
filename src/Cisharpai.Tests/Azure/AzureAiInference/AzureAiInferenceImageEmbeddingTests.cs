@@ -26,7 +26,7 @@ public sealed class AzureAiInferenceImageEmbeddingTests
         var imagePath = CreateTestImage();
         try
         {
-            var response = await client.GetImageEmbeddingAsync(imagePath, "clip-model");
+            await client.GetImageEmbeddingAsync(imagePath, "clip-model");
 
             Assert.That(capturedBody, Is.Not.Null);
             var doc = JsonDocument.Parse(capturedBody!);
@@ -97,7 +97,7 @@ public sealed class AzureAiInferenceImageEmbeddingTests
         var imagePath = CreateTestImage();
         try
         {
-            var response = await client.GetImageEmbeddingAsync(imagePath, "");
+            await client.GetImageEmbeddingAsync(imagePath, "");
 
             var doc = JsonDocument.Parse(capturedBody!);
             Assert.That(doc.RootElement.GetProperty("model").GetString(), Is.EqualTo("fallback-model"));

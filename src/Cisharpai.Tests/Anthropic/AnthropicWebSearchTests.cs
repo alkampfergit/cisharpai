@@ -193,8 +193,7 @@ public sealed class AnthropicWebSearchTests
         Assert.That(capturedBody, Is.Not.Null);
         var doc = JsonDocument.Parse(capturedBody!);
         Assert.That(doc.RootElement.TryGetProperty("tools", out var tools) && tools.GetArrayLength() > 0
-            ? tools.EnumerateArray().Any(t => t.GetProperty("name").GetString() == "web_search")
-            : false,
+            && tools.EnumerateArray().Any(t => t.GetProperty("name").GetString() == "web_search"),
             Is.False,
             "web_search tool should not be injected when Enabled = false");
     }

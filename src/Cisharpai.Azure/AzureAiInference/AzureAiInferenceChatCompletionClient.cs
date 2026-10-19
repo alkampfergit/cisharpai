@@ -7,7 +7,6 @@ using Cisharpai.Helpers;
 using Cisharpai.Models;
 using Cisharpai.Azure.AzureAiInference.Models;
 using Cisharpai.Azure.Common;
-using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.Azure.AzureAiInference;

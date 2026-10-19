@@ -5,7 +5,6 @@ using Cisharpai.Features.Chat;
 using Cisharpai.Helpers;
 using Cisharpai.Models;
 using Cisharpai.Anthropic.Models;
-using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.Anthropic;
@@ -14,6 +13,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
 {
     private const string MessagesEndpoint = "messages";
     private const string EphemeralCacheType = "ephemeral";
+    private const string MaxTokensStopReason = "max_tokens";
 
     private static readonly JsonSerializerOptions StreamJsonOptions = new()
     {
@@ -614,7 +614,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         if (refusal is not null)
             content = string.Empty;
 
-        var incompleteReason = raw.StopReason == "max_tokens" ? "max_tokens" : null;
+        var incompleteReason = raw.StopReason == MaxTokensStopReason ? MaxTokensStopReason : null;
 
         var webSearchCount = raw.Usage.ServerToolUse?.WebSearchRequests;
 
@@ -752,7 +752,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         if (refusal is not null)
             content = string.Empty;
 
-        var incompleteReason = raw.StopReason == "max_tokens" ? "max_tokens" : null;
+        var incompleteReason = raw.StopReason == MaxTokensStopReason ? MaxTokensStopReason : null;
 
         return new ChatCompletionResponse(
             Content: content,
@@ -794,7 +794,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
         if (refusal is not null)
             content = string.Empty;
 
-        var incompleteReason = raw.StopReason == "max_tokens" ? "max_tokens" : null;
+        var incompleteReason = raw.StopReason == MaxTokensStopReason ? MaxTokensStopReason : null;
 
         var chatCompletion = new ChatCompletionResponse(
             Content: content,

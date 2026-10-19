@@ -234,7 +234,7 @@ public class SemanticChunkerTests
             Assert.That(chunks[0].StartOffset, Is.EqualTo(0));
             Assert.That(chunks[0].EndOffset, Is.LessThanOrEqualTo(text.Length));
             Assert.That(chunks[0].EndOffset, Is.GreaterThan(0));
-            Assert.That(chunks.Last().EndOffset, Is.EqualTo(text.Length));
+            Assert.That(chunks[^1].EndOffset, Is.EqualTo(text.Length));
             Assert.That(chunks.All(c => c.DocumentId == "doc"), Is.True);
             Assert.That(chunks.Select(c => c.Index), Is.EqualTo(Enumerable.Range(0, chunks.Count)));
         });

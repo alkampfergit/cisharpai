@@ -14,7 +14,7 @@ public sealed class OpenAiJsonOutputIntegrationTests
         DotEnv.Load();
     }
 
-    private IChatCompletionClient CreateClient()
+    private static IChatCompletionClient CreateClient()
     {
         var apiKey = Environment.GetEnvironmentVariable(DotEnv.OpenAiTestApiKey);
         Assert.That(apiKey, Is.Not.Null.And.Not.Empty,

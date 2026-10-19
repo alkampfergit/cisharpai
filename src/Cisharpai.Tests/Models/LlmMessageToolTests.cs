@@ -8,7 +8,7 @@ public sealed class LlmMessageToolTests
     [Test]
     public void LlmRole_Tool_Exists()
     {
-        Assert.That(Enum.IsDefined(typeof(LlmRole), LlmRole.Tool), Is.True);
+        Assert.That(Enum.IsDefined(LlmRole.Tool), Is.True);
     }
 
     [Test]

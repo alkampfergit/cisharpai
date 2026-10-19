@@ -49,8 +49,8 @@ public sealed class AzureOpenAiEmbeddingIntegrationTests
         Assert.That(response, Is.Not.Null);
         Assert.That(response.IsSuccess, Is.True, $"Request failed: {response.ErrorMessage}");
         Assert.That(response.Embeddings, Is.Not.Null.And.Not.Empty);
-        Assert.That(response.Embeddings.Count, Is.EqualTo(1));
-        Assert.That(response.Embeddings[0].Length, Is.GreaterThan(0));
+        Assert.That(response.Embeddings, Has.Count.EqualTo(1));
+        Assert.That(response.Embeddings[0], Has.Length.GreaterThan(0));
         Assert.That(response.TotalTokens, Is.GreaterThan(0));
         Assert.That(response.Model, Is.Not.Null.And.Not.Empty);
     }
@@ -91,7 +91,7 @@ public sealed class AzureOpenAiEmbeddingIntegrationTests
         Assert.That(response, Is.Not.Null);
         Assert.That(response.IsSuccess, Is.True, $"Request failed: {response.ErrorMessage}");
         Assert.That(response.Embeddings, Is.Not.Null);
-        Assert.That(response.Embeddings.Count, Is.EqualTo(3));
+        Assert.That(response.Embeddings, Has.Count.EqualTo(3));
     }
 
     [Test]
@@ -139,7 +139,7 @@ public sealed class AzureOpenAiEmbeddingIntegrationTests
         Assert.That(response, Is.Not.Null);
         Assert.That(response.IsSuccess, Is.True, $"Request failed: {response.ErrorMessage}");
         Assert.That(response.Embeddings, Is.Not.Null.And.Not.Empty);
-        Assert.That(response.Embeddings[0].Length, Is.EqualTo(requestedDimensions));
+        Assert.That(response.Embeddings[0], Has.Length.EqualTo(requestedDimensions));
         Assert.That(response.Dimensions, Is.EqualTo(requestedDimensions));
     }
 

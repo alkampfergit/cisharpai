@@ -13,6 +13,8 @@ namespace Cisharp.Console.Scenarios;
 
 public sealed class ToolCallingScenario : IScenario
 {
+    private const string Fahrenheit = "fahrenheit";
+
     public string Name => "Tool calling";
     public string Description => "Demonstrates tool calling (function calling) with a weather tool across providers.";
 
@@ -175,14 +177,14 @@ public sealed class ToolCallingScenario : IScenario
         // Return mock weather data based on location
         var (temp, condition) = location.ToLowerInvariant() switch
         {
-            var l when l.Contains("paris") => (unit == "fahrenheit" ? "72" : "22", "Sunny with light clouds"),
-            var l when l.Contains("tokyo") => (unit == "fahrenheit" ? "79" : "26", "Humid and partly cloudy"),
-            var l when l.Contains("london") => (unit == "fahrenheit" ? "59" : "15", "Overcast with light rain"),
-            var l when l.Contains("new york") => (unit == "fahrenheit" ? "68" : "20", "Clear skies"),
-            _ => (unit == "fahrenheit" ? "70" : "21", "Partly cloudy")
+            var l when l.Contains("paris") => (unit == Fahrenheit ? "72" : "22", "Sunny with light clouds"),
+            var l when l.Contains("tokyo") => (unit == Fahrenheit ? "79" : "26", "Humid and partly cloudy"),
+            var l when l.Contains("london") => (unit == Fahrenheit ? "59" : "15", "Overcast with light rain"),
+            var l when l.Contains("new york") => (unit == Fahrenheit ? "68" : "20", "Clear skies"),
+            _ => (unit == Fahrenheit ? "70" : "21", "Partly cloudy")
         };
 
-        var unitSymbol = unit == "fahrenheit" ? "F" : "C";
+        var unitSymbol = unit == Fahrenheit ? "F" : "C";
         return $"{{\"location\": \"{location}\", \"temperature\": \"{temp} {unitSymbol}\", \"condition\": \"{condition}\"}}";
     }
 }

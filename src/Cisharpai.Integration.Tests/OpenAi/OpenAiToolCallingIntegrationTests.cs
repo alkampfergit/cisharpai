@@ -18,7 +18,7 @@ public sealed class OpenAiToolCallingIntegrationTests
         DotEnv.Load();
     }
 
-    private IChatCompletionClient CreateClient()
+    private static IChatCompletionClient CreateClient()
     {
         var apiKey = Environment.GetEnvironmentVariable(DotEnv.OpenAiTestApiKey);
         Assert.That(apiKey, Is.Not.Null.And.Not.Empty,
@@ -65,7 +65,7 @@ public sealed class OpenAiToolCallingIntegrationTests
 
         Assert.That(response.IsSuccess, Is.True, $"Request failed: {response.ErrorMessage}");
         Assert.That(response.ToolCalls, Is.Not.Null);
-        Assert.That(response.ToolCalls!.Count, Is.GreaterThanOrEqualTo(1));
+        Assert.That(response.ToolCalls!, Has.Count.GreaterThanOrEqualTo(1));
 
         var toolCall = response.ToolCalls[0];
         Assert.That(toolCall.FunctionName, Is.EqualTo("get_weather"));
@@ -95,7 +95,7 @@ public sealed class OpenAiToolCallingIntegrationTests
 
         Assert.That(response.IsSuccess, Is.True, $"Request failed: {response.ErrorMessage}");
         Assert.That(response.ToolCalls, Is.Not.Null, "ToolChoice.Required should force a tool call");
-        Assert.That(response.ToolCalls!.Count, Is.GreaterThanOrEqualTo(1));
+        Assert.That(response.ToolCalls!, Has.Count.GreaterThanOrEqualTo(1));
     }
 
     // --- ToolChoice.None Produces Text Response ---

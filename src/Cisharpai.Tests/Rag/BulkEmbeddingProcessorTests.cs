@@ -235,7 +235,9 @@ public class BulkEmbeddingProcessorTests
             finally { disposed = true; }
         }
         var processor = new BulkEmbeddingProcessor(Client(_ => Response([1], [2])), new() { MaxBatchItems = 2 });
-        await foreach (var _ in processor.EmbedAsync(Source())) break;
+        var enumerator = processor.EmbedAsync(Source()).GetAsyncEnumerator();
+        await enumerator.MoveNextAsync();
+        await enumerator.DisposeAsync();
         Assert.That(disposed, Is.True);
         Assert.That(consumed, Is.EqualTo(2));
     }
@@ -385,7 +387,7 @@ public class BulkEmbeddingProcessorTests
             return Response(request.Input.Select(_ => SingleOneVector).ToArray());
         }), new() { MaxBatchItems = 2, MaxBatchTokens = 10000, TokenEstimator = s => s.Length });
 
-        var batches = await Collect(processor.EmbedAsync(Enumerable.Range(0, 5).Select(Chunk)));
+        await Collect(processor.EmbedAsync(Enumerable.Range(0, 5).Select(Chunk)));
         Assert.That(requests[0].Input, Has.Count.EqualTo(2));
         Assert.That(requests[1].Input, Has.Count.EqualTo(2));
         Assert.That(requests[2].Input, Has.Count.EqualTo(1));

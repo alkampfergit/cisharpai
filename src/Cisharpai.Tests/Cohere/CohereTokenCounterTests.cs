@@ -238,7 +238,7 @@ public sealed class CohereTokenCounterTests
     [Test]
     public void CountAsync_PropagatesCancellation()
     {
-        var cts = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
         cts.Cancel();
 
         var handler = new MockHttpMessageHandler((_, ct) =>

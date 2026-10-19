@@ -2,7 +2,6 @@ using Cisharpai.Features;
 using Cisharpai.Helpers;
 using Cisharpai.Models;
 using Cisharpai.OpenAi.Models;
-using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.OpenAi;

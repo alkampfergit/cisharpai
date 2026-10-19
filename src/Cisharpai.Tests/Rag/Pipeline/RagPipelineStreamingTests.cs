@@ -120,7 +120,7 @@ public class RagPipelineStreamingTests
         await foreach (var chunk in pipeline.AskStreamingAsync("test"))
             chunks.Add(chunk);
 
-        var final = chunks.Last().FinalResult;
+        var final = chunks[^1].FinalResult;
         Assert.That(final, Is.Not.Null);
         Assert.That(final!.Answer, Is.EqualTo("The capital is Paris."));
         Assert.That(final.Citations, Has.Count.EqualTo(1));

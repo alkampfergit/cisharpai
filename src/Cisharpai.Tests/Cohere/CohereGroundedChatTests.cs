@@ -112,28 +112,6 @@ public sealed class CohereGroundedChatTests
             new DocumentChunk(Text: "Berlin is the capital of Germany.")
         ]);
 
-    private (MockHttpMessageHandler handler, CohereChatCompletionClient client) CreateClientWithResponse(string responseJson)
-    {
-        string? capturedBody = null;
-        var handler = new MockHttpMessageHandler(async (request, _) =>
-        {
-            capturedBody = await request.Content!.ReadAsStringAsync(CancellationToken.None);
-            return new HttpResponseMessage(HttpStatusCode.OK)
-            {
-                Content = new StringContent(responseJson, System.Text.Encoding.UTF8, "application/json")
-            };
-        });
-        CapturedBody = null;
-        _capturedBodyAccessor = () => capturedBody;
-
-        using var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.cohere.com/v2/") };
-        var client = new CohereChatCompletionClient(httpClient, new CohereClientOptions());
-        return (handler, client);
-    }
-
-    private Func<string?>? _capturedBodyAccessor;
-    private string? CapturedBody { get; set; }
-
     private static async Task<(GroundedChatCompletionResponse response, string? capturedBody)> ExecuteGroundedChat(
         string responseJson,
         GroundedChatOptions? options = null,

@@ -55,7 +55,8 @@ public sealed class BulkEmbeddingOptions
 
     internal BulkEmbeddingOptions Snapshot()
     {
-        ValidateOptions(MaxBatchItems, Dimensions, InputType, MaxBatchTokens, TokenEstimator, MaxConcurrency, MaxPendingBatches, MaxRetries, RetryBaseDelay);
+        ValidateBatching(MaxBatchItems, Dimensions, InputType, MaxBatchTokens, TokenEstimator);
+        ValidateConcurrency(MaxConcurrency, MaxPendingBatches, MaxRetries, RetryBaseDelay);
 
         return new BulkEmbeddingOptions
         {
@@ -75,10 +76,9 @@ public sealed class BulkEmbeddingOptions
         };
     }
 
-    private static void ValidateOptions(
+    private static void ValidateBatching(
         int maxBatchItems, int? dimensions, EmbeddingInputType inputType,
-        int? maxBatchTokens, Func<string, int>? tokenEstimator,
-        int maxConcurrency, int? maxPendingBatches, int maxRetries, TimeSpan retryBaseDelay)
+        int? maxBatchTokens, Func<string, int>? tokenEstimator)
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxBatchItems);
         if (dimensions is <= 0)
@@ -89,6 +89,11 @@ public sealed class BulkEmbeddingOptions
             throw new ArgumentOutOfRangeException(nameof(maxBatchTokens), maxBatchTokens, "MaxBatchTokens must be positive when specified.");
         if (maxBatchTokens is not null && tokenEstimator is null)
             throw new ArgumentException("TokenEstimator must not be null when MaxBatchTokens is set.", nameof(tokenEstimator));
+    }
+
+    private static void ValidateConcurrency(
+        int maxConcurrency, int? maxPendingBatches, int maxRetries, TimeSpan retryBaseDelay)
+    {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxConcurrency);
         if (maxConcurrency > 32)
             throw new ArgumentOutOfRangeException(nameof(maxConcurrency), maxConcurrency, "MaxConcurrency must not exceed 32.");

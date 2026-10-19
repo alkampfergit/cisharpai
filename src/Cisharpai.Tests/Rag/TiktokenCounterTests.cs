@@ -133,7 +133,7 @@ public sealed class TiktokenCounterTests
     public void CountAsync_ThrowsOnPreCancelledToken()
     {
         var counter = new TiktokenCounter("gpt-4o");
-        var cts = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
         cts.Cancel();
 
         Assert.That(() => counter.CountAsync("Hello, world!", cts.Token),

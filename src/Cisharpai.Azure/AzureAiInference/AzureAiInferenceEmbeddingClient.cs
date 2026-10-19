@@ -5,8 +5,6 @@ using Cisharpai.Features.Embeddings;
 using Cisharpai.Models;
 using Cisharpai.Azure.AzureAiInference.Models;
 using Cisharpai.Azure.Common;
-using Cisharpai;
-using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.Azure.AzureAiInference;
@@ -102,7 +100,7 @@ public sealed class AzureAiInferenceEmbeddingClient : IEmbeddingClient, IImageEm
         }
     }
 
-    public async Task<EmbeddingResponse> GetImageEmbeddingAsync(
+    public Task<EmbeddingResponse> GetImageEmbeddingAsync(
         string imagePath,
         string model,
         CancellationToken cancellationToken = default)
@@ -110,6 +108,14 @@ public sealed class AzureAiInferenceEmbeddingClient : IEmbeddingClient, IImageEm
         if (string.IsNullOrWhiteSpace(imagePath))
             throw new ArgumentException("Image path is required.", nameof(imagePath));
 
+        return GetImageEmbeddingCoreAsync(imagePath, model, cancellationToken);
+    }
+
+    private async Task<EmbeddingResponse> GetImageEmbeddingCoreAsync(
+        string imagePath,
+        string model,
+        CancellationToken cancellationToken)
+    {
         try
         {
             var imageDataUri = await ImageDataUriHelper.ToDataUriAsync(imagePath, cancellationToken);
@@ -158,16 +164,16 @@ public sealed class AzureAiInferenceEmbeddingClient : IEmbeddingClient, IImageEm
         var base64Embeddings = new List<string>();
         int? dimensions = null;
 
-        foreach (var item in raw.Data.OrderBy(d => d.Index))
+        foreach (var embedding in raw.Data.OrderBy(d => d.Index).Select(d => d.Embedding))
         {
             if (encodingFormat == "base64" &&
-                item.Embedding.ValueKind == JsonValueKind.String)
+                embedding.ValueKind == JsonValueKind.String)
             {
-                base64Embeddings.Add(item.Embedding.GetString() ?? string.Empty);
+                base64Embeddings.Add(embedding.GetString() ?? string.Empty);
             }
-            else if (item.Embedding.ValueKind == JsonValueKind.Array)
+            else if (embedding.ValueKind == JsonValueKind.Array)
             {
-                var vector = item.Embedding
+                var vector = embedding
                     .EnumerateArray()
                     .Select(e => e.GetSingle())
                     .ToArray();

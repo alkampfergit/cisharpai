@@ -194,53 +194,6 @@ public sealed class OpenAiFileSearchRetrievalTests
         }
         """;
 
-    private const string FileSearchWithCitationsResponse = """
-        {
-            "id": "resp_fs_005",
-            "model": "gpt-5-0",
-            "status": "completed",
-            "output": [
-                {
-                    "type": "file_search_call",
-                    "id": "fs_call_005",
-                    "status": "completed",
-                    "queries": ["query"],
-                    "results": [
-                        {
-                            "file_id": "file-abc",
-                            "filename": "doc.pdf",
-                            "score": 0.90,
-                            "text": "The answer is 42."
-                        }
-                    ]
-                },
-                {
-                    "type": "message",
-                    "role": "assistant",
-                    "content": [
-                        {
-                            "type": "output_text",
-                            "text": "The answer is 42.",
-                            "annotations": [
-                                {
-                                    "type": "file_citation",
-                                    "file_id": "file-abc",
-                                    "filename": "doc.pdf",
-                                    "start_index": 0,
-                                    "end_index": 17
-                                }
-                            ]
-                        }
-                    ]
-                }
-            ],
-            "usage": {
-                "input_tokens": 100,
-                "output_tokens": 10
-            }
-        }
-        """;
-
     private const string FileSearchSameFileMultiplePassagesResponse = """
         {
             "id": "resp_fs_006",

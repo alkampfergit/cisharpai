@@ -156,7 +156,7 @@ public sealed class CisharpaiClientFactoryTests
         using var provider = services.BuildServiceProvider();
         var factory = provider.GetRequiredService<ICisharpaiClientFactory>();
 
-        Assert.That(services.Count, Is.EqualTo(descriptorCountAfterFirstRegistration));
+        Assert.That(services, Has.Count.EqualTo(descriptorCountAfterFirstRegistration));
         Assert.That(factory.GetRegisteredProviders(), Has.Count.EqualTo(1));
     }
 

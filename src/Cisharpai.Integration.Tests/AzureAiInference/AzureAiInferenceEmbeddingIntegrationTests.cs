@@ -14,7 +14,7 @@ public sealed class AzureAiInferenceEmbeddingIntegrationTests
         DotEnv.Load();
     }
 
-    private IEmbeddingClient CreateClient()
+    private static IEmbeddingClient CreateClient()
     {
         var endpoint = Environment.GetEnvironmentVariable(DotEnv.AzureAiInferenceTestEmbeddingEndpoint);
         var apiKey = Environment.GetEnvironmentVariable(DotEnv.AzureAiInferenceTestEmbeddingKey);
@@ -57,7 +57,7 @@ public sealed class AzureAiInferenceEmbeddingIntegrationTests
 
         Assert.That(response.IsSuccess, Is.True, $"Request failed: {response.ErrorMessage}");
         Assert.That(response.Embeddings, Has.Count.EqualTo(1));
-        Assert.That(response.Embeddings[0].Length, Is.GreaterThan(0));
+        Assert.That(response.Embeddings[0], Has.Length.GreaterThan(0));
         Assert.That(response.Dimensions, Is.GreaterThan(0));
     }
 
@@ -77,9 +77,9 @@ public sealed class AzureAiInferenceEmbeddingIntegrationTests
 
         Assert.That(response.IsSuccess, Is.True, $"Request failed: {response.ErrorMessage}");
         Assert.That(response.Embeddings, Has.Count.EqualTo(3));
-        Assert.That(response.Embeddings[0].Length, Is.GreaterThan(0));
-        Assert.That(response.Embeddings[1].Length, Is.GreaterThan(0));
-        Assert.That(response.Embeddings[2].Length, Is.GreaterThan(0));
+        Assert.That(response.Embeddings[0], Has.Length.GreaterThan(0));
+        Assert.That(response.Embeddings[1], Has.Length.GreaterThan(0));
+        Assert.That(response.Embeddings[2], Has.Length.GreaterThan(0));
     }
 
     // --- Text Embedding with Dimensions ---
@@ -106,7 +106,7 @@ public sealed class AzureAiInferenceEmbeddingIntegrationTests
         }
 
         Assert.That(response.Embeddings, Has.Count.EqualTo(1));
-        Assert.That(response.Embeddings[0].Length, Is.EqualTo(256));
+        Assert.That(response.Embeddings[0], Has.Length.EqualTo(256));
         Assert.That(response.Dimensions, Is.EqualTo(256));
     }
 
@@ -136,7 +136,7 @@ public sealed class AzureAiInferenceEmbeddingIntegrationTests
             }
 
             Assert.That(response.Embeddings, Has.Count.EqualTo(1));
-            Assert.That(response.Embeddings[0].Length, Is.GreaterThan(0));
+            Assert.That(response.Embeddings[0], Has.Length.GreaterThan(0));
             Assert.That(response.Dimensions, Is.GreaterThan(0));
         }
         finally

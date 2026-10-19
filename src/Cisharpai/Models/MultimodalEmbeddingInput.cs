@@ -1,6 +1,11 @@
 namespace Cisharpai.Models;
 
-public abstract record EmbeddingContentPart;
+public abstract record EmbeddingContentPart
+{
+    private protected EmbeddingContentPart()
+    {
+    }
+}
 
 public sealed record TextEmbeddingContent(string Text) : EmbeddingContentPart;
 

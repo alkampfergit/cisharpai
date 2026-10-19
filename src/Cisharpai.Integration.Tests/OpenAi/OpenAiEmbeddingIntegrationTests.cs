@@ -38,7 +38,7 @@ public sealed class OpenAiEmbeddingIntegrationTests
 
         Assert.That(response.IsSuccess, Is.True, $"Request failed: {response.ErrorMessage}");
         Assert.That(response.Embeddings, Has.Count.EqualTo(1));
-        Assert.That(response.Embeddings[0].Length, Is.GreaterThan(0));
+        Assert.That(response.Embeddings[0], Has.Length.GreaterThan(0));
         Assert.That(response.Model, Does.Contain("text-embedding-3-small"));
         Assert.That(response.TotalTokens, Is.GreaterThan(0));
         Assert.That(response.Dimensions, Is.GreaterThan(0));
@@ -98,7 +98,7 @@ public sealed class OpenAiEmbeddingIntegrationTests
 
         Assert.That(response.IsSuccess, Is.True, $"Request failed: {response.ErrorMessage}");
         Assert.That(response.Dimensions, Is.EqualTo(256));
-        Assert.That(response.Embeddings[0].Length, Is.EqualTo(256));
+        Assert.That(response.Embeddings[0], Has.Length.EqualTo(256));
     }
 
     [TestCase("text-embedding-3-small")]
@@ -127,6 +127,6 @@ public sealed class OpenAiEmbeddingIntegrationTests
 
         Assert.That(response.IsSuccess, Is.True, $"Request failed: {response.ErrorMessage}");
         Assert.That(response.Embeddings, Has.Count.EqualTo(1));
-        Assert.That(response.Embeddings[0].Length, Is.GreaterThan(0));
+        Assert.That(response.Embeddings[0], Has.Length.GreaterThan(0));
     }
 }

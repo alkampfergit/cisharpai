@@ -226,7 +226,7 @@ public class InMemoryRetrieverTests
     public async Task RetrieveAsync_CancellationRespected()
     {
         var embeddingClient = Substitute.For<IEmbeddingClient>();
-        var cts = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
         await cts.CancelAsync();
 
         embeddingClient.GetEmbeddingsAsync(Arg.Any<EmbeddingRequest>(), Arg.Any<CancellationToken>())
@@ -288,7 +288,7 @@ public class InMemoryRetrieverTests
             DefaultResponse = FakeResponses.Embedding()
         };
         var retriever = new InMemoryRetriever(fakeEmbedding);
-        var cts = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
         cts.Cancel();
 
         Assert.That(
@@ -300,7 +300,7 @@ public class InMemoryRetrieverTests
     public void RetrieveAsync_CancelledAfterEmbedding_Throws()
     {
         var embeddingClient = Substitute.For<IEmbeddingClient>();
-        var cts = new CancellationTokenSource();
+        using var cts = new CancellationTokenSource();
 
         embeddingClient.GetEmbeddingsAsync(Arg.Any<EmbeddingRequest>(), Arg.Any<CancellationToken>())
             .Returns(callInfo =>
@@ -584,7 +584,7 @@ public class InMemoryRetrieverTests
     }
 
     [Test]
-    public void AddRange_ChunkEmbeddingOverload_IsAtomic()
+    public void AddRange_ChunkEmbeddingOverload_EmptyInput_AddsNothing()
     {
         var fakeEmbedding = new FakeEmbeddingClient
         {
@@ -592,13 +592,8 @@ public class InMemoryRetrieverTests
         };
         var retriever = new InMemoryRetriever(fakeEmbedding);
 
-        var items = new[]
-        {
-            new ChunkEmbedding(MakeChunk("doc", 0, "a"), new float[] { 1f }),
-            new ChunkEmbedding(MakeChunk("doc", 1, "b"), new float[] { 0f })
-        };
-        retriever.AddRange(items);
+        retriever.AddRange(Array.Empty<ChunkEmbedding>());
 
-        Assert.That(retriever.Count, Is.EqualTo(2));
+        Assert.That(retriever.Count, Is.EqualTo(0));
     }
 }

@@ -4,8 +4,6 @@ using Cisharpai.Features;
 using Cisharpai.Features.Embeddings;
 using Cisharpai.Models;
 using Cisharpai.Cohere.Models;
-using Cisharpai;
-using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.Cohere;
@@ -89,7 +87,7 @@ public sealed class CohereEmbeddingClient : IEmbeddingClient, IImageEmbeddingFea
         }
     }
 
-    public async Task<EmbeddingResponse> GetImageEmbeddingAsync(
+    public Task<EmbeddingResponse> GetImageEmbeddingAsync(
         string imagePath,
         string model,
         CancellationToken cancellationToken = default)
@@ -97,6 +95,14 @@ public sealed class CohereEmbeddingClient : IEmbeddingClient, IImageEmbeddingFea
         if (string.IsNullOrWhiteSpace(imagePath))
             throw new ArgumentException("Image path is required.", nameof(imagePath));
 
+        return GetImageEmbeddingCoreAsync(imagePath, model, cancellationToken);
+    }
+
+    private async Task<EmbeddingResponse> GetImageEmbeddingCoreAsync(
+        string imagePath,
+        string model,
+        CancellationToken cancellationToken)
+    {
         try
         {
             var dataUri = await ImageDataUriHelper.ToDataUriAsync(imagePath, cancellationToken);

@@ -1,4 +1,3 @@
-using Cisharpai;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 

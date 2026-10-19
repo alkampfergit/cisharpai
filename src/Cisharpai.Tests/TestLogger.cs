@@ -29,14 +29,14 @@ internal sealed class TestLogger<T> : ILogger<T>
             properties,
             exception));
     }
+}
 
-    private sealed class NullScope : IDisposable
+internal sealed class NullScope : IDisposable
+{
+    public static NullScope Instance { get; } = new();
+
+    public void Dispose()
     {
-        public static NullScope Instance { get; } = new();
-
-        public void Dispose()
-        {
-        }
     }
 }
 

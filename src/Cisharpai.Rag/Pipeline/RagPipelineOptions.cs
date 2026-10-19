@@ -28,10 +28,15 @@ public sealed record RagPipelineOptions
     internal void Validate()
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(TopK);
-        if (Retrieval?.TopK is <= 0)
-            throw new ArgumentOutOfRangeException(nameof(Retrieval), Retrieval.TopK, "Retrieval.TopK must be positive when set.");
+        ValidateRetrievalTopK(Retrieval?.TopK);
 
         if (RerankerTopN is not null)
             ArgumentOutOfRangeException.ThrowIfNegativeOrZero(RerankerTopN.Value);
+    }
+
+    private static void ValidateRetrievalTopK(int? retrievalTopK)
+    {
+        if (retrievalTopK is <= 0)
+            throw new ArgumentOutOfRangeException(nameof(retrievalTopK), retrievalTopK, "Retrieval.TopK must be positive when set.");
     }
 }

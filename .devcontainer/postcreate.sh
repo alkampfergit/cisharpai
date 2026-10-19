@@ -4,6 +4,9 @@
 
 set -euo pipefail
 
+# Common curl flags: HTTPS only, TLS 1.2+
+CURL_SECURE=(--proto '=https' --tlsv1.2)
+
 echo "=========================================="
 echo "Starting devcontainer post-creation setup"
 echo "=========================================="
@@ -23,26 +26,26 @@ bash .devcontainer/setup-git-aliases.sh
 
 # Install Claude Code via the official installer
 echo "Installing Claude Code CLI..."
-curl --proto '=https' --tlsv1.2 -fsSL https://claude.ai/install.sh | bash || true
+curl "${CURL_SECURE[@]}" -fsSL https://claude.ai/install.sh | bash || true
 
 # Install CLI tools distributed via npm
 if command -v npm >/dev/null 2>&1; then
     echo "Installing OpenAI Codex..."
     npm install -g @openai/codex --ignore-scripts || true
     echo "Installing automata-cli..."
-    npm install -g automata-cli || true
+    npm install -g automata-cli --ignore-scripts || true
 else
     echo "npm not available, skipping npm-based CLI installs."
 fi
 
 # Install beads
 echo "Installing beads..."
-curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash || true
+curl "${CURL_SECURE[@]}" -fsSL https://raw.githubusercontent.com/steveyegge/beads/main/scripts/install.sh | bash || true
 
 # Install uv and GitHub spec-kit
 if ! command -v uv >/dev/null 2>&1; then
     echo "Installing uv..."
-    curl --proto '=https' --tlsv1.2 -LsSf https://astral.sh/uv/install.sh | sh
+    curl "${CURL_SECURE[@]}" -LsSf https://astral.sh/uv/install.sh | sh
 else
     echo "uv already installed, skipping."
 fi
@@ -66,7 +69,7 @@ else
 fi
 TOKENSAVE_URL="https://github.com/aovestdipaperino/tokensave/releases/download/${TOKENSAVE_TAG}/tokensave-${TOKENSAVE_TAG}-${TOKENSAVE_ARCH}.tar.gz"
 echo "  Downloading tokensave ${TOKENSAVE_VERSION} (${TOKENSAVE_ARCH})..."
-curl --proto '=https' --tlsv1.2 -sL "$TOKENSAVE_URL" -o /tmp/tokensave.tar.gz || true
+curl "${CURL_SECURE[@]}" -sL "$TOKENSAVE_URL" -o /tmp/tokensave.tar.gz || true
 if [[ -f /tmp/tokensave.tar.gz ]]; then
     tar xzf /tmp/tokensave.tar.gz -C /tmp || true
     if [[ -f /tmp/tokensave ]]; then
@@ -101,7 +104,7 @@ append_if_missing() {
 
 if ! command -v brew >/dev/null 2>&1; then
     echo "Installing Homebrew..."
-    NONINTERACTIVE=1 bash -c "$(curl --proto '=https' --tlsv1.2 -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || true
+    NONINTERACTIVE=1 bash -c "$(curl "${CURL_SECURE[@]}" -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || true
 else
     echo "Homebrew already installed, skipping."
 fi

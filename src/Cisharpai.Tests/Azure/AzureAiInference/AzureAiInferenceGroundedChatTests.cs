@@ -407,6 +407,7 @@ public sealed class AzureAiInferenceGroundedChatTests
         Assert.Multiple(() =>
         {
             Assert.That(response.IsSuccess, Is.False);
+            Assert.That(response.ErrorMessage, Is.Not.Null.And.Not.Empty);
             Assert.That(response.GroundingKind, Is.EqualTo(GroundingKind.Synthesized));
         });
     }
