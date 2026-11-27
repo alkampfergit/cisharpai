@@ -12,12 +12,12 @@ namespace Cisharpai.Rag.OpenAi;
 /// Responses API <c>file_search</c> tool. Created by
 /// <see cref="OpenAiHostedRetrievalFeature.ForStore"/>.
 /// </summary>
-internal sealed class OpenAiFileSearchRetriever : IRetriever
+internal sealed partial class OpenAiFileSearchRetriever : IRetriever
 {
     private readonly LlmHttpClient _client;
     private readonly Cisharpai.OpenAi.OpenAiClientOptions _options;
     private readonly string _vectorStoreId;
-    private readonly ILogger? _logger;
+    private readonly ILogger _logger;
 
     internal OpenAiFileSearchRetriever(
         LlmHttpClient client,
@@ -28,7 +28,7 @@ internal sealed class OpenAiFileSearchRetriever : IRetriever
         _client = client;
         _options = options;
         _vectorStoreId = vectorStoreId;
-        _logger = logger;
+        _logger = logger ?? Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance;
     }
 
     public Task<IReadOnlyList<ScoredChunk>> RetrieveAsync(
@@ -96,18 +96,17 @@ internal sealed class OpenAiFileSearchRetriever : IRetriever
         }
         catch (LlmHttpRequestException ex)
         {
-            _logger?.LogWarning(ex, "File search retrieval failed for store {StoreId}: HTTP {StatusCode}",
-                _vectorStoreId, ex.StatusCode);
+            LogFileSearchHttpFailure(_vectorStoreId, ex.StatusCode, ex);
             return [];
         }
         catch (JsonException ex)
         {
-            _logger?.LogWarning(ex, "File search response parsing failed for store {StoreId}", _vectorStoreId);
+            LogFileSearchParsingFailure(_vectorStoreId, ex);
             return [];
         }
         catch (InvalidOperationException ex)
         {
-            _logger?.LogWarning(ex, "File search retrieval failed for store {StoreId}", _vectorStoreId);
+            LogFileSearchRetrievalFailure(_vectorStoreId, ex);
             return [];
         }
     }
@@ -125,9 +124,7 @@ internal sealed class OpenAiFileSearchRetriever : IRetriever
         if (failedCalls.Count > 0)
         {
             var failedIds = string.Join(", ", failedCalls.Select(f => f.Id ?? "unknown"));
-            _logger?.LogWarning(
-                "{FailedCount} of {TotalCount} file search call(s) failed in store {StoreId} (ids: {FailedIds})",
-                failedCalls.Count, fileSearchCalls.Count, _vectorStoreId, failedIds);
+            LogFileSearchCallsFailed(failedCalls.Count, fileSearchCalls.Count, _vectorStoreId, failedIds);
         }
 
         var results = fileSearchCalls

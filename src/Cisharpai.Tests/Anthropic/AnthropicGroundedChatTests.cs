@@ -948,19 +948,19 @@ public sealed class AnthropicGroundedChatTests
     }
 
     [Test]
-    public void GroundedChat_EmptyDocuments_ReturnsError()
+    public async Task GroundedChat_EmptyDocuments_ReturnsError()
     {
         using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
         var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
 
         var options = new GroundedChatOptions(Documents: []);
 
-        var response = client.GetGroundedChatCompletionAsync(CreateRequest(), options).Result;
+        var response = await client.GetGroundedChatCompletionAsync(CreateRequest(), options);
         Assert.That(response.IsSuccess, Is.False);
     }
 
     [Test]
-    public void GroundedChat_InvalidDocument_ReturnsError()
+    public async Task GroundedChat_InvalidDocument_ReturnsError()
     {
         using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.anthropic.com/v1/") };
         var client = new AnthropicChatCompletionClient(httpClient, new AnthropicClientOptions());
@@ -968,7 +968,7 @@ public sealed class AnthropicGroundedChatTests
         var options = new GroundedChatOptions(
             Documents: [new DocumentChunk(Id: "doc-1")]);
 
-        var response = client.GetGroundedChatCompletionAsync(CreateRequest(), options).Result;
+        var response = await client.GetGroundedChatCompletionAsync(CreateRequest(), options);
         Assert.That(response.IsSuccess, Is.False);
     }
 

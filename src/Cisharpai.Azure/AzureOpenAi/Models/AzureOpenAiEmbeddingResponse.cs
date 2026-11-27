@@ -1,8 +1,10 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace Cisharpai.Azure.AzureOpenAi.Models;
 
+[SuppressMessage("Naming", "CA1720:Identifier contains type name", Justification = "Property name mirrors the Azure OpenAI API JSON schema")]
 public sealed class AzureOpenAiEmbeddingData
 {
     public string Object { get; set; } = string.Empty;
@@ -24,6 +26,7 @@ public sealed class AzureOpenAiEmbeddingUsage
     public int TotalTokens { get; set; }
 }
 
+[SuppressMessage("Naming", "CA1720:Identifier contains type name", Justification = "Property name mirrors the Azure OpenAI API JSON schema")]
 public sealed class AzureOpenAiEmbeddingResponse
 {
     public string Object { get; set; } = string.Empty;

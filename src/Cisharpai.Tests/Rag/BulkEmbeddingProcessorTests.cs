@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Cisharpai.Models;
 using Cisharpai.Rag.Embeddings;
@@ -11,7 +12,7 @@ public class BulkEmbeddingProcessorTests
 {
     private static readonly float[] SingleOneVector = [1f];
     private static readonly int[] ExpectedDefaultBatchSizes = [32, 1];
-    private static TextChunk Chunk(int index) => new("document", index, index, index + index.ToString().Length, index.ToString());
+    private static TextChunk Chunk(int index) => new("document", index, index, index + index.ToString(CultureInfo.InvariantCulture).Length, index.ToString(CultureInfo.InvariantCulture));
     private static TextChunk ChunkWithText(int index, string text) => new("document", index, index, index + text.Length, text);
     private static EmbeddingResponse Response(params float[][] vectors) =>
         new(vectors, null, "model", 42, RawResponseJson: "response", RawRequestJson: "request");
@@ -43,7 +44,7 @@ public class BulkEmbeddingProcessorTests
                 yield return Chunk(index);
             }
         }
-        var client = Client(request => Response(request.Input.Select(text => new[] { float.Parse(text) }).ToArray()));
+        var client = Client(request => Response(request.Input.Select(text => new[] { float.Parse(text, CultureInfo.InvariantCulture) }).ToArray()));
         var processor = new BulkEmbeddingProcessor(client, new() { MaxBatchItems = 32 });
         var emitted = 0;
         long index = 0;
@@ -559,7 +560,7 @@ public class BulkEmbeddingProcessorTests
             {
                 var idx = Interlocked.Increment(ref callIndex) - 1;
                 return gates[idx].Task.ContinueWith(_ =>
-                    Response(call.Arg<EmbeddingRequest>().Input.Select(t => new[] { float.Parse(t) }).ToArray()),
+                    Response(call.Arg<EmbeddingRequest>().Input.Select(t => new[] { float.Parse(t, CultureInfo.InvariantCulture) }).ToArray()),
                     TaskScheduler.Default);
             });
 

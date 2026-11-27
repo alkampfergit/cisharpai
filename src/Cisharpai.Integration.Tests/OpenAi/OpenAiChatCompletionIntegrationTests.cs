@@ -13,7 +13,7 @@ public sealed class OpenAiChatCompletionIntegrationTests
         DotEnv.Load();
     }
 
-    [TestCase("gpt-4.1-nano")]
+    [TestCase("gpt-4.1-mini")]
     [TestCase("gpt-5-nano")]
     public async Task GetChatCompletionAsync_ReturnsValidResponse(string model)
     {

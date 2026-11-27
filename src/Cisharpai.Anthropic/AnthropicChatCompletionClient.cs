@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.Anthropic;
 
-public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature, IStreamingChatFeature, IGroundedChatFeature, IPromptCachingFeature, IWebSearchFeature
+public sealed partial class AnthropicChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IToolCallingFeature, IStreamingChatFeature, IGroundedChatFeature, IPromptCachingFeature, IWebSearchFeature
 {
     private const string MessagesEndpoint = "messages";
     private const string EphemeralCacheType = "ephemeral";
@@ -22,7 +22,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
 
     private readonly LlmHttpClient _client;
     private readonly AnthropicClientOptions _options;
-    private readonly ILogger<AnthropicChatCompletionClient>? _logger;
+    private readonly ILogger _logger;
 
     public IFeatureCollection Features { get; }
 
@@ -30,7 +30,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
     {
         _client = new LlmHttpClient(httpClient, logger: loggerFactory?.CreateLogger<LlmHttpClient>());
         _options = options;
-        _logger = loggerFactory?.CreateLogger<AnthropicChatCompletionClient>();
+        _logger = (ILogger?)loggerFactory?.CreateLogger<AnthropicChatCompletionClient>() ?? Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance;
 
         var features = new FeatureCollection();
         features.Set<IJsonOutputFeature>(this);
@@ -520,7 +520,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
             {
                 if (cite is null)
                 {
-                    _logger?.LogWarning("Skipping null citation entry in content block.");
+                    LogNullCitationEntry();
                     continue;
                 }
 
@@ -541,8 +541,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
     {
         if (string.IsNullOrWhiteSpace(cite.Source))
         {
-            _logger?.LogWarning(
-                "Skipping search_result_location citation with missing source.");
+            LogMissingCitationSource();
             return null;
         }
 
@@ -659,19 +658,19 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
             {
                 if (cite is null)
                 {
-                    _logger?.LogWarning("Skipping null citation entry in web search content block.");
+                    LogNullWebSearchCitationEntry();
                     continue;
                 }
 
                 if (cite.Type != "web_search_result_location")
                 {
-                    _logger?.LogWarning("Skipping unexpected citation type '{Type}' in web search response.", cite.Type);
+                    LogUnexpectedCitationType(cite.Type);
                     continue;
                 }
 
                 if (string.IsNullOrWhiteSpace(cite.Url))
                 {
-                    _logger?.LogWarning("Skipping web_search_result_location citation with missing URL.");
+                    LogMissingWebSearchCitationUrl();
                     continue;
                 }
 
@@ -776,9 +775,7 @@ public sealed class AnthropicChatCompletionClient : IChatCompletionClient, IJson
 
         if (groundedChatOptions.CitationMode is CitationMode.Accurate or CitationMode.Fast)
         {
-            _logger?.LogWarning(
-                "Anthropic does not distinguish citation modes; CitationMode.{Mode} is treated as Enabled.",
-                groundedChatOptions.CitationMode);
+            LogCitationModeNotDistinguished(groundedChatOptions.CitationMode);
         }
     }
 

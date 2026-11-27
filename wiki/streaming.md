@@ -20,7 +20,7 @@ if (streamFeature is null)
 
 var request = new ChatCompletionRequest(
     Messages: [new LlmMessage(LlmRole.User, "Write a poem about the sea")],
-    Model: "gpt-4.1-nano",
+    Model: "gpt-4.1-mini",
     MaxTokens: 500);
 
 // Stream tokens as they arrive

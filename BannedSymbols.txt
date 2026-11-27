@@ -1,0 +1,9 @@
+P:System.DateTime.Now;Inject TimeProvider and call GetLocalNow() so the code can be tested with a fixed clock
+P:System.DateTime.UtcNow;Inject TimeProvider and call GetUtcNow() so the code can be tested with a fixed clock
+P:System.DateTime.Today;Inject TimeProvider and call GetLocalNow() so the code can be tested with a fixed clock
+P:System.DateTimeOffset.Now;Inject TimeProvider and call GetLocalNow() so the code can be tested with a fixed clock
+P:System.DateTimeOffset.UtcNow;Inject TimeProvider and call GetUtcNow() so the code can be tested with a fixed clock
+M:System.Threading.Tasks.Task.Wait;Blocking on a task can deadlock and starves the thread pool: await it
+P:System.Threading.Tasks.Task`1.Result;Blocking on a task can deadlock and starves the thread pool: await it
+M:System.Threading.Thread.Sleep(System.Int32);Use await Task.Delay(..., cancellationToken) so the wait can be cancelled
+M:System.Threading.Thread.Sleep(System.TimeSpan);Use await Task.Delay(..., cancellationToken) so the wait can be cancelled

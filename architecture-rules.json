@@ -1,0 +1,119 @@
+{
+  "description": "Machine-readable architecture rules, checked by .claude/skills/speckit-local-full/scripts/architecture.ps1. Changing this file changes the architecture: do it only when a spec requires it, never to make a check pass.",
+
+  "allowedRootEntries": [
+    ".claude", ".specify", ".config", ".vscode", ".github", ".agents",
+    ".devcontainer", ".automata",
+    ".gitignore", ".gitattributes", ".editorconfig",
+    ".mcp.json", ".envsample",
+    "features", "specs", "docs", "src", "wiki", "memories", "scripts", "llm",
+    "codex.toml", "context7.json",
+    "Directory.Build.props", "Directory.Packages.props",
+    "BannedSymbols.txt", "global.json", "nuget.config", "stryker-config.json", "architecture-rules.json",
+    "README.md", "CLAUDE.md", "AGENTS.md", "RELEASE_NOTES.md", "LICENSE",
+    "*.sln", "GitVersion.yml"
+  ],
+
+  "forbiddenPackagesEverywhere": [],
+
+  "projects": [
+    {
+      "name": "Cisharpai",
+      "folder": "src",
+      "allowedProjectReferences": [],
+      "forbiddenPackages": ["NUnit*", "NSubstitute*"],
+      "forbiddenFrameworkReferences": ["Microsoft.AspNetCore.App"]
+    },
+    {
+      "name": "Cisharpai.OpenAi",
+      "folder": "src",
+      "allowedProjectReferences": ["Cisharpai"],
+      "forbiddenPackages": ["NUnit*", "NSubstitute*"],
+      "forbiddenFrameworkReferences": ["Microsoft.AspNetCore.App"]
+    },
+    {
+      "name": "Cisharpai.Anthropic",
+      "folder": "src",
+      "allowedProjectReferences": ["Cisharpai"],
+      "forbiddenPackages": ["NUnit*", "NSubstitute*"],
+      "forbiddenFrameworkReferences": ["Microsoft.AspNetCore.App"]
+    },
+    {
+      "name": "Cisharpai.Azure",
+      "folder": "src",
+      "allowedProjectReferences": ["Cisharpai"],
+      "forbiddenPackages": ["NUnit*", "NSubstitute*"],
+      "forbiddenFrameworkReferences": ["Microsoft.AspNetCore.App"]
+    },
+    {
+      "name": "Cisharpai.Cohere",
+      "folder": "src",
+      "allowedProjectReferences": ["Cisharpai"],
+      "forbiddenPackages": ["NUnit*", "NSubstitute*"],
+      "forbiddenFrameworkReferences": ["Microsoft.AspNetCore.App"]
+    },
+    {
+      "name": "Cisharpai.Rag",
+      "folder": "src",
+      "allowedProjectReferences": ["Cisharpai"],
+      "forbiddenPackages": ["NUnit*", "NSubstitute*"],
+      "forbiddenFrameworkReferences": ["Microsoft.AspNetCore.App"]
+    },
+    {
+      "name": "Cisharpai.Rag.OpenAi",
+      "folder": "src",
+      "allowedProjectReferences": ["Cisharpai.OpenAi", "Cisharpai.Rag"],
+      "forbiddenPackages": ["NUnit*", "NSubstitute*"],
+      "forbiddenFrameworkReferences": ["Microsoft.AspNetCore.App"]
+    },
+    {
+      "name": "Cisharpai.Rag.Tokenizers",
+      "folder": "src",
+      "allowedProjectReferences": ["Cisharpai"],
+      "forbiddenPackages": ["NUnit*", "NSubstitute*"],
+      "forbiddenFrameworkReferences": ["Microsoft.AspNetCore.App"]
+    },
+    {
+      "name": "Cisharpai.Testing",
+      "folder": "src",
+      "allowedProjectReferences": ["Cisharpai", "Cisharpai.Rag"],
+      "forbiddenPackages": ["NUnit*", "NSubstitute*"],
+      "forbiddenFrameworkReferences": ["Microsoft.AspNetCore.App"]
+    },
+    {
+      "name": "Cisharp.Console",
+      "folder": "src",
+      "allowedProjectReferences": ["Cisharpai", "Cisharpai.OpenAi", "Cisharpai.Anthropic", "Cisharpai.Azure", "Cisharpai.Cohere"],
+      "forbiddenPackages": ["NUnit*", "NSubstitute*"],
+      "forbiddenFrameworkReferences": []
+    },
+    {
+      "name": "Cisharpai.Tests.Common",
+      "folder": "src",
+      "allowedProjectReferences": [],
+      "forbiddenPackages": [],
+      "forbiddenFrameworkReferences": []
+    },
+    {
+      "name": "Cisharpai.Tests",
+      "folder": "src",
+      "allowedProjectReferences": ["Cisharpai", "Cisharpai.OpenAi", "Cisharpai.Anthropic", "Cisharpai.Azure", "Cisharpai.Cohere", "Cisharpai.Tests.Common", "Cisharpai.Testing", "Cisharpai.Rag", "Cisharpai.Rag.OpenAi", "Cisharpai.Rag.Tokenizers"],
+      "forbiddenPackages": [],
+      "forbiddenFrameworkReferences": []
+    },
+    {
+      "name": "Cisharpai.Integration.Tests",
+      "folder": "src",
+      "allowedProjectReferences": ["Cisharpai", "Cisharpai.OpenAi", "Cisharpai.Anthropic", "Cisharpai.Azure", "Cisharpai.Cohere", "Cisharpai.Tests.Common"],
+      "forbiddenPackages": [],
+      "forbiddenFrameworkReferences": []
+    }
+  ],
+
+  "architectureTests": {
+    "project": "Cisharpai.Tests",
+    "package": "TngTech.ArchUnitNET.NUnit",
+    "filePattern": "Architecture*Tests.cs",
+    "requiredRuleIds": ["A1", "A2", "A3", "A4", "A5"]
+  }
+}

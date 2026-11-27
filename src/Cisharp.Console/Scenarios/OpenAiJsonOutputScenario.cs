@@ -18,7 +18,7 @@ public sealed class OpenAiJsonOutputScenario : IScenario
         var apiKey = ScenarioHelpers.RequireEnv(DotEnv.OpenAiApiKey);
         var baseUrl = ScenarioHelpers.GetEnv(DotEnv.OpenAiBaseUrl);
 
-        var model = await AnsiConsole.AskAsync("Model?", "gpt-4.1-nano", cancellationToken);
+        var model = await AnsiConsole.AskAsync("Model?", "gpt-4.1-mini", cancellationToken);
 
         var services = ScenarioHelpers.CreateServiceCollection();
         services.AddOpenAiClient(options =>

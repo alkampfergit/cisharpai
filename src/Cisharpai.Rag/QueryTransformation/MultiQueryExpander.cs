@@ -26,7 +26,7 @@ public sealed class MultiQueryExpander : QueryTransformerBase
         QueryTransformerOptions? options = null,
         string? systemPrompt = null,
         bool includeOriginal = true)
-        : base(client, options, systemPrompt, string.Format(DefaultSystemPromptTemplate, variantCount))
+        : base(client, options, systemPrompt, DefaultSystemPromptTemplate.Replace("{0}", variantCount.ToString(System.Globalization.CultureInfo.InvariantCulture), StringComparison.Ordinal))
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(variantCount, 1);
         _variantCount = variantCount;

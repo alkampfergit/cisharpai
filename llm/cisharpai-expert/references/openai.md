@@ -35,7 +35,7 @@ The client automatically routes requests based on the model name:
 **Chat:**
 - `OpenAiModels.Chat.Gpt4_1` — `gpt-4.1`
 - `OpenAiModels.Chat.Gpt4_1Mini` — `gpt-4.1-mini`
-- `OpenAiModels.Chat.Gpt4_1Nano` — `gpt-4.1-nano`
+- `OpenAiModels.Chat.Gpt4_1Nano` — `gpt-4.1-nano` *(deprecated)*
 - `OpenAiModels.Chat.O3` — `o3`
 - `OpenAiModels.Chat.O3Mini` — `o3-mini`
 - `OpenAiModels.Chat.O4Mini` — `o4-mini`

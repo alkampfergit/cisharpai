@@ -1,3 +1,4 @@
+using System.Globalization;
 using Cisharpai.Models;
 using Cisharpai.Rag.Embeddings;
 using Cisharpai.Rag.Models;
@@ -8,7 +9,7 @@ namespace Cisharpai.Tests.Rag;
 [TestFixture]
 public class BulkEmbeddingProviderProfileTests
 {
-    private static TextChunk Chunk(int index) => new("document", index, index, index + index.ToString().Length, index.ToString());
+    private static TextChunk Chunk(int index) => new("document", index, index, index + index.ToString(CultureInfo.InvariantCulture).Length, index.ToString(CultureInfo.InvariantCulture));
 
     private static EmbeddingResponse Response(int count) =>
         new(Enumerable.Range(0, count).Select(_ => new[] { 1f }).ToArray(), null, "model", 42);

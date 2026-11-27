@@ -477,7 +477,7 @@ public sealed class CohereGroundedChatTests
     }
 
     [Test]
-    public void GroundedChat_EmptyDocuments_ReturnsError()
+    public async Task GroundedChat_EmptyDocuments_ReturnsError()
     {
         using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.cohere.com/v2/") };
         var client = new CohereChatCompletionClient(httpClient, new CohereClientOptions());
@@ -485,12 +485,12 @@ public sealed class CohereGroundedChatTests
         var options = new GroundedChatOptions(Documents: []);
 
         // The ArgumentException is caught internally and returned as an error response
-        var response = client.GetGroundedChatCompletionAsync(CreateRequest(), options).Result;
+        var response = await client.GetGroundedChatCompletionAsync(CreateRequest(), options);
         Assert.That(response.IsSuccess, Is.False);
     }
 
     [Test]
-    public void GroundedChat_InvalidDocument_ReturnsError()
+    public async Task GroundedChat_InvalidDocument_ReturnsError()
     {
         using var httpClient = new HttpClient { BaseAddress = new Uri("https://api.cohere.com/v2/") };
         var client = new CohereChatCompletionClient(httpClient, new CohereClientOptions());
@@ -498,7 +498,7 @@ public sealed class CohereGroundedChatTests
         var options = new GroundedChatOptions(
             Documents: [new DocumentChunk(Id: "doc-1")]); // No Data or Text
 
-        var response = client.GetGroundedChatCompletionAsync(CreateRequest(), options).Result;
+        var response = await client.GetGroundedChatCompletionAsync(CreateRequest(), options);
         Assert.That(response.IsSuccess, Is.False);
     }
 

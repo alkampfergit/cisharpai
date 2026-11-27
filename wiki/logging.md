@@ -46,7 +46,7 @@ services.AddLogging(b =>
 
 ```
 14:22:11 info: Cisharpai.LlmHttpClient[1000]
-      Sending POST request to https://api.openai.com/v1/chat/completions with body {"model":"gpt-4.1-nano",...}
+      Sending POST request to https://api.openai.com/v1/chat/completions with body {"model":"gpt-4.1-mini",...}
 14:22:12 info: Cisharpai.LlmHttpClient[1001]
       POST request to https://api.openai.com/v1/chat/completions completed with status 200 in 612.4 ms and body {"id":"chatcmpl-...",...}
 ```

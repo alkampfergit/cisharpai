@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
 
 namespace Cisharpai.Azure.AzureAiInference.Models;
@@ -24,6 +25,7 @@ public sealed class AzureAiInferenceChatChoice
     public string? FinishReason { get; set; }
 }
 
+[SuppressMessage("Naming", "CA1720:Identifier contains type name", Justification = "Property name mirrors the Azure AI Inference API JSON schema")]
 public sealed class AzureAiInferenceChatResponse
 {
     public string Id { get; set; } = string.Empty;

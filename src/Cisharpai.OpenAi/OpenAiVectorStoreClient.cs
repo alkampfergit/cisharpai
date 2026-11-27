@@ -18,7 +18,7 @@ namespace Cisharpai.OpenAi;
 /// are out of scope.
 /// </para>
 /// </summary>
-public sealed class OpenAiVectorStoreClient
+public sealed partial class OpenAiVectorStoreClient
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -28,14 +28,16 @@ public sealed class OpenAiVectorStoreClient
 
     private readonly HttpClient _httpClient;
     private readonly ILogger _logger;
+    private readonly TimeProvider _timeProvider;
 
-    public OpenAiVectorStoreClient(HttpClient httpClient, ILoggerFactory? loggerFactory = null)
+    public OpenAiVectorStoreClient(HttpClient httpClient, ILoggerFactory? loggerFactory = null, TimeProvider? timeProvider = null)
     {
         _httpClient = httpClient;
         _logger = loggerFactory?.CreateLogger<OpenAiVectorStoreClient>() ?? NullLogger<OpenAiVectorStoreClient>.Instance;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
-    public static OpenAiVectorStoreClient Create(OpenAiClientOptions options, ILoggerFactory? loggerFactory = null)
+    public static OpenAiVectorStoreClient Create(OpenAiClientOptions options, ILoggerFactory? loggerFactory = null, TimeProvider? timeProvider = null)
     {
         var handler = new OpenAiAuthenticationHandler(options) { InnerHandler = new HttpClientHandler() };
         var httpClient = new HttpClient(handler)
@@ -43,7 +45,7 @@ public sealed class OpenAiVectorStoreClient
             BaseAddress = new Uri(options.BaseUrl),
             Timeout = TimeSpan.FromMinutes(5)
         };
-        return new OpenAiVectorStoreClient(httpClient, loggerFactory);
+        return new OpenAiVectorStoreClient(httpClient, loggerFactory, timeProvider);
     }
 
     public async Task<VectorStoreResult<OpenAiVectorStore>> CreateStoreAsync(
@@ -174,19 +176,19 @@ public sealed class OpenAiVectorStoreClient
     {
         var effectiveTimeout = timeout ?? TimeSpan.FromMinutes(5);
         var effectiveInterval = pollInterval ?? TimeSpan.FromSeconds(1);
-        var deadline = DateTimeOffset.UtcNow + effectiveTimeout;
+        var deadline = _timeProvider.GetUtcNow() + effectiveTimeout;
 
-        using var deadlineCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        deadlineCts.CancelAfter(effectiveTimeout);
-        var deadlineToken = deadlineCts.Token;
+        using var timeoutCts = new CancellationTokenSource(effectiveTimeout, _timeProvider);
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+        var linkedToken = linkedCts.Token;
 
         try
         {
             while (true)
             {
-                deadlineToken.ThrowIfCancellationRequested();
+                linkedToken.ThrowIfCancellationRequested();
 
-                var result = await GetFileInStoreAsync(vectorStoreId, fileId, deadlineToken);
+                var result = await GetFileInStoreAsync(vectorStoreId, fileId, linkedToken);
                 if (!result.IsSuccess)
                     return result;
 
@@ -194,18 +196,14 @@ public sealed class OpenAiVectorStoreClient
                 if (status is "completed" or "failed" or "cancelled")
                     return result;
 
-                if (_logger.IsEnabled(LogLevel.Debug))
-                {
-                    _logger.LogDebug("File {FileId} in store {StoreId} status: {Status}, polling again in {Interval}ms",
-                        fileId, vectorStoreId, status, effectiveInterval.TotalMilliseconds);
-                }
+                LogFilePollingStatus(fileId, vectorStoreId, status, effectiveInterval.TotalMilliseconds);
 
-                var remaining = deadline - DateTimeOffset.UtcNow;
+                var remaining = deadline - _timeProvider.GetUtcNow();
                 if (remaining <= TimeSpan.Zero)
                     break;
 
                 var delay = effectiveInterval < remaining ? effectiveInterval : remaining;
-                await Task.Delay(delay, deadlineToken);
+                await Task.Delay(delay, _timeProvider, linkedToken);
             }
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)

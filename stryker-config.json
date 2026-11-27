@@ -1,0 +1,8 @@
+{
+  "stryker-config": {
+    "reporters": ["json"],
+    "mutation-level": "Standard",
+    "thresholds": { "high": 85, "low": 70, "break": 70 },
+    "mutate": ["!**/Migrations/**", "!**/*.g.cs", "!**/*.Designer.cs"]
+  }
+}

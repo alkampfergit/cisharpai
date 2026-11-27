@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Cisharpai.Anthropic;
 
 /// <summary>
@@ -6,6 +8,7 @@ namespace Cisharpai.Anthropic;
 public static class AnthropicModels
 {
     /// <summary>Chat / completion models.</summary>
+    [SuppressMessage("Naming", "CA1707:Identifiers should not match keywords", Justification = "Model identifiers mirror official API model IDs")]
     public static class Chat
     {
         public const string ClaudeOpus4_5 = "claude-opus-4-5-20251101";

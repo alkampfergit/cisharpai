@@ -31,7 +31,7 @@ var toolOptions = new ToolCallingOptions(
 // 3. Send a request
 var request = new ChatCompletionRequest(
     Messages: [new LlmMessage(LlmRole.User, "What's the weather in Paris?")],
-    Model: "gpt-4.1-nano");
+    Model: "gpt-4.1-mini");
 
 var response = await toolFeature!.GetChatCompletionWithToolsAsync(request, toolOptions);
 
@@ -66,7 +66,7 @@ var messages = new List<LlmMessage>
     new(LlmRole.Tool, result, ToolCallId: toolCall.Id)
 };
 
-var followUp = new ChatCompletionRequest(Messages: messages, Model: "gpt-4.1-nano");
+var followUp = new ChatCompletionRequest(Messages: messages, Model: "gpt-4.1-mini");
 var finalResponse = await toolFeature.GetChatCompletionWithToolsAsync(followUp, toolOptions);
 
 Console.WriteLine(finalResponse.Content); // "The weather in Paris is sunny, 22C."

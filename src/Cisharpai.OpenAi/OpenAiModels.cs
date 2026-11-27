@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Cisharpai.OpenAi;
 
 /// <summary>
@@ -6,6 +8,7 @@ namespace Cisharpai.OpenAi;
 public static class OpenAiModels
 {
     /// <summary>Chat / completion models.</summary>
+    [SuppressMessage("Naming", "CA1707:Identifiers should not match keywords", Justification = "Model identifiers mirror official API model IDs")]
     public static class Chat
     {
         public const string Gpt4_1 = "gpt-4.1";

@@ -63,7 +63,7 @@ public class FakeRagPipelineTests
 
         fake.Reset();
 
-        Assert.Throws<InvalidOperationException>(() => fake.AskAsync("q").GetAwaiter().GetResult());
+        Assert.ThrowsAsync<InvalidOperationException>(async () => await fake.AskAsync("q"));
     }
 
     [Test]

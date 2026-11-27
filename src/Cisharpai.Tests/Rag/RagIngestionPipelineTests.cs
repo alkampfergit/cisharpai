@@ -144,7 +144,7 @@ public class RagIngestionPipelineTests
                 for (var i = 0; i < 100; i++)
                 {
                     visited++;
-                    yield return new(i.ToString(), "ab");
+                    yield return new(i.ToString(System.Globalization.CultureInfo.InvariantCulture), "ab");
                 }
             }
             finally { disposed = true; }

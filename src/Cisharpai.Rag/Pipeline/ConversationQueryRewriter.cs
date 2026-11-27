@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using Cisharpai.Models;
 
@@ -55,7 +56,7 @@ public sealed class ConversationQueryRewriter
         var historyBlock = new StringBuilder();
         foreach (var msg in conversationHistory)
         {
-            historyBlock.AppendLine($"{msg.Role}: {msg.Content}");
+            historyBlock.AppendLine(CultureInfo.InvariantCulture, $"{msg.Role}: {msg.Content}");
         }
 
         var userPrompt = $"Conversation history:\n{historyBlock}\nFollow-up question: {query}";

@@ -42,7 +42,7 @@ public sealed class OpenAiJsonOutputIntegrationTests
 
     // --- JSON Mode ---
 
-    [TestCase("gpt-4.1-nano")]
+    [TestCase("gpt-4.1-mini")]
     [TestCase("gpt-5-nano")]
     public async Task JsonMode_ReturnsValidJson(string model)
     {
@@ -70,7 +70,7 @@ public sealed class OpenAiJsonOutputIntegrationTests
 
     // --- Structured Outputs ---
 
-    [TestCase("gpt-4.1-nano")]
+    [TestCase("gpt-4.1-mini")]
     [TestCase("gpt-5-nano")]
     public async Task StructuredOutputs_SimpleSchema_MatchesSchema(string model)
     {
@@ -145,7 +145,7 @@ public sealed class OpenAiJsonOutputIntegrationTests
 
         var request = new ChatCompletionRequest(
             Messages: [new LlmMessage(LlmRole.User, "List 3 colors with their hex codes")],
-            Model: "gpt-4.1-nano",
+            Model: "gpt-4.1-mini",
             Temperature: 0,
             MaxTokens: 500);
 

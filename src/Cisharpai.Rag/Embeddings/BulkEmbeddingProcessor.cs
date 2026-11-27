@@ -269,6 +269,7 @@ public sealed class BulkEmbeddingProcessor : IBulkEmbeddingProcessor
         }
     }
 
+    [System.Diagnostics.CodeAnalysis.SuppressMessage("Security", "CA5394:Do not use insecure randomness", Justification = "Jitter for retry delay, not security-sensitive")]
     private TimeSpan ComputeRetryDelay(int attempt)
     {
         var baseMs = _options.RetryBaseDelay.TotalMilliseconds;

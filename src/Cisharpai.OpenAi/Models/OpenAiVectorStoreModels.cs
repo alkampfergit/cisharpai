@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
 
 namespace Cisharpai.OpenAi.Models;
@@ -30,6 +31,7 @@ public sealed class OpenAiExpiresAfter
     public int Days { get; set; }
 }
 
+[SuppressMessage("Naming", "CA1720:Identifier contains type name", Justification = "Property name mirrors the OpenAI API JSON schema")]
 public sealed class OpenAiVectorStore
 {
     [JsonPropertyName("id")]
@@ -81,6 +83,7 @@ public sealed class OpenAiVectorStoreListResponse
     public bool HasMore { get; set; }
 }
 
+[SuppressMessage("Naming", "CA1720:Identifier contains type name", Justification = "Property name mirrors the OpenAI API JSON schema")]
 public sealed class OpenAiVectorStoreFile
 {
     [JsonPropertyName("id")]
@@ -121,6 +124,7 @@ public sealed class OpenAiVectorStoreFileListResponse
     public bool HasMore { get; set; }
 }
 
+[SuppressMessage("Naming", "CA1720:Identifier contains type name", Justification = "Property name mirrors the OpenAI API JSON schema")]
 public sealed class OpenAiUploadedFile
 {
     [JsonPropertyName("id")]
