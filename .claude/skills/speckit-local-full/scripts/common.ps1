@@ -184,7 +184,7 @@ function Get-FeatureState {
 function Update-PhaseFromLine {
     param(
         [Parameter(Mandatory)][pscustomobject]$Phase,
-        [Parameter(Mandatory)][string]$Line
+        [Parameter(Mandatory)][AllowEmptyString()][string]$Line
     )
     $complexity = [regex]::Match($Line, '^\s*\**Complexity\**\s*:\s*\**(?<level>low|medium|high)\**\s*(?:[-:]+\s*(?<reason>.*))?$', 'IgnoreCase')
     if ($complexity.Success -and $null -eq $Phase.complexity) {

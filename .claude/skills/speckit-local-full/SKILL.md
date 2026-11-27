@@ -279,7 +279,11 @@ Backlog source: <file>, plus features/README.md
 Feature <NN>: <title>. The full description is <file>; read it together with
 features/README.md and specify exactly that feature, no more.
 SPECIFY_FEATURE_DIRECTORY=<specDir>
+GIT_BRANCH_NAME=feature/<id>
 ```
+
+Setting `GIT_BRANCH_NAME` tells the `before_specify` branch-creation hook to reuse
+the branch the orchestrator already checked out instead of creating a new one.
 
 and add to the prompt:
 
@@ -329,8 +333,8 @@ Add to the plan prompt:
 ```text
 The technology choices are fixed by features/README.md and <file>; record them, do not
 re-evaluate them.
-The plan skill has a mandatory before_plan hook, speckit-research-verify (registered in
-.specify/extensions.yml). Run it first, exactly as the skill instructs: it checks the
+The plan skill has a mandatory pre-planning step: speckit-research-verify. Run it first,
+exactly as the skill instructs: it checks the
 feature's technical assumptions against the Microsoft Learn and Context7 MCP servers and
 writes <specDir>/docs-verification.md with the files to touch. Load those MCP tools with
 tool search if they are not already available. Then write the plan from that file: a
@@ -339,7 +343,7 @@ structure, and "unverified" rows go into research.md as open items. In your repo
 the confirmed / corrected / unverified counts.
 ```
 
-If `docs-verification.md` is missing after the plan subagent returns, the hook was skipped:
+If `docs-verification.md` is missing after the plan subagent returns, the pre-planning step was skipped:
 spawn a subagent (model `plan`) to run `speckit-research-verify` and then revise `plan.md` against it,
 before committing. A plan built on unchecked assumptions is the failure this hook exists to
 prevent.

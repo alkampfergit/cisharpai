@@ -120,7 +120,11 @@ try {
     }
 
     $testLog = Join-Path $LogDir 'test.log'
-    dotnet test $solution -c $Configuration --no-build --nologo *> $testLog
+    $unitTestProject = Get-ChildItem $root -Recurse -Depth 4 -File -Filter '*.csproj' |
+        Where-Object { $_.FullName -notmatch $skip -and $_.Name -match '\.Tests\.csproj$' -and $_.Name -notmatch 'Integration' } |
+        Select-Object -First 1
+    $testTarget = if ($unitTestProject) { $unitTestProject.FullName } else { $solution }
+    dotnet test $testTarget -c $Configuration --no-build --nologo *> $testLog
     $testExit = $LASTEXITCODE
     $result.logs += $testLog
     $testLines = @(Get-Content $testLog)

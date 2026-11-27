@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json;
 using Cisharpai.OpenAi;
 using Cisharpai.OpenAi.Models;
+using Microsoft.Extensions.Time.Testing;
 
 namespace Cisharpai.Tests.OpenAi;
 
@@ -962,6 +963,98 @@ public sealed class OpenAiVectorStoreClientTests
         var client = OpenAiVectorStoreClient.Create(options);
 
         Assert.That(client, Is.Not.Null);
+    }
+
+    #endregion
+
+    #region TimeProvider integration
+
+    private static OpenAiVectorStoreClient CreateClientWithTimeProvider(
+        Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> handler,
+        FakeTimeProvider timeProvider)
+    {
+        var mockHandler = new MockHttpMessageHandler(handler);
+        var httpClient = new HttpClient(mockHandler)
+        {
+            BaseAddress = new Uri("https://api.openai.com/v1/")
+        };
+        return new OpenAiVectorStoreClient(httpClient, timeProvider: timeProvider);
+    }
+
+    [Test]
+    public async Task PollFile_FakeTimeProvider_TimeoutCancelsInFlightRequest()
+    {
+        var fake = new FakeTimeProvider();
+        var timeout = TimeSpan.FromMinutes(5);
+        var requestReceived = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var client = CreateClientWithTimeProvider(async (_, ct) =>
+        {
+            requestReceived.TrySetResult();
+            await Task.Delay(Timeout.InfiniteTimeSpan, ct);
+            return new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StringContent(FileInStoreInProgressResponse, System.Text.Encoding.UTF8, "application/json")
+            };
+        }, fake);
+
+        var pollTask = client.PollFileUntilProcessedAsync(
+            "vs_abc123", "file-xyz789",
+            timeout: timeout,
+            pollInterval: TimeSpan.FromSeconds(1));
+
+        await requestReceived.Task;
+        fake.Advance(timeout + TimeSpan.FromSeconds(1));
+
+        var result = await pollTask;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.IsSuccess, Is.False);
+            Assert.That(result.ErrorMessage, Does.Contain("Timeout"));
+        });
+    }
+
+    [Test]
+    public async Task PollFile_FakeTimeProvider_AdvancesThroughPollingIntervals()
+    {
+        var fake = new FakeTimeProvider();
+        var callCount = 0;
+        var interval = TimeSpan.FromMinutes(1);
+        var handlerCalled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var client = CreateClientWithTimeProvider((_, _) =>
+        {
+            var count = Interlocked.Increment(ref callCount);
+            var json = count < 3 ? FileInStoreInProgressResponse : FileInStoreCompletedResponse;
+            handlerCalled.TrySetResult();
+            return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json")
+            });
+        }, fake);
+
+        var pollTask = client.PollFileUntilProcessedAsync(
+            "vs_abc123", "file-xyz789",
+            timeout: TimeSpan.FromHours(1),
+            pollInterval: interval);
+
+        for (var i = 0; i < 10 && !pollTask.IsCompleted; i++)
+        {
+            await handlerCalled.Task;
+            handlerCalled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            fake.Advance(interval);
+            await Task.Delay(10);
+        }
+
+        var result = await pollTask;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.IsSuccess, Is.True);
+            Assert.That(result.Value!.Status, Is.EqualTo("completed"));
+            Assert.That(callCount, Is.GreaterThanOrEqualTo(3));
+        });
     }
 
     #endregion

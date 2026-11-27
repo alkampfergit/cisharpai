@@ -214,7 +214,7 @@ jobs:
             '/d:sonar.cs.vstest.reportsPaths=artifacts/TestResults/**/*.trx'
             '/d:sonar.cs.opencover.reportsPaths=artifacts/TestResults/**/coverage.opencover.xml'
             '/d:sonar.exclusions=.claude/**,.agents/**'
-            '/d:sonar.coverage.exclusions=**/*Tests*/**,**/Cisharp.Console/**,.agents/**,.claude/**'
+            '/d:sonar.coverage.exclusions=**/*Tests*/**,**/Cisharp.Console/**,.agents/**,.claude/**,scripts/**'
             '/d:sonar.cpd.exclusions=**/*Tests*/**,**/Cisharp.Console/**,**/Models/**'
           )
           .sonar/scanner/dotnet-sonarscanner @scannerArgs

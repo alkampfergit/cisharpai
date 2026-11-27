@@ -128,12 +128,13 @@ try {
         Complete-Mutation
     }
 
-    $result.score = [math]::Round(100.0 * $result.killed / $tested, 1)
+    $unroundedScore = 100.0 * $result.killed / $tested
+    $result.score = [math]::Round($unroundedScore, 1)
     $total = $result.survivors.Count
     if ($total -gt $MaxListed) {
         $result.survivors = @($result.survivors | Select-Object -First $MaxListed) + "... and $($total - $MaxListed) more; see the Stryker logs."
     }
-    if ($result.score -lt $result.threshold) {
+    if ($unroundedScore -lt $result.threshold) {
         $result.problems += "Mutation score $($result.score)% is below the $($result.threshold)% threshold: $($result.survived) mutant(s) survived and $($result.noTests) are in code no test runs. Add or strengthen unit tests so that each listed change makes a test fail (assert the boundary or the result the mutant alters). Do not delete the code, exclude files in stryker-config.json or lower the threshold."
     }
     Complete-Mutation

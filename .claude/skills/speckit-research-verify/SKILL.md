@@ -12,7 +12,7 @@ disable-model-invocation: false
 
 # Verify Assumptions Before Planning
 
-Runs as the `before_plan` hook. A plan written from memory repeats whatever the model
+Invoked as a pre-planning step by the orchestrator. A plan written from memory repeats whatever the model
 remembers about .NET, EF Core, Blazor and the other libraries, and that memory is often a
 version or two behind. This command replaces those assumptions with what the current
 documentation says, and works out which files the feature has to create or change, so the
@@ -27,7 +27,7 @@ $ARGUMENTS
 ## Steps
 
 1. **Locate the feature.** Run
-   `.specify/scripts/powershell/check-prerequisites.ps1 -Json -PathsOnly` from the
+   `.specify/scripts/bash/check-prerequisites.sh --json --paths-only` from the
    repository root and take `FEATURE_DIR` and `FEATURE_SPEC`. Read the spec. If the
    repository has a `features/` backlog, also read `features/README.md` and the backlog
    file this spec was written from: their decisions are settled and are not up for
@@ -56,7 +56,7 @@ $ARGUMENTS
    files this feature has to create and the existing files it has to modify, each with one
    line on why. Name real paths; where a path depends on a choice the plan still has to
    make, say so instead of inventing one. Every path must fit
-   `docs/architecture-rules.md` (layout, approved projects, allowed references): read it
+   `architecture-rules.json` (layout, approved projects, allowed references): read it
    first, and if the feature cannot be built inside those rules, say so under
    "Unverified" instead of planning around them.
 

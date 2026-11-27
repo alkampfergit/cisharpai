@@ -178,17 +178,17 @@ public sealed partial class OpenAiVectorStoreClient
         var effectiveInterval = pollInterval ?? TimeSpan.FromSeconds(1);
         var deadline = _timeProvider.GetUtcNow() + effectiveTimeout;
 
-        using var deadlineCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        deadlineCts.CancelAfter(effectiveTimeout);
-        var deadlineToken = deadlineCts.Token;
+        using var timeoutCts = new CancellationTokenSource(effectiveTimeout, _timeProvider);
+        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, timeoutCts.Token);
+        var linkedToken = linkedCts.Token;
 
         try
         {
             while (true)
             {
-                deadlineToken.ThrowIfCancellationRequested();
+                linkedToken.ThrowIfCancellationRequested();
 
-                var result = await GetFileInStoreAsync(vectorStoreId, fileId, deadlineToken);
+                var result = await GetFileInStoreAsync(vectorStoreId, fileId, linkedToken);
                 if (!result.IsSuccess)
                     return result;
 
@@ -203,7 +203,7 @@ public sealed partial class OpenAiVectorStoreClient
                     break;
 
                 var delay = effectiveInterval < remaining ? effectiveInterval : remaining;
-                await Task.Delay(delay, deadlineToken);
+                await Task.Delay(delay, _timeProvider, linkedToken);
             }
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)

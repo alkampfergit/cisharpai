@@ -3,8 +3,11 @@
 
   "allowedRootEntries": [
     ".claude", ".specify", ".config", ".vscode", ".github", ".agents",
+    ".devcontainer", ".automata",
     ".gitignore", ".gitattributes", ".editorconfig",
+    ".mcp.json", ".envsample",
     "features", "specs", "docs", "src", "wiki", "memories", "scripts", "llm",
+    "codex.toml", "context7.json",
     "Directory.Build.props", "Directory.Packages.props",
     "BannedSymbols.txt", "global.json", "nuget.config", "stryker-config.json", "architecture-rules.json",
     "README.md", "CLAUDE.md", "AGENTS.md", "RELEASE_NOTES.md", "LICENSE",
