@@ -282,8 +282,10 @@ SPECIFY_FEATURE_DIRECTORY=<specDir>
 GIT_BRANCH_NAME=feature/<id>
 ```
 
-Setting `GIT_BRANCH_NAME` tells the `before_specify` branch-creation hook to reuse
-the branch the orchestrator already checked out instead of creating a new one.
+Setting `GIT_BRANCH_NAME` tells the `before_specify` branch-creation hook to target
+the branch the orchestrator already checked out. Because that branch already exists,
+also pass `--allow-existing-branch` (Bash) or `-AllowExistingBranch` (PowerShell)
+to the branch-creation script so it switches to it instead of failing.
 
 and add to the prompt:
 

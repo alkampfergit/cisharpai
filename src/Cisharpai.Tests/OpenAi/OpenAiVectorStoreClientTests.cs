@@ -1016,18 +1016,17 @@ public sealed class OpenAiVectorStoreClientTests
     }
 
     [Test]
+    [CancelAfter(10_000)]
     public async Task PollFile_FakeTimeProvider_AdvancesThroughPollingIntervals()
     {
         var fake = new FakeTimeProvider();
         var callCount = 0;
         var interval = TimeSpan.FromMinutes(1);
-        var handlerCalled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
         var client = CreateClientWithTimeProvider((_, _) =>
         {
             var count = Interlocked.Increment(ref callCount);
             var json = count < 3 ? FileInStoreInProgressResponse : FileInStoreCompletedResponse;
-            handlerCalled.TrySetResult();
             return Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
             {
                 Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json")
@@ -1039,12 +1038,10 @@ public sealed class OpenAiVectorStoreClientTests
             timeout: TimeSpan.FromHours(1),
             pollInterval: interval);
 
-        for (var i = 0; i < 10 && !pollTask.IsCompleted; i++)
+        while (!pollTask.IsCompleted)
         {
-            await handlerCalled.Task;
-            handlerCalled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             fake.Advance(interval);
-            await Task.Delay(10);
+            await Task.Yield();
         }
 
         var result = await pollTask;
