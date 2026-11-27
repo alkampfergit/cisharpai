@@ -43,7 +43,7 @@ public sealed class OpenAiVisionIntegrationTests
 
         var request = new ChatCompletionRequest(
             Messages: [message],
-            Model: "gpt-4.1-nano",
+            Model: "gpt-4.1-mini",
             MaxTokens: 100);
 
         var response = await client.GetChatCompletionAsync(request);
@@ -70,7 +70,7 @@ public sealed class OpenAiVisionIntegrationTests
 
             var request = new ChatCompletionRequest(
                 Messages: [message],
-                Model: "gpt-4.1-nano",
+                Model: "gpt-4.1-mini",
                 MaxTokens: 100);
 
             var response = await client.GetChatCompletionAsync(request);

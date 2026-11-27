@@ -22,7 +22,11 @@
 
     <!-- Build tooling -->
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.402" />
-    <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.35.0.4138" />
+    <GlobalPackageReference Include="Microsoft.CodeAnalysis.BannedApiAnalyzers" Version="4.14.0" />
+    <GlobalPackageReference Include="SonarAnalyzer.CSharp" Version="10.35.0.4138" />
+
+    <!-- Architecture testing -->
+    <PackageVersion Include="TngTech.ArchUnitNET.NUnit" Version="0.13.5" />
 
     <!-- Testing packages -->
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />

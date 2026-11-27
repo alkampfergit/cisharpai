@@ -1,9 +1,12 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Cisharpai.Features;
 
 /// <summary>
 /// A collection of features that can be discovered and accessed by type.
 /// Provides a type-safe way to query optional capabilities of a client.
 /// </summary>
+[SuppressMessage("Naming", "CA1716:Identifiers should not match keywords", Justification = "Follows ASP.NET Core IFeatureCollection pattern")]
 public interface IFeatureCollection : IEnumerable<KeyValuePair<Type, object>>
 {
     /// <summary>

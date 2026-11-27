@@ -384,7 +384,7 @@ public class InMemoryRetrieverTests
     }
 
     [Test]
-    public void Add_SnapshotsVector_CallerMutationDoesNotAffectStore()
+    public async Task Add_SnapshotsVector_CallerMutationDoesNotAffectStore()
     {
         var fakeEmbedding = new FakeEmbeddingClient();
         fakeEmbedding.EnqueueResponse(FakeResponses.Embedding(new float[] { 1f, 0f }));
@@ -398,7 +398,7 @@ public class InMemoryRetrieverTests
 
         // The stored vector should still be [1, 0], so "text" should rank first
         // against a query vector of [1, 0]
-        var results = retriever.RetrieveAsync("query", new RetrievalOptions { TopK = 1 }).GetAwaiter().GetResult();
+        var results = await retriever.RetrieveAsync("query", new RetrievalOptions { TopK = 1 });
 
         Assert.That(results, Has.Count.EqualTo(1));
         Assert.That(results[0].Score, Is.GreaterThan(0.99).Within(0.01));

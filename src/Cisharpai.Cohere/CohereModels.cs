@@ -1,8 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Cisharpai.Cohere;
 
 /// <summary>
 /// Well-known Cohere model identifiers.
 /// </summary>
+[SuppressMessage("Naming", "CA1707:Identifiers should not match keywords", Justification = "Model identifiers mirror official API model IDs")]
 public static class CohereModels
 {
     /// <summary>Chat / completion models.</summary>

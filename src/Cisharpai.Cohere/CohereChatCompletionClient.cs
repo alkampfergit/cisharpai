@@ -10,12 +10,12 @@ using Microsoft.Extensions.Logging;
 
 namespace Cisharpai.Cohere;
 
-public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IGroundedChatFeature, IToolCallingFeature, IStreamingChatFeature
+public sealed partial class CohereChatCompletionClient : IChatCompletionClient, IJsonOutputFeature, IGroundedChatFeature, IToolCallingFeature, IStreamingChatFeature
 {
     private const string ChatEndpoint = "chat";
     private readonly LlmHttpClient _client;
     private readonly CohereClientOptions _options;
-    private readonly ILogger<CohereChatCompletionClient>? _logger;
+    private readonly ILogger _logger;
 
     private static readonly JsonSerializerOptions StreamJsonOptions = new()
     {
@@ -32,7 +32,7 @@ public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOut
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
         }, loggerFactory?.CreateLogger<LlmHttpClient>());
         _options = options;
-        _logger = loggerFactory?.CreateLogger<CohereChatCompletionClient>();
+        _logger = (ILogger?)loggerFactory?.CreateLogger<CohereChatCompletionClient>() ?? Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance;
 
         var features = new FeatureCollection();
         features.Set<IJsonOutputFeature>(this);
@@ -503,8 +503,7 @@ public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOut
 
     private string MapSearchResultFallback()
     {
-        _logger?.LogWarning(
-            "CitationMode.SearchResult is not supported by Cohere; falling back to CitationMode.Enabled.");
+        LogSearchResultCitationNotSupported();
         return "ENABLED";
     }
 
@@ -512,9 +511,7 @@ public sealed class CohereChatCompletionClient : IChatCompletionClient, IJsonOut
     {
         if (requested == CitationMode.Accurate && IsCommandAModel(model))
         {
-            _logger?.LogWarning(
-                "Cohere model '{Model}' does not support CitationMode.Accurate; falling back to CitationMode.Fast.",
-                model);
+            LogAccurateCitationNotSupported(model);
             return CitationMode.Fast;
         }
         return requested;

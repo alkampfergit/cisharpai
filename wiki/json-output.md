@@ -154,7 +154,7 @@ var request = new ChatCompletionRequest(
 
 ### Structured Outputs (json_schema)
 - gpt-4o-2024-08-06 and later
-- gpt-4.1, gpt-4.1-mini, gpt-4.1-nano
+- gpt-4.1, gpt-4.1-mini
 - o1, o3, o3-mini, o4-mini
 - gpt-5, gpt-5-mini, gpt-5-nano
 

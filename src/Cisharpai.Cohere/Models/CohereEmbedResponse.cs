@@ -1,7 +1,9 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json.Serialization;
 
 namespace Cisharpai.Cohere.Models;
 
+[SuppressMessage("Naming", "CA1720:Identifier contains type name", Justification = "Property names mirror the Cohere API JSON schema")]
 public sealed class CohereEmbeddings
 {
     public List<List<float>>? Float { get; set; }

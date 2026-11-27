@@ -261,7 +261,7 @@ public sealed class CohereTokenCounterTests
         {
             await request.Content!.ReadAsStringAsync(CancellationToken.None);
             var count = Interlocked.Increment(ref callIndex);
-            var tokens = string.Join(", ", Enumerable.Range(1, count + 2).Select(i => i.ToString()));
+            var tokens = string.Join(", ", Enumerable.Range(1, count + 2).Select(i => i.ToString(System.Globalization.CultureInfo.InvariantCulture)));
             var tokenStrings = string.Join(", ", Enumerable.Range(1, count + 2).Select(_ => "\"a\""));
 
             return new HttpResponseMessage(HttpStatusCode.OK)

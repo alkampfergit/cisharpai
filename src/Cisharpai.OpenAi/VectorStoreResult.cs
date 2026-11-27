@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Cisharpai.OpenAi;
 
 /// <summary>
@@ -5,6 +7,7 @@ namespace Cisharpai.OpenAi;
 /// <see cref="IsSuccess"/> is <c>false</c> on API errors, with <see cref="ErrorMessage"/>
 /// describing the failure — no exceptions for API errors.
 /// </summary>
+[SuppressMessage("Design", "CA1000:Do not declare static members on generic types", Justification = "Factory methods for generic result type")]
 public sealed record VectorStoreResult<T>(
     bool IsSuccess,
     T? Value,

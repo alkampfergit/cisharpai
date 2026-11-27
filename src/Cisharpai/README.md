@@ -33,7 +33,7 @@ using Cisharpai.Models;
 // Use any provider package to get an IChatCompletionClient
 var request = new ChatCompletionRequest(
     Messages: [new LlmMessage(LlmRole.User, "Hello!")],
-    Model: "gpt-4.1-nano");
+    Model: "gpt-4.1-mini");
 
 var response = await client.GetChatCompletionAsync(request);
 Console.WriteLine(response.Content);

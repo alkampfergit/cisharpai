@@ -46,7 +46,7 @@ public sealed class OpenAiToolCallingIntegrationTests
 
     // --- Single Tool Call ---
 
-    [TestCase("gpt-4.1-nano")]
+    [TestCase("gpt-4.1-mini")]
     public async Task ToolCalling_SingleToolCall_ReturnsToolCall(string model)
     {
         var client = CreateClient();
@@ -75,7 +75,7 @@ public sealed class OpenAiToolCallingIntegrationTests
 
     // --- ToolChoice.Required Forces Tool Call ---
 
-    [TestCase("gpt-4.1-nano")]
+    [TestCase("gpt-4.1-mini")]
     public async Task ToolCalling_ToolChoiceRequired_ForcesToolCall(string model)
     {
         var client = CreateClient();
@@ -100,7 +100,7 @@ public sealed class OpenAiToolCallingIntegrationTests
 
     // --- ToolChoice.None Produces Text Response ---
 
-    [TestCase("gpt-4.1-nano")]
+    [TestCase("gpt-4.1-mini")]
     public async Task ToolCalling_ToolChoiceNone_ReturnsTextResponse(string model)
     {
         var client = CreateClient();
@@ -125,7 +125,7 @@ public sealed class OpenAiToolCallingIntegrationTests
 
     // --- Full Multi-turn Tool Call Loop ---
 
-    [TestCase("gpt-4.1-nano")]
+    [TestCase("gpt-4.1-mini")]
     public async Task ToolCalling_MultiTurnLoop_ReturnsTextResponseAfterToolResult(string model)
     {
         var client = CreateClient();

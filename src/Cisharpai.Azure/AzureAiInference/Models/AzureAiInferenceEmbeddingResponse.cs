@@ -1,8 +1,10 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace Cisharpai.Azure.AzureAiInference.Models;
 
+[SuppressMessage("Naming", "CA1720:Identifier contains type name", Justification = "Property name mirrors the Azure AI Inference API JSON schema")]
 public sealed class AzureAiInferenceEmbeddingData
 {
     public int Index { get; set; }
@@ -24,6 +26,7 @@ public sealed class AzureAiInferenceEmbeddingUsage
     public int TotalTokens { get; set; }
 }
 
+[SuppressMessage("Naming", "CA1720:Identifier contains type name", Justification = "Property name mirrors the Azure AI Inference API JSON schema")]
 public sealed class AzureAiInferenceEmbeddingResponse
 {
     public string Id { get; set; } = string.Empty;

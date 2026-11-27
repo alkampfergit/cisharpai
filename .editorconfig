@@ -1,5 +1,22 @@
 root = true
 
-# Test files: suppress NUnit2045 (Assert.Multiple) — not enforced in this project
+# Test files
 [**/*Tests.cs]
+# NUnit convention uses underscores in test method names (Method_Scenario_Expected)
+dotnet_diagnostic.CA1707.severity = none
+# Assert.Multiple not enforced in this project
 dotnet_diagnostic.NUnit2045.severity = none
+
+# Test helper/base/fixture files in test projects
+[**/Cisharpai.Tests/**/*.cs]
+dotnet_diagnostic.CA1707.severity = none
+# Random in tests is not security-sensitive
+dotnet_diagnostic.CA5394.severity = none
+
+[**/Cisharpai.Integration.Tests/**/*.cs]
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.CA5394.severity = none
+
+# Console demo app uses locale-dependent display for user-facing output
+[**/Cisharp.Console/**/*.cs]
+dotnet_diagnostic.CA1305.severity = none

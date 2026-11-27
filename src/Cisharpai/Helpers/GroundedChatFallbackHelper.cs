@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
@@ -153,7 +154,7 @@ public static partial class GroundedChatFallbackHelper
                 ? JsonSerializer.Serialize(doc.Data!)
                 : doc.Text;
 
-            sb.AppendLine($"[Document {i}: {docId}]");
+            sb.AppendLine(CultureInfo.InvariantCulture, $"[Document {i}: {docId}]");
             sb.AppendLine(content);
             sb.AppendLine();
         }

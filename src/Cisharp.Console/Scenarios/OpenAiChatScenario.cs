@@ -18,7 +18,7 @@ public sealed class OpenAiChatScenario : IScenario
         var baseUrl = ScenarioHelpers.GetEnv(DotEnv.OpenAiBaseUrl);
         var organization = ScenarioHelpers.GetEnv(DotEnv.OpenAiOrganization);
 
-        var model = await AnsiConsole.AskAsync("Model?", "gpt-4.1-nano", cancellationToken);
+        var model = await AnsiConsole.AskAsync("Model?", "gpt-4.1-mini", cancellationToken);
         var prompt = await AnsiConsole.AskAsync("User prompt?", "Write a short haiku about winter.", cancellationToken);
 
         var services = ScenarioHelpers.CreateServiceCollection();

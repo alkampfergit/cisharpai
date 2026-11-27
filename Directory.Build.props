@@ -1,5 +1,11 @@
 <Project>
 
+  <!-- Target frameworks, declared once. Projects reference these instead of hard-coding TFMs. -->
+  <PropertyGroup>
+    <LatestTargetFramework>net10.0</LatestTargetFramework>
+    <LibraryTargetFrameworks>net8.0;$(LatestTargetFramework)</LibraryTargetFrameworks>
+  </PropertyGroup>
+
   <PropertyGroup>
     <!-- Packing defaults -->
     <IsPackable>true</IsPackable>
@@ -33,8 +39,25 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.SourceLink.GitHub" PrivateAssets="All" />
-    <!-- Same Roslyn rules SonarCloud applies to C#: violations show up as warnings in a local build. -->
-    <PackageReference Include="SonarAnalyzer.CSharp" PrivateAssets="All" IncludeAssets="runtime;build;native;contentfiles;analyzers" />
+  </ItemGroup>
+
+  <!--
+    Build-time sensors. Every project inherits these, so a defect the compiler or the
+    analyzers can see stops the build instead of reaching review. Do not weaken them and do
+    not add NoWarn / WarningsNotAsErrors to get a build through: fix the code the diagnostic
+    points at. .claude/skills/speckit-local-full/scripts/verify.ps1 checks that these properties keep these values.
+  -->
+  <PropertyGroup>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Nullable>enable</Nullable>
+    <AnalysisLevel>10.0-recommended</AnalysisLevel>
+    <AnalysisLevelSecurity>10.0-all</AnalysisLevelSecurity>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+
+  <!-- APIs the code must not call, each with its replacement (build error RS0030). -->
+  <ItemGroup>
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)BannedSymbols.txt" />
   </ItemGroup>
 
 </Project>

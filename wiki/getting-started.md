@@ -82,7 +82,7 @@ var client = provider.GetRequiredService<IChatCompletionClient>();
 
 var request = new ChatCompletionRequest(
     Messages: [new LlmMessage(LlmRole.User, "Say hello in one sentence.")],
-    Model: "gpt-4.1-nano",       // optional if DefaultModel is set
+    Model: "gpt-4.1-mini",       // optional if DefaultModel is set
     Temperature: 0.2,
     MaxTokens: 100);
 

@@ -45,7 +45,7 @@ public sealed class OpenAiStreamingIntegrationTests
 
         var request = new ChatCompletionRequest(
             Messages: [new LlmMessage(LlmRole.User, "Say hello in one word")],
-            Model: "gpt-4.1-nano",
+            Model: "gpt-4.1-mini",
             MaxTokens: 20);
 
         var chunks = new List<ChatCompletionChunk>();
@@ -71,7 +71,7 @@ public sealed class OpenAiStreamingIntegrationTests
 
         var request = new ChatCompletionRequest(
             Messages: [new LlmMessage(LlmRole.User, "Say hi")],
-            Model: "gpt-4.1-nano",
+            Model: "gpt-4.1-mini",
             MaxTokens: 10);
 
         var chunks = new List<ChatCompletionChunk>();
@@ -92,7 +92,7 @@ public sealed class OpenAiStreamingIntegrationTests
 
         var request = new ChatCompletionRequest(
             Messages: [new LlmMessage(LlmRole.User, "Count from 1 to 5, just the numbers separated by spaces")],
-            Model: "gpt-4.1-nano",
+            Model: "gpt-4.1-mini",
             MaxTokens: 30);
 
         var chunks = new List<ChatCompletionChunk>();

@@ -123,7 +123,7 @@ public sealed class CisharpaiClientFactoryTests
     }
 
     [Test]
-    public void Factory_IsThreadSafe_ConcurrentCalls()
+    public async Task Factory_IsThreadSafe_ConcurrentCalls()
     {
         var services = new ServiceCollection();
         services.AddCisharpaiClientFactory()
@@ -139,9 +139,9 @@ public sealed class CisharpaiClientFactoryTests
                 return factory.CreateChatCompletionClient(config);
             })).ToArray();
 
-        Task.WaitAll(tasks);
+        var results = await Task.WhenAll(tasks);
 
-        Assert.That(tasks.All(t => t.Result.IsSuccess), Is.True);
+        Assert.That(results.All(r => r.IsSuccess), Is.True);
     }
 
     [Test]

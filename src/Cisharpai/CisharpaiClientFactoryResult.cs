@@ -1,5 +1,8 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Cisharpai;
 
+[SuppressMessage("Design", "CA1000:Do not declare static members on generic types", Justification = "Factory methods for generic result type")]
 public sealed record CisharpaiClientFactoryResult<T> where T : class
 {
     public bool IsSuccess { get; private init; }

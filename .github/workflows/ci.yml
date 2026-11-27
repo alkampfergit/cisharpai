@@ -88,10 +88,13 @@ jobs:
           AZURE_INFERENCE_TEST_EMBEDDING_MODEL: ${{ secrets.AZURE_INFERENCE_TEST_EMBEDDING_MODEL }}
           COHERE_TEST_API_KEY: ${{ secrets.COHERE_TEST_API_KEY }}
         run: |
-          dotnet test src/Cisharpai.Integration.Tests/Cisharpai.Integration.Tests.csproj `
-            --configuration Release `
-            --logger "trx;LogFilePrefix=integration-tests" `
-            --results-directory artifacts/TestResults/integration
+          $testArgs = @(
+            'src/Cisharpai.Integration.Tests/Cisharpai.Integration.Tests.csproj'
+            '--configuration', 'Release'
+            '--logger', 'trx;LogFilePrefix=integration-tests'
+            '--results-directory', 'artifacts/TestResults/integration'
+          )
+          dotnet test @testArgs
 
       - name: Flatten all TRX files
         shell: bash
@@ -202,15 +205,18 @@ jobs:
           $assemblyInformationalVersion = $gv.InformationalVersion
 
           # Begin SonarCloud analysis
-          .sonar/scanner/dotnet-sonarscanner begin `
-            /k:"alkampfergit_cisharpai" `
-            /o:"alkampfergit-github" `
-            /d:sonar.token="$env:SONAR_TOKEN" `
-            /d:sonar.host.url="https://sonarcloud.io" `
-            /d:sonar.cs.vstest.reportsPaths="artifacts/TestResults/**/*.trx" `
-            /d:sonar.cs.opencover.reportsPaths="artifacts/TestResults/**/coverage.opencover.xml" `
-            /d:sonar.coverage.exclusions="**/*Tests*/**,**/Cisharp.Console/**,.agents/**" `
-            /d:sonar.cpd.exclusions="**/*Tests*/**,**/Cisharp.Console/**,**/Models/**"
+          $scannerArgs = @(
+            'begin'
+            '/k:alkampfergit_cisharpai'
+            '/o:alkampfergit-github'
+            "/d:sonar.token=$env:SONAR_TOKEN"
+            '/d:sonar.host.url=https://sonarcloud.io'
+            '/d:sonar.cs.vstest.reportsPaths=artifacts/TestResults/**/*.trx'
+            '/d:sonar.cs.opencover.reportsPaths=artifacts/TestResults/**/coverage.opencover.xml'
+            '/d:sonar.coverage.exclusions=**/*Tests*/**,**/Cisharp.Console/**,.agents/**'
+            '/d:sonar.cpd.exclusions=**/*Tests*/**,**/Cisharp.Console/**,**/Models/**'
+          )
+          .sonar/scanner/dotnet-sonarscanner @scannerArgs
           if ($LASTEXITCODE -ne 0) { throw "SonarScanner begin failed" }
 
           # Restore
@@ -218,12 +224,15 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Restore failed" }
 
           # Build
-          dotnet build Cisharpai.sln `
-            --configuration Release `
-            --no-restore `
-            /p:AssemblyVersion=$assemblyVer `
-            /p:FileVersion=$assemblyFileVersion `
-            /p:InformationalVersion=$assemblyInformationalVersion
+          $buildArgs = @(
+            'Cisharpai.sln'
+            '--configuration', 'Release'
+            '--no-restore'
+            "/p:AssemblyVersion=$assemblyVer"
+            "/p:FileVersion=$assemblyFileVersion"
+            "/p:InformationalVersion=$assemblyInformationalVersion"
+          )
+          dotnet build @buildArgs
           if ($LASTEXITCODE -ne 0) { throw "Build failed" }
 
           # Test with coverage (unit tests only)
@@ -233,14 +242,17 @@ jobs:
             $resultsDir = "artifacts/TestResults/$tfm"
             New-Item -ItemType Directory -Force -Path $resultsDir | Out-Null
 
-            dotnet test src/Cisharpai.Tests/Cisharpai.Tests.csproj `
-              --configuration Release `
-              --no-build `
-              -f $tfm `
-              --logger "trx;LogFilePrefix=Cisharpai.Tests-$tfm" `
-              --results-directory $resultsDir `
-              --collect:"XPlat Code Coverage" `
-              -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
+            $testArgs = @(
+              'src/Cisharpai.Tests/Cisharpai.Tests.csproj'
+              '--configuration', 'Release'
+              '--no-build'
+              '-f', $tfm
+              '--logger', "trx;LogFilePrefix=Cisharpai.Tests-$tfm"
+              '--results-directory', $resultsDir
+              '--collect:XPlat Code Coverage'
+              '--', 'DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover'
+            )
+            dotnet test @testArgs
             if ($LASTEXITCODE -ne 0) { throw "Tests failed for $tfm" }
           }
 

@@ -148,7 +148,7 @@ public sealed class ToolCallingScenario : IScenario
                 var apiKey = ScenarioHelpers.RequireEnv(DotEnv.OpenAiApiKey);
                 services.AddOpenAiClient(options => { options.ApiKey = apiKey; });
                 var sp = services.BuildServiceProvider();
-                return (sp.GetRequiredService<IChatCompletionClient>(), "gpt-4.1-nano");
+                return (sp.GetRequiredService<IChatCompletionClient>(), "gpt-4.1-mini");
             }
             case "Anthropic":
             {
